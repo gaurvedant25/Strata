@@ -6,6 +6,9 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   // relative base so a build also works from a sub-path (GitHub Pages project sites)
   base: "./",
+  // honour PORT so the harness can assign a free port instead of colliding on 5173
+  server: { port: Number(process.env.PORT) || 5173 },
+  preview: { port: Number(process.env.PORT) || 4173 },
   plugins: [
     react(),
     tailwindcss(),
