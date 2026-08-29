@@ -109,7 +109,7 @@ export function Sheet({
         onClick={onClose}
         className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
       />
-      <div className="animate-rise relative flex max-h-[88vh] flex-col rounded-t-3xl border-t border-line bg-panel">
+      <div className="animate-rise relative mx-auto flex max-h-[88vh] w-full max-w-lg flex-col rounded-t-3xl border-t border-line bg-panel">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="text-lg font-semibold">{title}</h2>
           <button

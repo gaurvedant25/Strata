@@ -158,7 +158,7 @@ export function Settings() {
       </p>
 
       {msg && (
-        <div className="fixed inset-x-4 bottom-28 z-50 rounded-xl border border-line bg-panel2 px-4 py-3 text-center text-[14px] shadow-xl">
+        <div className="fixed inset-x-0 bottom-28 z-50 mx-auto max-w-lg rounded-xl border border-line bg-panel2 px-4 py-3 text-center text-[14px] shadow-xl">
           {msg}
           <button className="ml-3 text-accent" onClick={() => setMsg(null)}>
             OK

@@ -32,13 +32,22 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* iOS auto-zooms any input rendered under 16px */
-input,
-select,
-textarea,
-button {
-  font-size: 16px;
-  font-family: inherit;
+/* iOS auto-zooms any *form field* rendered under 16px. Buttons are exempt from
+   that behaviour, so they must not be pinned here — and this has to sit in a
+   layer, or it would outrank every Tailwind text-size utility. */
+@layer base {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
 }
 
 input[type="number"]::-webkit-outer-spin-button,

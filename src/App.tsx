@@ -47,15 +47,17 @@ export default function App() {
       <RestTimer />
 
       {inWorkout && tab !== "home" && s.restUntil == null && (
-        <button
-          onClick={() => setTab("home")}
-          className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 flex items-center justify-between rounded-2xl border border-accent/40 bg-accent/15 px-4 py-3 backdrop-blur-xl"
-        >
-          <span className="text-[14px] font-semibold text-accent">Workout in progress</span>
-          <span className="text-[13px] tabular-nums text-accent/80">
-            {fmtDuration(s.now - s.active!.startedAt)} →
-          </span>
-        </button>
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 mx-auto max-w-lg px-3">
+          <button
+            onClick={() => setTab("home")}
+            className="flex w-full items-center justify-between rounded-2xl border border-accent/40 bg-accent/15 px-4 py-3 backdrop-blur-xl"
+          >
+            <span className="text-[14px] font-semibold text-accent">Workout in progress</span>
+            <span className="text-[13px] tabular-nums text-accent/80">
+              {fmtDuration(s.now - s.active!.startedAt)} →
+            </span>
+          </button>
+        </div>
       )}
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">

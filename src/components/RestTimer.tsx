@@ -10,7 +10,8 @@ export function RestTimer() {
   const pct = s.restTotal > 0 ? Math.max(0, Math.min(1, left / s.restTotal)) : 0;
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 px-3">
+    // inset-x-0 + mx-auto keeps it tied to the app column instead of the whole window
+    <div className="pointer-events-auto fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 mx-auto max-w-lg px-3">
       <div className="animate-rise overflow-hidden rounded-2xl border border-line bg-panel2/95 shadow-2xl shadow-black/60 backdrop-blur-xl">
         <div className="h-1 w-full bg-line">
           <div
