@@ -1,0 +1,43 @@
+{
+  "pkg": "gym",
+  "globalName": "GymUI",
+  "shape": "package",
+  "srcDir": "src",
+  "tsconfig": "tsconfig.app.json",
+  "buildCmd": "npm run build && node .design-sync/prep.mjs",
+  "cssEntry": ".design-sync/.cache/ds-styles.css",
+  "componentSrcMap": {
+    "Button": "src/components/ui.tsx",
+    "Card": "src/components/ui.tsx",
+    "DashCard": "src/components/ui.tsx",
+    "IconButton": "src/components/ui.tsx",
+    "Screen": "src/components/ui.tsx",
+    "Sheet": "src/components/ui.tsx",
+    "Field": "src/components/ui.tsx",
+    "Empty": "src/components/ui.tsx",
+    "Stat": "src/components/ui.tsx",
+    "BodyMap": "src/components/BodyMap.tsx",
+    "Heatmap": "src/components/Heatmap.tsx"
+  },
+  "overrides": {
+    "Sheet": {
+      "cardMode": "single",
+      "primaryStory": "LogBodyWeight",
+      "viewport": "420x520"
+    }
+  },
+  "dtsPropsFor": {
+    "Button": "children: React.ReactNode; onClick?: () => void; variant?: \"solid\" | \"ghost\" | \"outline\" | \"danger\"; size?: \"sm\" | \"md\" | \"lg\"; className?: string; disabled?: boolean; type?: \"button\" | \"submit\";",
+    "Card": "children: React.ReactNode; className?: string;",
+    "DashCard": "children: React.ReactNode; className?: string; onClick?: () => void;",
+    "IconButton": "children: React.ReactNode; onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; size?: number; tone?: \"muted\" | \"light\"; className?: string;",
+    "Screen": "title: string; subtitle?: string; right?: React.ReactNode; children: React.ReactNode;",
+    "Sheet": "open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode;",
+    "Field": "label: string; hint?: string; children: React.ReactNode;",
+    "Empty": "icon: string; title: string; body: string; action?: React.ReactNode;",
+    "Stat": "label: string; value: string; sub?: string;",
+    "BodyMap": "scores: Partial<Record<\"shoulders\" | \"chest\" | \"arms\" | \"legs\", { ratio: number; score: number; tier: \"Beginner\" | \"Novice\" | \"Intermediate\" | \"Advanced\" | \"Elite\"; best1rm: number; lift: string }>>; selected: \"shoulders\" | \"chest\" | \"arms\" | \"legs\" | null; onSelect: (m: \"shoulders\" | \"chest\" | \"arms\" | \"legs\") => void;",
+    "Heatmap": "activeDates: Set<string>; weeks?: number;"
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}
