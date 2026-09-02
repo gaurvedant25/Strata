@@ -12,7 +12,7 @@ const EDGE = "rgba(0,0,0,.55)";
 /** Half-thickness of the body, in px of the transformed space. */
 const DEPTH = 18;
 /** Silhouette copies stacked through the depth to give the figure volume. */
-const LAYERS = 14;
+const LAYERS = 0; // laminate disabled: edge-on it reads as a comb, not a body
 
 function Figure({
   gender,
