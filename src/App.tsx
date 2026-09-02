@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { CalendarIcon, ChartIcon, GridIcon } from "./components/icons";
 import { fmtDuration } from "./lib/util";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
@@ -65,9 +65,26 @@ function GearIcon({ className, size = 23 }: { className?: string; size?: number 
 export default function App() {
   const s = useStore();
   const [tab, setTab] = useState<Tab>("home");
+  // Whether the full-screen logger is the thing on top right now. Starting or
+  // resuming a session opens it; navigating away (nav taps, the header back
+  // button) only minimizes it — the session keeps running underneath and a
+  // "Workout in progress" pill is how you get back in.
+  const [viewLogger, setViewLogger] = useState(false);
+  const prevActiveId = useRef<string | null>(null);
+
+  const inWorkout = !!s.active;
+
+  // open the logger the moment a session starts or is resumed; close it (back
+  // to whatever tab was showing) the moment it's finished or discarded
+  useEffect(() => {
+    const prev = prevActiveId.current;
+    prevActiveId.current = s.activeSessionId;
+    if (prev == null && s.activeSessionId != null) setViewLogger(true);
+    if (prev != null && s.activeSessionId == null) setViewLogger(false);
+  }, [s.activeSessionId]);
 
   // each tab should open at its own top, not inherit the last tab's scroll
-  useEffect(() => window.scrollTo(0, 0), [tab]);
+  useEffect(() => window.scrollTo(0, 0), [tab, viewLogger]);
 
   if (!s.ready) {
     return (
@@ -77,20 +94,31 @@ export default function App() {
     );
   }
 
-  const inWorkout = !!s.active;
+  const showLogger = inWorkout && viewLogger;
+
+  function goTab(id: Tab) {
+    setTab(id);
+    setViewLogger(false);
+  }
 
   return (
     <div className="mx-auto min-h-full max-w-lg">
-      {tab === "home" && (inWorkout ? <ActiveWorkout /> : <Home go={setTab} />)}
-      {tab === "routines" && <Routines />}
-      {tab === "history" && <History />}
-      {tab === "progress" && <Progress />}
-      {tab === "settings" && <Settings />}
+      {showLogger ? (
+        <ActiveWorkout onBack={() => setViewLogger(false)} />
+      ) : (
+        <>
+          {tab === "home" && <Home go={goTab} />}
+          {tab === "routines" && <Routines />}
+          {tab === "history" && <History />}
+          {tab === "progress" && <Progress />}
+          {tab === "settings" && <Settings />}
+        </>
+      )}
 
-      {inWorkout && tab !== "home" && (
+      {inWorkout && !showLogger && (
         <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 mx-auto max-w-lg px-3">
           <button
-            onClick={() => setTab("home")}
+            onClick={() => setViewLogger(true)}
             className="flex w-full items-center justify-between rounded-2xl border border-line bg-panel/95 px-4 py-3 backdrop-blur-xl"
           >
             <span className="text-[14px] font-semibold text-white">Workout in progress</span>
@@ -104,12 +132,12 @@ export default function App() {
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg">
           {TABS.map(({ id, label, Icon }) => {
-            const active = tab === id;
+            const active = !showLogger && tab === id;
             return (
               <button
                 key={id}
-                aria-label={id === "home" && inWorkout ? "Active workout" : label}
-                onClick={() => setTab(id)}
+                aria-label={label}
+                onClick={() => goTab(id)}
                 className="flex flex-1 items-center justify-center py-4"
               >
                 <Icon className={active ? "text-white" : "text-muted"} />

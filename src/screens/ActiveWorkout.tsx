@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { ExercisePicker } from "../components/ExercisePicker";
+import { ChevronRight } from "../components/icons";
 import { Button, Card, Sheet } from "../components/ui";
 import { e1rm, lastPerformance, personalRecords, sessionSetCount, sessionVolume } from "../lib/stats";
 import { fmtDuration, num } from "../lib/util";
 import { useStore } from "../store";
 import type { SessionEntry, SetLog } from "../types";
 
-export function ActiveWorkout() {
+export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   const s = useStore();
   const session = s.active!;
   const [picker, setPicker] = useState(false);
@@ -27,7 +28,14 @@ export function ActiveWorkout() {
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-20 border-b border-line/70 bg-ink/85 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onBack}
+            aria-label="Back to dashboard"
+            className="grid size-9 shrink-0 place-items-center rounded-full bg-panel2 text-muted active:bg-line"
+          >
+            <ChevronRight className="rotate-180" size={18} />
+          </button>
           <div className="min-w-0 flex-1">
             <input
               value={session.name}
