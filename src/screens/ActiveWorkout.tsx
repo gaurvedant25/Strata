@@ -177,9 +177,7 @@ function EntryCard({
   );
 
   function toggleDone(set: SetLog) {
-    const nowDone = !set.done;
-    s.updateSet(entry.id, set.id, { done: nowDone });
-    if (nowDone && !set.warmup && s.settings.restAutoStart) s.startRest();
+    s.updateSet(entry.id, set.id, { done: !set.done });
   }
 
   return (
@@ -275,9 +273,6 @@ function EntryCard({
           disabled={!entry.sets.length}
         >
           − Set
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => s.startRest()}>
-          Rest
         </Button>
       </div>
     </Card>

@@ -4,7 +4,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -59,57 +58,19 @@ function boot() {
   return bootstrap;
 }
 
-function beep() {
-  try {
-    const AC =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    const ctx = new AC();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.65);
-    setTimeout(() => void ctx.close(), 1200);
-  } catch {
-    /* audio is a nicety, never fatal */
-  }
-}
-
 function useProvideStore() {
   const [s, setS] = useState<State>(empty);
-  const [restUntil, setRestUntil] = useState<number | null>(null);
-  const [restTotal, setRestTotal] = useState(0);
   const [now, setNow] = useState(Date.now());
-  const fired = useRef(false);
 
   useEffect(() => {
     void boot().then((data) => setS({ ...data, ready: true }));
   }, []);
 
-  // one ticker for the whole app: rest countdown + live session duration
+  // drives live session duration and relative timestamps across the app
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
-
-  useEffect(() => {
-    if (restUntil == null) return;
-    if (now < restUntil) {
-      fired.current = false;
-      return;
-    }
-    if (fired.current) return;
-    fired.current = true;
-    if (s.settings.vibrate) navigator.vibrate?.([200, 100, 200]);
-    if (s.settings.sound) beep();
-  }, [now, restUntil, s.settings.vibrate, s.settings.sound]);
 
   const reload = useCallback(async () => {
     const data = await store.loadAll();
@@ -152,25 +113,7 @@ function useProvideStore() {
     now,
     active,
     exerciseById,
-    restUntil,
-    restTotal,
-    restLeft: restUntil == null ? 0 : Math.max(0, (restUntil - now) / 1000),
     reload,
-
-    startRest(seconds?: number) {
-      const secs = seconds ?? s.settings.restSeconds;
-      setRestTotal(secs);
-      setRestUntil(Date.now() + secs * 1000);
-      fired.current = false;
-    },
-    addRest(seconds: number) {
-      setRestUntil((u) => (u == null ? Date.now() + seconds * 1000 : u + seconds * 1000));
-      setRestTotal((t) => Math.max(0, t + seconds));
-      fired.current = false;
-    },
-    stopRest() {
-      setRestUntil(null);
-    },
 
     async startSession(routine?: Routine) {
       const id = uid();
@@ -209,7 +152,6 @@ function useProvideStore() {
       await writeSession(next);
       await store.put.activeSessionId(null);
       setS((p) => ({ ...p, activeSessionId: null }));
-      setRestUntil(null);
     },
 
     async discardSession() {
@@ -222,7 +164,6 @@ function useProvideStore() {
         sessions: p.sessions.filter((x) => x.id !== cur.id),
         activeSessionId: null,
       }));
-      setRestUntil(null);
     },
 
     async resumeSession(id: string) {

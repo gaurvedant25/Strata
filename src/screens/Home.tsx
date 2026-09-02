@@ -161,20 +161,16 @@ function useRoutineMeta(routine: Routine) {
   }, [s.sessions, s.now, routine.id, routine.items.length]);
 }
 
+// Tapping the card (or its tune icon) only opens Routines — starting a session
+// from a routine happens there, not straight off the dashboard.
 function RoutineCard({ routine, n, go }: { routine: Routine; n: number; go: (t: Tab) => void }) {
-  const s = useStore();
   const { progress, label } = useRoutineMeta(routine);
 
   return (
-    <DashCard className="relative p-4" onClick={() => void s.startSession(routine)}>
+    <DashCard className="relative p-4" onClick={() => go("routines")}>
       <div className="flex items-start justify-between">
         <Ring n={n} progress={progress} />
-        <IconButton
-          size={30}
-          onClick={() => {
-            go("routines");
-          }}
-        >
+        <IconButton size={30} onClick={() => go("routines")}>
           <Tune size={14} />
         </IconButton>
       </div>
@@ -195,14 +191,14 @@ function RoutineRow({
   go: (t: Tab) => void;
   className?: string;
 }) {
-  const s = useStore();
   const { progress, label } = useRoutineMeta(routine);
 
   // a div, not a button: it needs to contain the real IconButton below it, and
-  // a <button> can't legally nest another interactive control
+  // a <button> can't legally nest another interactive control. Tapping the row
+  // (or its tune icon) only opens Routines — same reasoning as RoutineCard above.
   return (
     <div
-      onClick={() => void s.startSession(routine)}
+      onClick={() => go("routines")}
       className={`flex w-full cursor-pointer items-center gap-3 border-t border-line pt-4 text-left ${className ?? ""}`}
     >
       <Ring n={n} progress={progress} />
@@ -210,12 +206,7 @@ function RoutineRow({
         <p className="truncate text-[15px] font-semibold leading-tight">{routine.name}</p>
         <p className="mt-0.5 truncate text-[12px] text-muted">{label}</p>
       </div>
-      <IconButton
-        size={30}
-        onClick={() => {
-          go("routines");
-        }}
-      >
+      <IconButton size={30} onClick={() => go("routines")}>
         <Tune size={14} />
       </IconButton>
     </div>

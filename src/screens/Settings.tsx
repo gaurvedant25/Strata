@@ -47,7 +47,7 @@ export function Settings() {
 
   return (
     <Screen title="Settings">
-      <Section title="Units & timer">
+      <Section title="Units">
         <Row label="Weight unit">
           <div className="flex gap-1.5">
             {(["kg", "lb"] as Unit[]).map((u) => (
@@ -63,43 +63,6 @@ export function Settings() {
             ))}
           </div>
         </Row>
-        <Row label="Default rest" hint="Starts automatically when you tick a working set.">
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() =>
-                void s.saveSettings({ restSeconds: Math.max(15, s.settings.restSeconds - 15) })
-              }
-              className="size-9 rounded-lg bg-panel2 text-muted"
-            >
-              −
-            </button>
-            <span className="w-16 text-center text-[15px] font-semibold tabular-nums">
-              {Math.floor(s.settings.restSeconds / 60)}:
-              {String(s.settings.restSeconds % 60).padStart(2, "0")}
-            </span>
-            <button
-              onClick={() => void s.saveSettings({ restSeconds: s.settings.restSeconds + 15 })}
-              className="size-9 rounded-lg bg-panel2 text-muted"
-            >
-              +
-            </button>
-          </div>
-        </Row>
-        <Toggle
-          label="Auto-start rest timer"
-          value={s.settings.restAutoStart}
-          onChange={(v) => void s.saveSettings({ restAutoStart: v })}
-        />
-        <Toggle
-          label="Vibrate when rest ends"
-          value={s.settings.vibrate}
-          onChange={(v) => void s.saveSettings({ vibrate: v })}
-        />
-        <Toggle
-          label="Beep when rest ends"
-          value={s.settings.sound}
-          onChange={(v) => void s.saveSettings({ sound: v })}
-        />
       </Section>
 
       <Section title="Exercises">
@@ -261,35 +224,5 @@ function Row({
       </div>
       {children}
     </div>
-  );
-}
-
-function Toggle({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!value)}
-      className="flex w-full items-center justify-between border-b border-line px-4 py-3.5 text-left last:border-b-0 active:bg-panel2"
-    >
-      <span className="text-[15px]">{label}</span>
-      <span
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-          value ? "bg-accent" : "bg-line"
-        }`}
-      >
-        <span
-          className={`absolute top-1 size-5 rounded-full bg-white transition-all ${
-            value ? "left-6" : "left-1"
-          }`}
-        />
-      </span>
-    </button>
   );
 }

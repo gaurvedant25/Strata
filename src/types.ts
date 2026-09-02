@@ -14,8 +14,6 @@ export type RoutineItem = {
   exerciseId: string;
   sets: number;
   reps: number;
-  /** rest override in seconds */
-  rest?: number;
 };
 
 export type Routine = {
@@ -63,16 +61,8 @@ export type BodyWeight = {
 
 export type Settings = {
   unit: Unit;
-  restSeconds: number;
-  restAutoStart: boolean;
-  vibrate: boolean;
-  sound: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
   unit: "kg",
-  restSeconds: 120,
-  restAutoStart: true,
-  vibrate: true,
-  sound: true,
 };

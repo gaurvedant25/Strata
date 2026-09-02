@@ -1,6 +1,5 @@
 import { useEffect, useState, type ComponentType } from "react";
 import { CalendarIcon, ChartIcon, GridIcon } from "./components/icons";
-import { RestTimer } from "./components/RestTimer";
 import { fmtDuration } from "./lib/util";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { History } from "./screens/History";
@@ -88,9 +87,7 @@ export default function App() {
       {tab === "progress" && <Progress />}
       {tab === "settings" && <Settings />}
 
-      <RestTimer />
-
-      {inWorkout && tab !== "home" && s.restUntil == null && (
+      {inWorkout && tab !== "home" && (
         <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 mx-auto max-w-lg px-3">
           <button
             onClick={() => setTab("home")}
