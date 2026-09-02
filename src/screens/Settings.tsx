@@ -3,7 +3,7 @@ import { Card, Screen, Sheet, inputCls } from "../components/ui";
 import { exportBackup, importBackup, wipe } from "../lib/db";
 import { todayKey } from "../lib/util";
 import { useStore } from "../store";
-import type { Unit } from "../types";
+import type { Gender, Unit } from "../types";
 
 export function Settings() {
   const s = useStore();
@@ -59,6 +59,21 @@ export function Settings() {
                 }`}
               >
                 {u}
+              </button>
+            ))}
+          </div>
+        </Row>
+        <Row label="Gender" hint="Strength standards on the Strength page differ by gender.">
+          <div className="flex gap-1.5">
+            {(["male", "female"] as Gender[]).map((g) => (
+              <button
+                key={g}
+                onClick={() => void s.saveSettings({ gender: g })}
+                className={`w-20 rounded-lg py-2 text-[14px] font-semibold capitalize ${
+                  s.settings.gender === g ? "bg-accent text-ink" : "bg-panel2 text-muted"
+                }`}
+              >
+                {g}
               </button>
             ))}
           </div>

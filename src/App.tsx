@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
-import { CalendarIcon, ChartIcon, GridIcon } from "./components/icons";
+import { CalendarIcon, ChartIcon } from "./components/icons";
 import { fmtDuration } from "./lib/util";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { History } from "./screens/History";
@@ -15,12 +15,31 @@ export type Tab = "home" | "routines" | "history" | "progress" | "settings";
 type IconT = ComponentType<{ className?: string; size?: number }>;
 
 const TABS: { id: Tab; label: string; Icon: IconT }[] = [
-  { id: "home", label: "Dashboard", Icon: GridIcon },
+  { id: "home", label: "Strength", Icon: BodyIcon },
   { id: "routines", label: "Routines", Icon: ListIcon },
   { id: "history", label: "History", Icon: CalendarIcon },
   { id: "progress", label: "Progress", Icon: ChartIcon },
   { id: "settings", label: "Settings", Icon: GearIcon },
 ];
+
+function BodyIcon({ className, size = 23 }: { className?: string; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="4.3" r="2.3" />
+      <path d="M12 8.2v6.3M7.5 10.2 12 8.2l4.5 2M8.3 21l1.9-6.5h3.6L15.7 21M9 14.5l-2.2 2.2M15 14.5l2.2 2.2" />
+    </svg>
+  );
+}
 
 function ListIcon({ className, size = 23 }: { className?: string; size?: number }) {
   return (

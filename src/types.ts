@@ -1,4 +1,5 @@
 export type Unit = "kg" | "lb";
+export type Gender = "male" | "female";
 
 export type Exercise = {
   id: string;
@@ -61,8 +62,11 @@ export type BodyWeight = {
 
 export type Settings = {
   unit: Unit;
+  /** drives which bodyweight-relative strength standards the body map scores against */
+  gender: Gender;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
   unit: "kg",
+  gender: "male",
 };
