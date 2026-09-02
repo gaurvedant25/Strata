@@ -22,7 +22,7 @@ const METRICS: { id: Metric; label: string }[] = [
   { id: "volume", label: "Volume" },
 ];
 
-const axis = { stroke: "#8b93a7", fontSize: 11 };
+const axis = { stroke: "#8e8e93", fontSize: 11 };
 
 export function Progress() {
   const s = useStore();
@@ -140,25 +140,25 @@ export function Progress() {
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 12, right: 16, left: -8, bottom: 4 }}>
-                  <CartesianGrid stroke="#262a35" vertical={false} />
+                  <CartesianGrid stroke="#29292c" vertical={false} />
                   <XAxis dataKey="x" tick={axis} tickLine={false} axisLine={false} minTickGap={24} />
                   <YAxis tick={axis} tickLine={false} axisLine={false} width={44} domain={["auto", "auto"]} />
                   <Tooltip
                     contentStyle={{
-                      background: "#12141a",
-                      border: "1px solid #262a35",
+                      background: "#161618",
+                      border: "1px solid #29292c",
                       borderRadius: 12,
                       fontSize: 13,
                     }}
-                    labelStyle={{ color: "#8b93a7" }}
+                    labelStyle={{ color: "#8e8e93" }}
                     formatter={(v) => [`${num(Number(v), 1)} ${unit}`, METRICS.find((m) => m.id === metric)!.label]}
                   />
                   <Line
                     type="monotone"
                     dataKey="value"
-                    stroke="#b8f130"
+                    stroke="#ffffff"
                     strokeWidth={2.5}
-                    dot={{ r: 3, fill: "#b8f130", strokeWidth: 0 }}
+                    dot={{ r: 3, fill: "#ffffff", strokeWidth: 0 }}
                     activeDot={{ r: 5 }}
                   />
                 </LineChart>
@@ -188,27 +188,27 @@ export function Progress() {
               <AreaChart data={bwData} margin={{ top: 10, right: 16, left: -8, bottom: 4 }}>
                 <defs>
                   <linearGradient id="bwFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#b8f130" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#b8f130" stopOpacity={0} />
+                    <stop offset="0%" stopColor="#ffffff" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="#262a35" vertical={false} />
+                <CartesianGrid stroke="#29292c" vertical={false} />
                 <XAxis dataKey="x" tick={axis} tickLine={false} axisLine={false} minTickGap={24} />
                 <YAxis tick={axis} tickLine={false} axisLine={false} width={44} domain={["auto", "auto"]} />
                 <Tooltip
                   contentStyle={{
-                    background: "#12141a",
-                    border: "1px solid #262a35",
+                    background: "#161618",
+                    border: "1px solid #29292c",
                     borderRadius: 12,
                     fontSize: 13,
                   }}
-                  labelStyle={{ color: "#8b93a7" }}
+                  labelStyle={{ color: "#8e8e93" }}
                   formatter={(v) => [`${num(Number(v))} ${unit}`, "Body weight"]}
                 />
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#b8f130"
+                  stroke="#ffffff"
                   strokeWidth={2.5}
                   fill="url(#bwFill)"
                 />

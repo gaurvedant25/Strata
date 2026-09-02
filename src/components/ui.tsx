@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type MouseEvent, type ReactNode } from "react";
 import { cls } from "../lib/util";
 
 export function Button({
@@ -47,8 +47,63 @@ export function Button({
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cls("rounded-2xl bg-panel", className)}>{children}</div>;
+}
+
+/** The larger, border-less bento card used on the dashboard. Tappable as a whole when onClick is given. */
+export function DashCard({
+  children,
+  className,
+  onClick,
+}: {
+  children: ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
   return (
-    <div className={cls("rounded-2xl border border-line bg-panel", className)}>{children}</div>
+    <div
+      onClick={onClick}
+      className={cls(
+        "rounded-[28px] bg-panel",
+        onClick && "cursor-pointer transition-transform active:scale-[0.98]",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Small round button used for per-card affordances (tune, close, add). Stops propagation
+ *  by default so tapping one inside a tappable DashCard doesn't also fire the card's onClick. */
+export function IconButton({
+  children,
+  onClick,
+  size = 36,
+  tone = "muted",
+  className,
+}: {
+  children: ReactNode;
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  size?: number;
+  tone?: "muted" | "light";
+  className?: string;
+}) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.(e);
+      }}
+      style={{ width: size, height: size }}
+      className={cls(
+        "grid shrink-0 place-items-center rounded-full transition-colors active:scale-95",
+        tone === "light" ? "bg-accent text-ink" : "bg-panel2 text-muted",
+        className,
+      )}
+    >
+      {children}
+    </button>
   );
 }
 

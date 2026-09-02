@@ -1,6 +1,6 @@
 /**
  * Generates the PWA icon set with no image dependencies:
- * a lime rounded square with a dark dumbbell, rasterised by hand and
+ * a black rounded square with a white dumbbell, rasterised by hand and
  * written out as PNG (zlib is in node core).
  *
  *   node scripts/icons.mjs
@@ -13,8 +13,8 @@ import { fileURLToPath } from "node:url";
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "public");
 mkdirSync(OUT, { recursive: true });
 
-const BG = [184, 241, 48, 255]; // accent lime
-const FG = [8, 9, 12, 255]; // ink
+const BG = [10, 10, 11, 255]; // near-black panel
+const FG = [255, 255, 255, 255]; // white glyph
 
 const crcTable = (() => {
   const t = new Int32Array(256);
@@ -134,8 +134,8 @@ for (const [name, buf] of files) {
 }
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="123" fill="#b8f130"/>
-  <g fill="#08090c">
+  <rect width="512" height="512" rx="123" fill="#0a0a0b"/>
+  <g fill="#ffffff">
     <rect x="148" y="234" width="216" height="44" rx="10"/>
     <rect x="110" y="192" width="48" height="128" rx="12"/>
     <rect x="354" y="192" width="48" height="128" rx="12"/>

@@ -1,33 +1,31 @@
 import { useMemo, useState } from "react";
-import { Button, Card, Empty, Screen, Sheet, Stat, inputCls } from "../components/ui";
-import { currentStreak, sessionSetCount, sessionVolume } from "../lib/stats";
-import { fmtDate, fmtDuration, num, todayKey } from "../lib/util";
+import { Heatmap } from "../components/Heatmap";
+import { Plus, Ring, Tune } from "../components/icons";
+import { Button, DashCard, IconButton, Sheet, inputCls } from "../components/ui";
+import { sessionVolume } from "../lib/stats";
+import { fmtRelative, mostCommonWeekdayLabel, num, todayKey } from "../lib/util";
 import { useStore } from "../store";
 import type { Tab } from "../App";
+import type { Routine } from "../types";
+
+const WEEK_MS = 7 * 86400000;
 
 export function Home({ go }: { go: (t: Tab) => void }) {
   const s = useStore();
   const [bwOpen, setBwOpen] = useState(false);
   const [bw, setBw] = useState("");
-  const unit = s.settings.unit;
+  const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
 
   const done = useMemo(() => s.sessions.filter((x) => x.endedAt), [s.sessions]);
+  const activeDates = useMemo(() => new Set(done.map((x) => x.date)), [done]);
 
-  const week = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); // Monday
-    const from = start.getTime();
-    const list = done.filter((x) => x.startedAt >= from);
-    return {
-      count: list.length,
-      volume: list.reduce((t, x) => t + sessionVolume(x), 0),
-      sets: list.reduce((t, x) => t + sessionSetCount(x), 0),
-    };
-  }, [done]);
-
+  const pinned = s.routines.slice(0, 2);
   const latestBw = s.bodyweight[s.bodyweight.length - 1];
-  const streak = useMemo(() => currentStreak(done), [done]);
+
+  const weekVolume = useMemo(() => {
+    const from = s.now - WEEK_MS;
+    return done.filter((x) => x.startedAt >= from).reduce((t, x) => t + sessionVolume(x), 0);
+  }, [done, s.now]);
 
   async function saveBw() {
     const v = parseFloat(bw.replace(",", "."));
@@ -38,117 +36,91 @@ export function Home({ go }: { go: (t: Tab) => void }) {
   }
 
   return (
-    <Screen
-      title="Gym Log"
-      subtitle={new Date().toLocaleDateString(undefined, {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-      })}
-    >
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <Stat label="This week" value={String(week.count)} sub={week.count === 1 ? "workout" : "workouts"} />
-        <Stat label="Volume" value={num(week.volume, 0)} sub={unit} />
-        <Stat label="Streak" value={String(streak)} sub={streak === 1 ? "day" : "days"} />
+    <div className="min-h-full px-4 pb-40 pt-[calc(env(safe-area-inset-top)+18px)]">
+      <div className="flex items-center justify-between">
+        <h1 className="text-[32px] font-bold tracking-tight">Workouts</h1>
+        <div className="flex items-center gap-2.5">
+          <IconButton onClick={() => go("settings")}>
+            <Tune />
+          </IconButton>
+          <IconButton tone="light" onClick={() => void s.startSession()}>
+            <Plus />
+          </IconButton>
+        </div>
       </div>
 
-      <Button size="lg" className="w-full" onClick={() => void s.startSession()}>
-        Start empty workout
-      </Button>
-
-      <div className="mt-6">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold">Start from a routine</h2>
-          <button className="text-[13px] text-accent" onClick={() => go("routines")}>
-            Manage
-          </button>
-        </div>
-        {s.routines.length === 0 ? (
-          <Card className="px-4 py-5 text-center text-sm text-muted">
-            No routines yet — build one in the Routines tab.
-          </Card>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        {pinned[0] ? (
+          <RoutineCard routine={pinned[0]} n={1} go={go} />
         ) : (
-          <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
-            {s.routines.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => void s.startSession(r)}
-                className="w-40 shrink-0 rounded-2xl border border-line bg-panel p-3.5 text-left active:bg-panel2"
-              >
-                <p className="truncate text-[15px] font-semibold">{r.name}</p>
-                <p className="mt-1 text-[12px] text-muted">
-                  {r.items.length} exercises ·{" "}
-                  {r.items.reduce((t, i) => t + i.sets, 0)} sets
-                </p>
-                <p className="mt-3 line-clamp-2 text-[12px] leading-snug text-muted/80">
-                  {r.items
-                    .map((i) => s.exerciseById.get(i.exerciseId)?.name)
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              </button>
-            ))}
-          </div>
+          <EmptyRoutineCard go={go} />
         )}
+
+        <DashCard className="relative p-4" onClick={() => setBwOpen(true)}>
+          <IconButton
+            size={30}
+            className="absolute right-3 top-3"
+            onClick={() => {
+              go("progress");
+            }}
+          >
+            <Tune size={14} />
+          </IconButton>
+          <p className="text-3xl font-bold tabular-nums leading-none">
+            {latestBw ? num(latestBw.weight) : "—"}{" "}
+            <span className="text-base font-semibold text-muted">{unitLabel}</span>
+          </p>
+          <p className="mt-6 text-[15px] font-semibold leading-tight">Body weight</p>
+          <p className="mt-0.5 text-[12px] text-muted">
+            {latestBw ? fmtRelative(latestBw.at, s.now) : "Tap to log"}
+          </p>
+        </DashCard>
       </div>
 
-      <div className="mt-6">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold">Body weight</h2>
-          <button className="text-[13px] text-accent" onClick={() => setBwOpen(true)}>
-            Log today
-          </button>
-        </div>
-        <Card className="flex items-center justify-between px-4 py-3.5">
-          <div>
-            <p className="text-2xl font-bold tabular-nums leading-none">
-              {latestBw ? `${num(latestBw.weight)} ${unit}` : "—"}
-            </p>
-            <p className="mt-1 text-[12px] text-muted">
-              {latestBw ? fmtDate(latestBw.date) : "Nothing logged yet"}
-            </p>
-          </div>
-          {s.bodyweight.length > 1 && (
-            <Trend
-              delta={latestBw.weight - s.bodyweight[Math.max(0, s.bodyweight.length - 2)].weight}
-              unit={unit}
-            />
-          )}
-        </Card>
-      </div>
+      <DashCard className="mt-3 p-4">
+        <button className="block w-full text-left" onClick={() => go("history")}>
+          <Heatmap activeDates={activeDates} />
+        </button>
 
-      <div className="mt-6">
-        <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="text-[15px] font-semibold">Recent</h2>
-          <button className="text-[13px] text-accent" onClick={() => go("history")}>
-            See all
-          </button>
-        </div>
-        {done.length === 0 ? (
-          <Empty
-            icon="🏋️"
-            title="No workouts yet"
-            body="Hit start above, add your lifts, and every set you tick off starts building your history."
-          />
+        {pinned[1] ? (
+          <RoutineRow routine={pinned[1]} n={2} go={go} className="mt-4" />
         ) : (
-          <div className="space-y-2">
-            {done.slice(0, 4).map((x) => (
-              <Card key={x.id} className="flex items-center justify-between px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[15px] font-medium">{x.name}</p>
-                  <p className="mt-0.5 text-[12px] text-muted">
-                    {fmtDate(x.date)} · {sessionSetCount(x)} sets ·{" "}
-                    {x.endedAt ? fmtDuration(x.endedAt - x.startedAt) : "—"}
-                  </p>
-                </div>
-                <p className="shrink-0 text-[13px] tabular-nums text-muted">
-                  {num(sessionVolume(x), 0)} {unit}
-                </p>
-              </Card>
-            ))}
-          </div>
+          <button
+            onClick={() => go("routines")}
+            className="mt-4 flex w-full items-center gap-3 border-t border-line pt-4 text-left"
+          >
+            <span className="grid size-[46px] shrink-0 place-items-center rounded-full border border-dashed border-faint text-muted">
+              <Plus size={18} />
+            </span>
+            <span className="text-[15px] font-medium text-muted">Add a routine</span>
+          </button>
         )}
-      </div>
+      </DashCard>
+
+      <DashCard className="relative mt-3 flex items-center justify-between p-5">
+        <IconButton
+          size={30}
+          className="absolute right-3 top-3"
+          onClick={() => go("progress")}
+        >
+          <Tune size={14} />
+        </IconButton>
+        <div>
+          <p className="text-[15px] font-semibold leading-tight">Volume lifted</p>
+          <p className="mt-0.5 text-[12px] text-muted">Last 7 days</p>
+        </div>
+        <p className="text-[28px] font-bold tabular-nums leading-none">
+          {weekVolume.toLocaleString()}{" "}
+          <span className="text-base font-semibold text-muted">{unitLabel}</span>
+        </p>
+      </DashCard>
+
+      <DashCard
+        className="mt-3 grid h-[104px] place-items-center"
+        onClick={() => go("routines")}
+      >
+        <Plus size={26} className="text-muted" />
+      </DashCard>
 
       <Sheet
         open={bwOpen}
@@ -164,26 +136,99 @@ export function Home({ go }: { go: (t: Tab) => void }) {
           autoFocus
           inputMode="decimal"
           className={inputCls}
-          placeholder={`Weight in ${unit}`}
+          placeholder={`Weight in ${unitLabel}`}
           value={bw}
           onChange={(e) => setBw(e.target.value)}
         />
         <p className="mt-2 text-[12px] text-muted">Saved against today. One entry per day.</p>
       </Sheet>
-    </Screen>
+    </div>
   );
 }
 
-function Trend({ delta, unit }: { delta: number; unit: string }) {
-  const up = delta > 0;
-  const flat = Math.abs(delta) < 0.05;
+function useRoutineMeta(routine: Routine) {
+  const s = useStore();
+  return useMemo(() => {
+    const forRoutine = s.sessions.filter((x) => x.routineId === routine.id && x.endedAt);
+    const doneThisWeek = forRoutine.filter((x) => x.startedAt >= s.now - WEEK_MS).length;
+    // no per-routine weekly target yet, so a session or two fills the ring — refine once
+    // routines carry their own scheduled frequency
+    const progress = Math.min(1, doneThisWeek / 2);
+    const label =
+      mostCommonWeekdayLabel(forRoutine.map((x) => x.date)) ??
+      `${routine.items.length} exercise${routine.items.length === 1 ? "" : "s"}`;
+    return { progress, label };
+  }, [s.sessions, s.now, routine.id, routine.items.length]);
+}
+
+function RoutineCard({ routine, n, go }: { routine: Routine; n: number; go: (t: Tab) => void }) {
+  const s = useStore();
+  const { progress, label } = useRoutineMeta(routine);
+
   return (
-    <span
-      className={`rounded-lg px-2.5 py-1.5 text-[13px] font-semibold tabular-nums ${
-        flat ? "bg-panel2 text-muted" : up ? "bg-amber-400/15 text-amber-300" : "bg-accent/15 text-accent"
-      }`}
+    <DashCard className="relative p-4" onClick={() => void s.startSession(routine)}>
+      <div className="flex items-start justify-between">
+        <Ring n={n} progress={progress} />
+        <IconButton
+          size={30}
+          onClick={() => {
+            go("routines");
+          }}
+        >
+          <Tune size={14} />
+        </IconButton>
+      </div>
+      <p className="mt-6 truncate text-[15px] font-semibold leading-tight">{routine.name}</p>
+      <p className="mt-0.5 truncate text-[12px] text-muted">{label}</p>
+    </DashCard>
+  );
+}
+
+function RoutineRow({
+  routine,
+  n,
+  go,
+  className,
+}: {
+  routine: Routine;
+  n: number;
+  go: (t: Tab) => void;
+  className?: string;
+}) {
+  const s = useStore();
+  const { progress, label } = useRoutineMeta(routine);
+
+  // a div, not a button: it needs to contain the real IconButton below it, and
+  // a <button> can't legally nest another interactive control
+  return (
+    <div
+      onClick={() => void s.startSession(routine)}
+      className={`flex w-full cursor-pointer items-center gap-3 border-t border-line pt-4 text-left ${className ?? ""}`}
     >
-      {flat ? "±0" : `${up ? "+" : "−"}${num(Math.abs(delta))}`} {unit}
-    </span>
+      <Ring n={n} progress={progress} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold leading-tight">{routine.name}</p>
+        <p className="mt-0.5 truncate text-[12px] text-muted">{label}</p>
+      </div>
+      <IconButton
+        size={30}
+        onClick={() => {
+          go("routines");
+        }}
+      >
+        <Tune size={14} />
+      </IconButton>
+    </div>
+  );
+}
+
+function EmptyRoutineCard({ go }: { go: (t: Tab) => void }) {
+  return (
+    <DashCard className="grid place-items-center p-4 text-center" onClick={() => go("routines")}>
+      <span className="grid size-[46px] place-items-center rounded-full border border-dashed border-faint text-muted">
+        <Plus size={18} />
+      </span>
+      <p className="mt-3 text-[13px] font-medium text-muted">Create a routine</p>
+    </DashCard>
   );
 }
