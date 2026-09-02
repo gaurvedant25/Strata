@@ -39,5 +39,6 @@
     "BodyMap": "scores: Partial<Record<\"shoulders\" | \"chest\" | \"arms\" | \"legs\", { ratio: number; score: number; tier: \"Beginner\" | \"Novice\" | \"Intermediate\" | \"Advanced\" | \"Elite\"; best1rm: number; lift: string }>>; selected: \"shoulders\" | \"chest\" | \"arms\" | \"legs\" | null; onSelect: (m: \"shoulders\" | \"chest\" | \"arms\" | \"legs\") => void;",
     "Heatmap": "activeDates: Set<string>; weeks?: number;"
   },
-  "readmeHeader": ".design-sync/conventions.md"
+  "readmeHeader": ".design-sync/conventions.md",
+  "projectId": "5fc2a8b3-ec06-4ddb-85a3-2a0f3885511a"
 }
