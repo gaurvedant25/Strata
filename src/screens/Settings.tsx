@@ -63,7 +63,7 @@ export function Settings() {
             ))}
           </div>
         </Row>
-        <Row label="Gender" hint="Strength standards on the Strength page differ by gender.">
+        <Row label="Sex" hint="Strength standards on the Strength page differ by sex.">
           <div className="flex gap-1.5">
             {(["male", "female"] as Gender[]).map((g) => (
               <button
