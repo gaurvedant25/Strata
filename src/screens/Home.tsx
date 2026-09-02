@@ -86,6 +86,7 @@ export function Home({ go }: { go: (t: Tab) => void }) {
 
           <div className="mt-4">
             <BodyMap
+              gender={s.settings.gender}
               scores={scores}
               selected={active}
               onSelect={pick}

@@ -57,3 +57,10 @@ After the first load the service worker has cached the whole app, so it opens in
   installed app, or switching browsers loses it — export a backup from Settings periodically.
 - iOS evicts storage for *websites* left unused for 7 days, but **installed** home-screen PWAs are
   exempt. Install it rather than using it from a Safari tab.
+
+## Credits
+
+The anatomical muscle artwork on the Strength screen is adapted from
+[react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)
+(MIT © 2022 ELABBASSI Hicham). The path data lives in `src/lib/anatomy/`, each
+file carrying the upstream copyright and licence notice.
