@@ -12,17 +12,22 @@ import type { BodyView } from "./index";
  * figure's own coordinate space, so the replacements land exactly where the
  * ankles end.
  */
-type FootBox = { center: number; span: number; width: number; top: number; bottom: number };
+type FootBox = {
+  center: number;
+  span: number;
+  width: number;
+  top: number;
+  bottom: number;
+  /** How far the foot turns out from the ankle. Nobody stands feet-parallel. */
+  splay: number;
+};
 
 const BOX: Record<Gender, FootBox> = {
   // male front viewBox "0 0 724 1448": original feet bbox x 245..482, y 1284..1341
-  male: { center: 363, span: 63, width: 91, top: 1282, bottom: 1342 },
+  male: { center: 363, span: 63, width: 91, top: 1282, bottom: 1342, splay: 24 },
   // female front viewBox "-50 -40 734 1538": original feet bbox x 227..414, y 1383..1428
-  female: { center: 320, span: 47, width: 92, top: 1381, bottom: 1434 },
+  female: { center: 320, span: 47, width: 92, top: 1381, bottom: 1434, splay: 22 },
 };
-
-/** How far each foot turns out from the ankle. Nobody stands with both feet parallel. */
-const SPLAY_DEG = 15;
 
 const n = (v: number) => Math.round(v * 10) / 10;
 
@@ -31,11 +36,18 @@ const n = (v: number) => Math.round(v * 10) / 10;
  * line. `s` is +1 for the foot on the +x side and -1 for the mirrored one; the
  * big toe always sits on the inner edge.
  */
-function foot(cx: number, w: number, top: number, bottom: number, s: 1 | -1): string[] {
+function foot(
+  cx: number,
+  w: number,
+  top: number,
+  bottom: number,
+  s: 1 | -1,
+  splay: number,
+): string[] {
   const h = bottom - top;
 
-  // outward means the toes swing away from the body's centre line
-  const rot = -s * SPLAY_DEG;
+  // outward means the toes swing away from the body centre line
+  const rot = -s * splay;
   const rad = (rot * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -126,8 +138,8 @@ export function feetPart(gender: Gender, view: BodyView): BodyPart | null {
   return {
     slug: "feet",
     path: {
-      right: foot(b.center + b.span, b.width, b.top, b.bottom, 1),
-      left: foot(b.center - b.span, b.width, b.top, b.bottom, -1),
+      right: foot(b.center + b.span, b.width, b.top, b.bottom, 1, b.splay),
+      left: foot(b.center - b.span, b.width, b.top, b.bottom, -1, b.splay),
     },
   };
 }
