@@ -123,15 +123,20 @@ export function BodyMap({
    * Depth layers are the same silhouette repeated, so it is baked to one
    * data-URL image the browser decodes once and composites, rather than
    * re-rasterising ~89 live paths per layer.
+   *
+   * It tracks the visible side rather than always using the front: the two
+   * figures don't share an outline (the back has no feet), so a front-built
+   * silhouette showed its toes poking out under the back view's ankles.
    */
+  const shown = anatomy(gender, view);
   const silUrl = useMemo(() => {
-    const d = front.parts
+    const d = shown.parts
       .flatMap(partPaths)
       .map((s) => `<path d="${s}"/>`)
       .join("");
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${front.viewBox}"><g fill="#1d1d24">${d}</g></svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${shown.viewBox}"><g fill="#1d1d24">${d}</g></svg>`;
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-  }, [front]);
+  }, [shown]);
 
   useEffect(() => setP(0), [view]);
 
