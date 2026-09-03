@@ -61,10 +61,13 @@ export function groupForSlug(slug: string): MuscleGroup | null {
 }
 
 export function anatomy(gender: Gender, view: BodyView) {
-  const feet = feetPart(gender, view);
-  const parts = feet
-    ? DATA[gender][view].map((p) => (p.slug === "feet" ? feet : p))
-    : DATA[gender][view];
+  const source = DATA[gender][view];
+  // Front swaps in the redrawn feet; back drops its feet altogether, since from
+  // behind the original renders them as flat slabs below the ankles.
+  const parts =
+    view === "front"
+      ? source.map((p) => (p.slug === "feet" ? feetPart(gender) : p))
+      : source.filter((p) => p.slug !== "feet");
   return { parts, viewBox: VIEWBOX[gender][view] };
 }
 

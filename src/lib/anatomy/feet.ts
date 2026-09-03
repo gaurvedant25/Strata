@@ -1,6 +1,5 @@
 import type { Gender } from "../../types";
 import type { BodyPart } from "./types";
-import type { BodyView } from "./index";
 
 /**
  * The vendored artwork draws front-view feet as plain stumps with no toes.
@@ -138,8 +137,8 @@ function foot(
   return [body, ...tendons, ...toes];
 }
 
-export function feetPart(gender: Gender, view: BodyView): BodyPart | null {
-  if (view !== "front") return null; // the back view shows heels, already fine
+/** Front-view feet only — the back view drops its feet entirely (see anatomy()). */
+export function feetPart(gender: Gender): BodyPart {
   const b = BOX[gender];
   return {
     slug: "feet",
