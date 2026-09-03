@@ -10,9 +10,19 @@ const INERT = "#33333a"; // drawn muscle that has no benchmark lift (abs, obliqu
 const EDGE = "rgba(0,0,0,.55)";
 
 /** Half-thickness of the body, in px of the transformed space. */
-const DEPTH = 18;
+const DEPTH = 16;
 /** Silhouette copies stacked through the depth to give the figure volume. */
-const LAYERS = 0; // laminate disabled: edge-on it reads as a comb, not a body
+const LAYERS = 10;
+/**
+ * How far the figure is allowed to turn. There is no side-view artwork, so it
+ * deliberately never approaches 90 degrees: past about 30 the flat faces would
+ * foreshorten to nothing and the depth laminate would show its edges as a comb.
+ * The far side arrives by cross-fade instead of by swinging through a profile
+ * that does not exist.
+ */
+const MAX_TILT = 26;
+/** Pointer travel, in px, that counts as a full turn. */
+const TRAVEL = 150;
 
 function Figure({
   gender,
@@ -20,16 +30,31 @@ function Figure({
   scores,
   selected,
   onSelect,
+  opacity,
 }: {
   gender: Gender;
   view: BodyView;
   scores: Partial<Record<MuscleGroup, MuscleScore>>;
   selected: MuscleGroup | null;
   onSelect: (m: MuscleGroup) => void;
+  opacity: number;
 }) {
   const { parts, viewBox } = anatomy(gender, view);
   return (
-    <svg viewBox={viewBox} width="100%" height="100%" style={{ display: "block" }}>
+    <svg
+      viewBox={viewBox}
+      width="100%"
+      height="100%"
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "block",
+        opacity,
+        transform: `translateZ(${DEPTH}px)`,
+        pointerEvents: opacity > 0.5 ? "auto" : "none",
+        transition: "opacity 300ms ease",
+      }}
+    >
       {parts.map((part) => {
         const group = groupForSlug(part.slug);
         const sc = group ? scores[group] : undefined;
@@ -38,6 +63,7 @@ function Figure({
         return (
           <g
             key={part.slug}
+            data-slug={part.slug}
             onClick={group ? () => onSelect(group) : undefined}
             style={{
               cursor: group ? "pointer" : "default",
@@ -64,13 +90,12 @@ function Figure({
 }
 
 /**
- * Anatomical body map with real depth.
+ * Anatomical body map with depth.
  *
- * The artwork is two flat drawings, so thickness is built rather than drawn:
- * the silhouette is stacked through Z as a laminate, and the front and back
- * faces sit at either end of it. That way the figure orbits an axis with
- * parallax and shows a solid edge side-on, instead of a zero-width card flip.
- * Drag horizontally to spin; it settles on whichever face you release nearest.
+ * The artwork is two flat drawings with no side view, so the figure turns only
+ * as far as flat art can honestly carry (see MAX_TILT) and the far side arrives
+ * by cross-fade. Thickness is real: the silhouette is stacked through Z behind
+ * the faces, which reads as volume at the shallow angles actually used.
  */
 export function BodyMap({
   gender,
@@ -87,60 +112,58 @@ export function BodyMap({
   view: BodyView;
   onViewChange: (v: BodyView) => void;
 }) {
-  const base = view === "front" ? 0 : 180;
-  const [drag, setDrag] = useState<number | null>(null);
+  const [p, setP] = useState(0); // drag progress, -1..1
   const startX = useRef(0);
+  const dragging = useRef(false);
 
   const front = anatomy(gender, "front");
   const [, , vbW, vbH] = front.viewBox.split(" ").map(Number);
 
   /**
-   * The depth layers are the same silhouette repeated, so it's baked to one
-   * data-URL image the browser decodes once and composites cheaply. Repeating
-   * the ~89 live paths per layer instead costs about a thousand shapes a frame,
-   * which measured at 1fps.
+   * Depth layers are the same silhouette repeated, so it is baked to one
+   * data-URL image the browser decodes once and composites, rather than
+   * re-rasterising ~89 live paths per layer.
    */
   const silUrl = useMemo(() => {
     const d = front.parts
       .flatMap(partPaths)
-      .map((p) => `<path d="${p}"/>`)
+      .map((s) => `<path d="${s}"/>`)
       .join("");
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${front.viewBox}"><g fill="#1d1d24">${d}</g></svg>`;
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }, [front]);
 
-  useEffect(() => setDrag(null), [view]);
+  useEffect(() => setP(0), [view]);
 
-  const angle = base + (drag ?? 0);
-  const rad = (angle * Math.PI) / 180;
-  // faces dim as they rotate away from the viewer, which is what reads as volume
-  const facing = Math.abs(Math.cos(rad));
-  const shade = 0.55 + 0.45 * facing;
+  const k = Math.min(1, Math.abs(p));
+  const other: BodyView = view === "front" ? "back" : "front";
+
+  /**
+   * The two drawings never overlap: the current one is gone by the halfway
+   * point and the next only starts arriving after it, so mid-turn you see the
+   * bare silhouette rather than a double exposure of front and back at once.
+   */
+  const outgoing = Math.max(0, 1 - k * 2);
+  const incoming = Math.max(0, k * 2 - 1);
 
   function down(e: React.PointerEvent) {
     startX.current = e.clientX;
-    setDrag(0);
+    dragging.current = true;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function move(e: React.PointerEvent) {
-    if (drag === null) return;
-    setDrag((e.clientX - startX.current) * 0.85);
+    if (!dragging.current) return;
+    const dx = e.clientX - startX.current;
+    setP(Math.max(-1, Math.min(1, dx / TRAVEL)));
   }
   function up() {
-    if (drag === null) return;
-    const norm = ((angle % 360) + 360) % 360;
-    const next: BodyView = norm > 90 && norm < 270 ? "back" : "front";
-    setDrag(null);
-    if (next !== view) onViewChange(next);
+    if (!dragging.current) return;
+    dragging.current = false;
+    if (Math.abs(p) > 0.45) onViewChange(other);
+    setP(0);
   }
 
-  const face: React.CSSProperties = {
-    position: "absolute",
-    inset: 0,
-    backfaceVisibility: "hidden",
-    WebkitBackfaceVisibility: "hidden",
-  };
-  const spin = drag === null ? "transform 430ms cubic-bezier(.22,.61,.36,1)" : "none";
+  const settle = dragging.current ? "none" : "transform 320ms cubic-bezier(.22,.61,.36,1)";
 
   return (
     <div className="select-none">
@@ -150,7 +173,7 @@ export function BodyMap({
         onPointerUp={up}
         onPointerCancel={up}
         style={{
-          perspective: 760,
+          perspective: 900,
           touchAction: "pan-y",
           cursor: "grab",
           margin: "0 auto",
@@ -164,14 +187,13 @@ export function BodyMap({
             position: "absolute",
             inset: 0,
             transformStyle: "preserve-3d",
-            transform: `rotateY(${angle}deg)`,
-            transition: spin,
+            transform: `rotateY(${p * MAX_TILT}deg)`,
+            transition: settle,
           }}
         >
           {/* laminate: one cached silhouette bitmap repeated through the depth */}
           {Array.from({ length: LAYERS }).map((_, i) => {
-            const t = i / (LAYERS - 1); // 0 at back, 1 at front
-            const z = (-DEPTH + t * 2 * DEPTH) * 0.92;
+            const t = i / (LAYERS - 1);
             return (
               <img
                 key={i}
@@ -184,37 +206,30 @@ export function BodyMap({
                   inset: 0,
                   width: "100%",
                   height: "100%",
-                  transform: `translateZ(${z}px)`,
+                  transform: `translateZ(${(-DEPTH + t * 2 * DEPTH) * 0.9}px)`,
                   pointerEvents: "none",
                 }}
               />
             );
           })}
 
-          <div style={{ ...face, transform: `translateZ(${DEPTH}px)`, filter: `brightness(${shade})` }}>
-            <Figure
-              gender={gender}
-              view="front"
-              scores={scores}
-              selected={selected}
-              onSelect={onSelect}
-            />
-          </div>
-          <div
-            style={{
-              ...face,
-              transform: `rotateY(180deg) translateZ(${DEPTH}px)`,
-              filter: `brightness(${shade})`,
-            }}
-          >
-            <Figure
-              gender={gender}
-              view="back"
-              scores={scores}
-              selected={selected}
-              onSelect={onSelect}
-            />
-          </div>
+          {/* both drawings sit at the same place and cross-fade as you turn */}
+          <Figure
+            gender={gender}
+            view="front"
+            scores={scores}
+            selected={selected}
+            onSelect={onSelect}
+            opacity={view === "front" ? outgoing : incoming}
+          />
+          <Figure
+            gender={gender}
+            view="back"
+            scores={scores}
+            selected={selected}
+            onSelect={onSelect}
+            opacity={view === "back" ? outgoing : incoming}
+          />
         </div>
       </div>
 

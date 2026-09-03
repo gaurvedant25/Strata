@@ -4,6 +4,7 @@ import { bodyBack } from "./bodyBack";
 import { bodyFemaleBack } from "./bodyFemaleBack";
 import { bodyFemaleFront } from "./bodyFemaleFront";
 import { bodyFront } from "./bodyFront";
+import { feetPart } from "./feet";
 import type { BodyPart } from "./types";
 
 export type { BodyPart };
@@ -60,7 +61,11 @@ export function groupForSlug(slug: string): MuscleGroup | null {
 }
 
 export function anatomy(gender: Gender, view: BodyView) {
-  return { parts: DATA[gender][view], viewBox: VIEWBOX[gender][view] };
+  const feet = feetPart(gender, view);
+  const parts = feet
+    ? DATA[gender][view].map((p) => (p.slug === "feet" ? feet : p))
+    : DATA[gender][view];
+  return { parts, viewBox: VIEWBOX[gender][view] };
 }
 
 /** Every path of a part, flattened — left/right/common are just draw sides. */
