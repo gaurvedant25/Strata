@@ -24,9 +24,9 @@ type FootBox = {
 
 const BOX: Record<Gender, FootBox> = {
   // male front viewBox "0 0 724 1448": original feet bbox x 245..482, y 1284..1341
-  male: { center: 363, span: 63, width: 91, top: 1282, bottom: 1342, splay: 24 },
+  male: { center: 363, span: 63, width: 91, top: 1282, bottom: 1342, splay: 16 },
   // female front viewBox "-50 -40 734 1538": original feet bbox x 227..414, y 1383..1428
-  female: { center: 320, span: 47, width: 92, top: 1381, bottom: 1434, splay: 22 },
+  female: { center: 320, span: 47, width: 92, top: 1381, bottom: 1434, splay: 15 },
 };
 
 const n = (v: number) => Math.round(v * 10) / 10;
@@ -68,14 +68,20 @@ function foot(
     return `${n(X)} ${n(Y)}`;
   };
 
-  // dorsum: narrow at the ankle, widening only gently to the ball of the foot
+  /**
+   * Dorsum. It starts above the box (negative y) on purpose: turning the foot
+   * tilts its top edge, and a flat-topped shape would swing one corner clear of
+   * the ankle and leave the leg visibly detached. Running it up behind the ankle
+   * — feet are drawn after ankles, so they cover them — keeps the join solid at
+   * any splay.
+   */
   const body =
-    `M${pt(-0.18, 0)}` +
-    `C${pt(-0.28, 0.26)} ${pt(-0.33, 0.5)} ${pt(-0.33, 0.66)}` +
-    `Q${pt(-0.32, 0.74)} ${pt(-0.24, 0.75)}` +
-    `L${pt(0.26, 0.72)}` +
-    `Q${pt(0.34, 0.7)} ${pt(0.33, 0.62)}` +
-    `C${pt(0.32, 0.42)} ${pt(0.24, 0.18)} ${pt(0.17, 0)}` +
+    `M${pt(-0.18, -0.14)}` +
+    `C${pt(-0.28, 0.2)} ${pt(-0.33, 0.5)} ${pt(-0.33, 0.7)}` +
+    `Q${pt(-0.32, 0.8)} ${pt(-0.24, 0.82)}` +
+    `L${pt(0.26, 0.79)}` +
+    `Q${pt(0.34, 0.77)} ${pt(0.33, 0.68)}` +
+    `C${pt(0.32, 0.45)} ${pt(0.24, 0.1)} ${pt(0.17, -0.14)}` +
     `Z`;
 
   /**
@@ -85,11 +91,11 @@ function foot(
    * flipper, not a foot. Each is rotated with the foot.
    */
   const TOES: [number, number, number, number][] = [
-    [-0.27, 0.8, 0.085, 0.21],
-    [-0.09, 0.815, 0.062, 0.17],
-    [0.03, 0.81, 0.055, 0.152],
-    [0.14, 0.795, 0.048, 0.134],
-    [0.235, 0.775, 0.042, 0.115],
+    [-0.235, 0.87, 0.073, 0.13],
+    [-0.085, 0.885, 0.054, 0.108],
+    [0.025, 0.88, 0.048, 0.097],
+    [0.12, 0.865, 0.042, 0.086],
+    [0.2, 0.845, 0.036, 0.075],
   ];
 
   const toes = TOES.map(([ox, oy, orx, ory]) => {
@@ -121,10 +127,10 @@ function foot(
     const xTop = -0.02 + i * 0.075;
     const xBot = -0.15 + i * 0.145;
     return (
-      `M${pt(xTop - 0.016, 0.22)}` +
-      `C${pt(xTop - 0.03, 0.4)} ${pt(xBot - 0.035, 0.54)} ${pt(xBot - 0.03, 0.66)}` +
-      `L${pt(xBot + 0.03, 0.65)}` +
-      `C${pt(xBot + 0.032, 0.53)} ${pt(xTop + 0.03, 0.4)} ${pt(xTop + 0.016, 0.22)}` +
+      `M${pt(xTop - 0.016, 0.16)}` +
+      `C${pt(xTop - 0.03, 0.4)} ${pt(xBot - 0.035, 0.58)} ${pt(xBot - 0.03, 0.72)}` +
+      `L${pt(xBot + 0.03, 0.71)}` +
+      `C${pt(xBot + 0.032, 0.57)} ${pt(xTop + 0.03, 0.4)} ${pt(xTop + 0.016, 0.16)}` +
       `Z`
     );
   });
