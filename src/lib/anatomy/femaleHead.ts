@@ -31,11 +31,18 @@ function ellipse(cx: number, cy: number, rx: number, ry: number) {
  * far enough down to meet the neck.
  */
 export function femaleHead(view: BodyView): BodyPart {
-  // front neck starts at y250, back neck at y218 — the ovals overlap them
+  /**
+   * cx is the body's centre line, not the old hair's. Every other part of the
+   * back figure centres on 1143; the hair it replaced measured 1109 because its
+   * long draping strands pulled the bounding box off-axis, and a head sitting
+   * 34 units to one side reads as the whole figure leaning.
+   *
+   * Front neck starts at y250, back neck at y218 — the ovals overlap them.
+   */
   const o =
     view === "front"
-      ? { cx: 320, cy: 174, rx: 60, ry: 80 }
-      : { cx: 1109, cy: 158, rx: 63, ry: 84 };
+      ? { cx: 320, cy: 180, rx: 62, ry: 76 }
+      : { cx: 1143, cy: 164, rx: 65, ry: 79 };
   return {
     slug: "head",
     path: { common: [ellipse(o.cx, o.cy, o.rx, o.ry)] },
