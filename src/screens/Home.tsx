@@ -7,7 +7,9 @@ import {
   CANONICAL_LIFT,
   FRONT_GROUPS,
   MUSCLE_LABEL,
+  TIER_LEVEL,
   computeMuscleScores,
+  tierInk,
   type MuscleGroup,
 } from "../lib/strength";
 import { fmtRelative, num, todayKey } from "../lib/util";
@@ -120,10 +122,13 @@ export function Home({ go }: { go: (t: Tab) => void }) {
             {detail ? (
               <>
                 <div className="flex items-center justify-between">
-                  <p className="text-[17px] font-semibold">{MUSCLE_LABEL[active]}</p>
+                  <div className="min-w-0">
+                    <p className="text-[17px] font-semibold">{MUSCLE_LABEL[active]}</p>
+                    <p className="text-[12px] text-muted">{TIER_LEVEL[detail.tier]}</p>
+                  </div>
                   <span
-                    className="rounded-full px-2.5 py-1 text-[12px] font-semibold"
-                    style={{ background: detail.color, color: "#0a0a0b" }}
+                    className="shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+                    style={{ background: detail.color, color: tierInk(detail.color) }}
                   >
                     {detail.tier}
                   </span>

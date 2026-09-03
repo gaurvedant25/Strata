@@ -26,22 +26,53 @@ export const CANONICAL_LIFT: Record<MuscleGroup, string> = {
   glutes: "Hip Thrust",
 };
 
-/** Six rungs. Beginner is the floor - below the first threshold. */
-export const TIERS = ["Beginner", "Novice", "Bronze", "Silver", "Gold", "Elite"] as const;
+/** Six rungs. Bronze is the floor - below the first threshold. */
+export const TIERS = ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Titan"] as const;
 export type Tier = (typeof TIERS)[number];
 
+/** Chosen for dark mode: each one has to read as a glow against a black body. */
 export const TIER_COLOR: Record<Tier, string> = {
-  Beginner: "#55555c",
-  Novice: "#6f4a2d",
-  Bronze: "#b5713a",
-  Silver: "#b9bec9",
-  Gold: "#e8b33a",
-  Elite: "#a065f0",
+  Bronze: "#CD7F32",
+  Silver: "#C0C0C0",
+  Gold: "#FFD700",
+  Platinum: "#00D2D3",
+  Diamond: "#70A1FF",
+  Titan: "#8A2BE2",
+};
+
+/** What each rung says about the lifter, for anywhere a tier needs explaining. */
+export const TIER_LEVEL: Record<Tier, string> = {
+  Bronze: "Novice",
+  Silver: "Intermediate",
+  Gold: "Advanced",
+  Platinum: "Dedicated Elite",
+  Diamond: "Master",
+  Titan: "Legend",
 };
 
 /**
- * Bodyweight multiples at the entry to each tier above Beginner, i.e.
- * [Novice, Bronze, Silver, Gold, Elite]. Approximated from commonly published
+ * Text colour to put on a solid patch of a tier colour.
+ *
+ * Most of the palette is light enough to take near-black text, but Titan's
+ * violet is dark — black on it lands at 3.5:1, under the 4.5:1 that small bold
+ * text needs — so it takes white instead. Picked by luminance rather than
+ * hardcoded, so a future palette change stays readable.
+ */
+export function tierInk(hex: string): string {
+  const v = parseInt(hex.slice(1), 16);
+  const lum = [(v >> 16) & 255, (v >> 8) & 255, v & 255]
+    .map((c) => {
+      const x = c / 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    })
+    .reduce((t, c, i) => t + [0.2126, 0.7152, 0.0722][i] * c, 0);
+  // contrast against near-black vs against white, whichever is higher
+  return (lum + 0.05) / 0.0527 >= 1.05 / (lum + 0.05) ? "#0a0a0b" : "#ffffff";
+}
+
+/**
+ * Bodyweight multiples at the entry to each tier above Bronze, i.e.
+ * [Silver, Gold, Platinum, Diamond, Titan]. Approximated from commonly published
  * strength-standard charts, split by sex because the distributions genuinely
  * differ. A rough compass for a personal log, not a certified table.
  */
