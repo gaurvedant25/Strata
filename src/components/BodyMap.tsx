@@ -64,6 +64,7 @@ function Figure({
           <g
             key={part.slug}
             data-slug={part.slug}
+            transform={part.transform}
             onClick={group ? () => onSelect(group) : undefined}
             style={{
               cursor: group ? "pointer" : "default",

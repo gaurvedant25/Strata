@@ -5,6 +5,7 @@ import { bodyFemaleBack } from "./bodyFemaleBack";
 import { bodyFemaleFront } from "./bodyFemaleFront";
 import { bodyFront } from "./bodyFront";
 import { feetPart } from "./feet";
+import { femaleBackHead, femaleHeadTransform } from "./femaleHead";
 import type { BodyPart } from "./types";
 
 export type { BodyPart };
@@ -64,10 +65,23 @@ export function anatomy(gender: Gender, view: BodyView) {
   const source = DATA[gender][view];
   // Front swaps in the redrawn feet; back drops its feet altogether, since from
   // behind the original renders them as flat slabs below the ankles.
-  const parts =
+  let parts =
     view === "front"
       ? source.map((p) => (p.slug === "feet" ? feetPart(gender) : p))
       : source.filter((p) => p.slug !== "feet");
+
+  // The female figure loses its hair and gets a slightly smaller face. On the
+  // back there is no head part — the hair is the head — so that view swaps in a
+  // plain skull rather than dropping the part and going headless.
+  if (gender === "female") {
+    parts =
+      view === "front"
+        ? parts
+            .filter((p) => p.slug !== "hair")
+            .map((p) => (p.slug === "head" ? { ...p, transform: femaleHeadTransform() } : p))
+        : parts.map((p) => (p.slug === "hair" ? femaleBackHead() : p));
+  }
+
   return { parts, viewBox: VIEWBOX[gender][view] };
 }
 
