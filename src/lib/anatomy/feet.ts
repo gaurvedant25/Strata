@@ -16,7 +16,7 @@ type FootBox = { center: number; span: number; width: number; top: number; botto
 
 const BOX: Record<Gender, FootBox> = {
   // male front viewBox "0 0 724 1448": original feet bbox x 245..482, y 1284..1341
-  male: { center: 363, span: 67, width: 104, top: 1282, bottom: 1346 },
+  male: { center: 363, span: 63, width: 91, top: 1282, bottom: 1342 },
   // female front viewBox "-50 -40 734 1538": original feet bbox x 227..414, y 1383..1428
   female: { center: 320, span: 47, width: 92, top: 1381, bottom: 1434 },
 };
@@ -99,7 +99,25 @@ function foot(cx: number, w: number, top: number, bottom: number, s: 1 | -1): st
     );
   });
 
-  return [body, ...toes];
+  /**
+   * Extensor tendons fanning from the ankle to the toe bases. Every other part
+   * of the figure is built from separate shapes whose outlines read as muscle
+   * separation; without these the foot is one blank slab and looks flat next to
+   * the rest of the body.
+   */
+  const tendons = [0, 1, 2].map((i) => {
+    const xTop = -0.02 + i * 0.075;
+    const xBot = -0.15 + i * 0.145;
+    return (
+      `M${pt(xTop - 0.016, 0.22)}` +
+      `C${pt(xTop - 0.03, 0.4)} ${pt(xBot - 0.035, 0.54)} ${pt(xBot - 0.03, 0.66)}` +
+      `L${pt(xBot + 0.03, 0.65)}` +
+      `C${pt(xBot + 0.032, 0.53)} ${pt(xTop + 0.03, 0.4)} ${pt(xTop + 0.016, 0.22)}` +
+      `Z`
+    );
+  });
+
+  return [body, ...tendons, ...toes];
 }
 
 export function feetPart(gender: Gender, view: BodyView): BodyPart | null {
