@@ -10,7 +10,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { TierBadge } from "../components/TierBadge";
 import { Card, Empty, Screen, Stat } from "../components/ui";
+import { RANKS, nextRank, rankProgress, rankStatsFrom } from "../lib/rank";
 import { exerciseHistory, personalRecords, sessionVolume } from "../lib/stats";
 import { num, parseKey } from "../lib/util";
 import { useStore } from "../store";
@@ -62,6 +64,8 @@ export function Progress() {
     [done, prs],
   );
 
+  const rank = useMemo(() => rankProgress(rankStatsFrom(s.sessions, unit)), [s.sessions, unit]);
+
   const bwData = s.bodyweight.map((b) => ({
     x: parseKey(b.date).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
     value: b.weight,
@@ -86,6 +90,36 @@ export function Progress() {
 
   return (
     <Screen title="Progress" subtitle="Every number comes from your own logs">
+      <Card className="mb-3 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[12px] text-muted">Your rank</p>
+            <p className="mt-0.5 text-[15px] font-semibold">{RANKS[rank.tier].level}</p>
+          </div>
+          <TierBadge tier={rank.tier} size="lg" />
+        </div>
+        <p className="mt-2.5 text-[12px] leading-relaxed text-muted">
+          {RANKS[rank.tier].description}
+        </p>
+        {rank.next && (
+          <>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-panel2">
+              <div
+                className="h-full rounded-full transition-[width] duration-500"
+                style={{
+                  width: `${Math.round(rank.progress * 100)}%`,
+                  backgroundColor: RANKS[nextRank(rank.tier)!].hex,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-[12px] text-muted">
+              {Math.round(rank.progress * 100)}% to {RANKS[rank.next].name}
+              {rank.remaining.length > 0 && ` · short on ${rank.remaining.join(", ")}`}
+            </p>
+          </>
+        )}
+      </Card>
+
       <div className="mb-5 grid grid-cols-3 gap-2">
         <Stat label="Workouts" value={String(totals.workouts)} sub="all time" />
         <Stat label="Volume" value={num(totals.volume / 1000, 1) + "k"} sub={unit} />
