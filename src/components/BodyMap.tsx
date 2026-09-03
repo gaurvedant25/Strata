@@ -5,9 +5,19 @@ import type { Gender } from "../types";
 
 export type { BodyView };
 
-const SKIN = "#26262c"; // body with no scored muscle behind it
-const INERT = "#33333a"; // drawn muscle that has no benchmark lift (abs, obliques)
-const EDGE = "rgba(0,0,0,.55)";
+const SKIN = "#3b3b45"; // body with no scored muscle behind it
+const INERT = "#45454f"; // drawn muscle that has no benchmark lift (abs, obliques)
+const EDGE = "rgba(0,0,0,.72)";
+
+/** Mixes a hex colour toward white (positive) or black (negative) for the sheen. */
+function shift(hex: string, amount: number) {
+  const v = parseInt(hex.slice(1), 16);
+  const mix = (c: number) =>
+    Math.round(amount >= 0 ? c + (255 - c) * amount : c * (1 + amount));
+  return `rgb(${mix((v >> 16) & 255)},${mix((v >> 8) & 255)},${mix(v & 255)})`;
+}
+
+const gradId = (hex: string) => `ds-${hex.slice(1)}`;
 
 /** Half-thickness of the body, in px of the transformed space. */
 const DEPTH = 16;
@@ -40,6 +50,8 @@ function Figure({
   opacity: number;
 }) {
   const { parts, viewBox } = anatomy(gender, view);
+  // one sheen gradient per tier colour actually in play
+  const lit = [...new Set(Object.values(scores).map((s) => s.color))];
   return (
     <svg
       viewBox={viewBox}
@@ -55,11 +67,20 @@ function Figure({
         transition: "opacity 300ms ease",
       }}
     >
+      <defs>
+        {lit.map((c) => (
+          <linearGradient key={c} id={gradId(c)} x1="0" y1="0" x2="0.25" y2="1">
+            <stop offset="0%" stopColor={shift(c, 0.5)} />
+            <stop offset="55%" stopColor={c} />
+            <stop offset="100%" stopColor={shift(c, -0.28)} />
+          </linearGradient>
+        ))}
+      </defs>
       {parts.map((part) => {
         const group = groupForSlug(part.slug);
         const sc = group ? scores[group] : undefined;
         const isSel = !!selected && group === selected;
-        const fill = sc ? sc.color : group ? SKIN : INERT;
+        const fill = sc ? `url(#${gradId(sc.color)})` : group ? SKIN : INERT;
         return (
           <g
             key={part.slug}
@@ -68,7 +89,11 @@ function Figure({
             onClick={group ? () => onSelect(group) : undefined}
             style={{
               cursor: group ? "pointer" : "default",
-              filter: sc && sc.score > 0.05 ? `drop-shadow(0 0 ${3 + sc.score * 9}px ${sc.color})` : undefined,
+              // two stacked shadows: a tight rim plus a wide halo, which is what
+              // makes a lit muscle glow rather than just sit on a coloured shape
+              filter: sc
+                ? `drop-shadow(0 0 ${3 + sc.score * 7}px ${sc.color}) drop-shadow(0 0 ${9 + sc.score * 20}px ${sc.color})`
+                : undefined,
               transition: "filter 220ms ease",
             }}
           >
@@ -77,7 +102,7 @@ function Figure({
                 key={i}
                 d={d}
                 fill={fill}
-                fillOpacity={sc ? 0.55 + sc.score * 0.45 : 1}
+                fillOpacity={sc ? 0.8 + sc.score * 0.2 : 1}
                 stroke={isSel ? "#fff" : EDGE}
                 strokeWidth={isSel ? 4 : 1.5}
                 style={{ transition: "fill 220ms ease, fill-opacity 220ms ease" }}
