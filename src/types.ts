@@ -17,12 +17,29 @@ export type RoutineItem = {
   reps: number;
 };
 
+/** One training day. Belongs to the split it was created under. */
 export type Routine = {
   id: string;
   name: string;
+  /** The split this day belongs to. Absent only on data from before splits existed. */
+  splitId?: string;
   items: RoutineItem[];
   createdAt: number;
   updatedAt: number;
+};
+
+/**
+ * A training programme: a named set of days you rotate through. One split is
+ * active at a time, and the Routines screen shows that split's days.
+ */
+export type Split = {
+  id: string;
+  name: string;
+  /** One line describing who the split suits, shown when choosing. */
+  blurb: string;
+  /** Which built-in preset this came from, so choosing it twice reuses it. */
+  preset?: string;
+  createdAt: number;
 };
 
 export type SetLog = {

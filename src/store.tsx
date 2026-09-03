@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import * as store from "./lib/db";
-import { seedExercises, seedRoutines } from "./lib/seed";
+import { buildPreset, type Preset } from "./lib/presets";
+import { seedExercises } from "./lib/seed";
 import { todayKey, uid } from "./lib/util";
 import {
   DEFAULT_SETTINGS,
@@ -18,26 +19,31 @@ import {
   type Session,
   type SetLog,
   type Settings,
+  type Split,
 } from "./types";
 
 type State = {
   ready: boolean;
   exercises: Exercise[];
   routines: Routine[];
+  splits: Split[];
   sessions: Session[];
   bodyweight: BodyWeight[];
   settings: Settings;
   activeSessionId: string | null;
+  activeSplitId: string | null;
 };
 
 const empty: State = {
   ready: false,
   exercises: [],
   routines: [],
+  splits: [],
   sessions: [],
   bodyweight: [],
   settings: DEFAULT_SETTINGS,
   activeSessionId: null,
+  activeSplitId: null,
 };
 
 type Ctx = ReturnType<typeof useProvideStore>;
@@ -46,13 +52,38 @@ const StoreCtx = createContext<Ctx | null>(null);
 /** Module-level so StrictMode's double-invoked effect can't seed the library twice. */
 let bootstrap: Promise<Awaited<ReturnType<typeof store.loadAll>>> | null = null;
 
+type Loaded = Awaited<ReturnType<typeof store.loadAll>>;
+
+/**
+ * Routines predate splits, and a version 1 backup can import more of them at
+ * any time, so any routine that does not belong to a split is adopted into one
+ * on load. Without this they would exist in the database but appear nowhere,
+ * since the Routines screen only ever shows the active split's days.
+ */
+async function adoptLooseRoutines(data: Loaded): Promise<Loaded> {
+  const loose = data.routines.filter((r) => !r.splitId);
+  if (!loose.length) return data;
+
+  const split: Split = {
+    id: uid(),
+    name: "My Split",
+    blurb: "Your own routines.",
+    createdAt: loose[0].createdAt,
+  };
+  await store.put.split(split);
+  await Promise.all(loose.map((r) => store.put.routine({ ...r, splitId: split.id })));
+  // an existing user lands back where they were, rather than on the chooser
+  if (!data.activeSplitId) await store.put.activeSplitId(split.id);
+  return store.loadAll();
+}
+
 function boot() {
   bootstrap ??= (async () => {
     const data = await store.loadAll();
-    if (data.exercises.length || data.sessions.length) return data;
-    const ex = seedExercises();
-    const rt = seedRoutines(ex);
-    await Promise.all([...ex.map(store.put.exercise), ...rt.map(store.put.routine)]);
+    // The exercise library is seeded, but routines are not: a fresh install is
+    // meant to reach the Routines screen with nothing chosen, and be asked.
+    if (data.exercises.length || data.sessions.length) return adoptLooseRoutines(data);
+    await Promise.all(seedExercises().map(store.put.exercise));
     return store.loadAll();
   })();
   return bootstrap;
@@ -73,13 +104,24 @@ function useProvideStore() {
   }, []);
 
   const reload = useCallback(async () => {
-    const data = await store.loadAll();
+    const data = await adoptLooseRoutines(await store.loadAll());
     setS({ ...data, ready: true });
   }, []);
 
   const active = useMemo(
     () => s.sessions.find((x) => x.id === s.activeSessionId) ?? null,
     [s.sessions, s.activeSessionId],
+  );
+
+  const activeSplit = useMemo(
+    () => s.splits.find((x) => x.id === s.activeSplitId) ?? null,
+    [s.splits, s.activeSplitId],
+  );
+
+  /** The days of the active split, in order. Empty when no split is chosen. */
+  const splitRoutines = useMemo(
+    () => (s.activeSplitId ? s.routines.filter((r) => r.splitId === s.activeSplitId) : []),
+    [s.routines, s.activeSplitId],
   );
 
   const exerciseById = useMemo(() => {
@@ -112,6 +154,8 @@ function useProvideStore() {
     ...s,
     now,
     active,
+    activeSplit,
+    splitRoutines,
     exerciseById,
     reload,
 
@@ -251,6 +295,66 @@ function useProvideStore() {
     async deleteExercise(id: string) {
       await store.del.exercise(id);
       setS((p) => ({ ...p, exercises: p.exercises.filter((x) => x.id !== id) }));
+    },
+
+    /**
+     * Starts a split. A preset already in use is switched back to rather than
+     * built again, so choosing it twice does not duplicate its days.
+     */
+    async useSplit(preset: Preset) {
+      const existing = s.splits.find((x) => x.preset === preset.key);
+      if (existing) {
+        await store.put.activeSplitId(existing.id);
+        setS((p) => ({ ...p, activeSplitId: existing.id }));
+        return;
+      }
+      const { split, routines } = buildPreset(preset, s.exercises);
+      await store.put.split(split);
+      await Promise.all(routines.map(store.put.routine));
+      await store.put.activeSplitId(split.id);
+      setS((p) => ({
+        ...p,
+        splits: [...p.splits, split],
+        routines: [...p.routines, ...routines],
+        activeSplitId: split.id,
+      }));
+    },
+
+    /** Starts an empty split of your own, ready for days to be added. */
+    async createSplit(name: string) {
+      const split: Split = {
+        id: uid(),
+        name: name.trim() || "My Split",
+        blurb: "Your own split.",
+        createdAt: Date.now(),
+      };
+      await store.put.split(split);
+      await store.put.activeSplitId(split.id);
+      setS((p) => ({ ...p, splits: [...p.splits, split], activeSplitId: split.id }));
+    },
+
+    async setActiveSplit(id: string | null) {
+      await store.put.activeSplitId(id);
+      setS((p) => ({ ...p, activeSplitId: id }));
+    },
+
+    async saveSplit(next: Split) {
+      await store.put.split(next);
+      setS((p) => ({ ...p, splits: p.splits.map((x) => (x.id === next.id ? next : x)) }));
+    },
+
+    /** Removes a split and its days. Logged workouts are untouched. */
+    async deleteSplit(id: string) {
+      const days = s.routines.filter((r) => r.splitId === id);
+      await Promise.all(days.map((r) => store.del.routine(r.id)));
+      await store.del.split(id);
+      if (s.activeSplitId === id) await store.put.activeSplitId(null);
+      setS((p) => ({
+        ...p,
+        splits: p.splits.filter((x) => x.id !== id),
+        routines: p.routines.filter((r) => r.splitId !== id),
+        activeSplitId: p.activeSplitId === id ? null : p.activeSplitId,
+      }));
     },
 
     async saveRoutine(r: Routine) {
