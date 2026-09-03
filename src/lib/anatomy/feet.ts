@@ -21,37 +21,56 @@ const BOX: Record<Gender, FootBox> = {
   female: { center: 320, span: 47, width: 92, top: 1381, bottom: 1434 },
 };
 
+/** How far each foot turns out from the ankle. Nobody stands with both feet parallel. */
+const SPLAY_DEG = 15;
+
 const n = (v: number) => Math.round(v * 10) / 10;
 
-/** An ellipse expressed as a path, since BodyPart only carries path data. */
-function ellipse(cx: number, cy: number, rx: number, ry: number) {
-  return `M${n(cx - rx)} ${n(cy)}a${n(rx)} ${n(ry)} 0 1 0 ${n(rx * 2)} 0a${n(rx)} ${n(ry)} 0 1 0 ${n(-rx * 2)} 0Z`;
-}
-
 /**
- * One foot. `s` is +1 for the foot on the +x side and -1 for the mirrored one;
- * the big toe always sits on the inner edge (toward the body's centre line).
+ * One foot, rotated outward about the ankle so it points away from the centre
+ * line. `s` is +1 for the foot on the +x side and -1 for the mirrored one; the
+ * big toe always sits on the inner edge.
  */
 function foot(cx: number, w: number, top: number, bottom: number, s: 1 | -1): string[] {
   const h = bottom - top;
-  const x = (f: number) => n(cx + s * w * f);
-  const y = (f: number) => n(top + h * f);
+
+  // outward means the toes swing away from the body's centre line
+  const rot = -s * SPLAY_DEG;
+  const rad = (rot * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  // pivot at the ankle, so the leg joint stays put while the foot turns
+  const px = cx;
+  const py = top;
+  const spin = (ax: number, ay: number): [number, number] => {
+    const dx = ax - px;
+    const dy = ay - py;
+    return [px + dx * cos - dy * sin, py + dx * sin + dy * cos];
+  };
+
+  /** fractional foot coords -> rotated absolute point */
+  const at = (fx: number, fy: number) => spin(cx + s * w * fx, top + h * fy);
+  const pt = (fx: number, fy: number) => {
+    const [X, Y] = at(fx, fy);
+    return `${n(X)} ${n(Y)}`;
+  };
 
   // dorsum: narrow at the ankle, widening only gently to the ball of the foot
   const body =
-    `M${x(-0.18)} ${y(0)}` +
-    `C${x(-0.28)} ${y(0.26)} ${x(-0.33)} ${y(0.5)} ${x(-0.33)} ${y(0.66)}` +
-    `Q${x(-0.32)} ${y(0.74)} ${x(-0.24)} ${y(0.75)}` +
-    `L${x(0.26)} ${y(0.72)}` +
-    `Q${x(0.34)} ${y(0.7)} ${x(0.33)} ${y(0.62)}` +
-    `C${x(0.32)} ${y(0.42)} ${x(0.24)} ${y(0.18)} ${x(0.17)} ${y(0)}` +
+    `M${pt(-0.18, 0)}` +
+    `C${pt(-0.28, 0.26)} ${pt(-0.33, 0.5)} ${pt(-0.33, 0.66)}` +
+    `Q${pt(-0.32, 0.74)} ${pt(-0.24, 0.75)}` +
+    `L${pt(0.26, 0.72)}` +
+    `Q${pt(0.34, 0.7)} ${pt(0.33, 0.62)}` +
+    `C${pt(0.32, 0.42)} ${pt(0.24, 0.18)} ${pt(0.17, 0)}` +
     `Z`;
 
   /**
-   * Five toes, listed inner to outer as [offset, centre-y, rx, ry] in fractions
-   * of the foot box. Spacing and size are deliberately uneven — the big toe is
-   * much larger and sits slightly apart, and the second toe reaches furthest.
-   * An even row of same-sized beads is what stops it reading as a foot.
+   * Five toes as [offset, centre-y, rx, ry] in fractions of the foot box, inner
+   * to outer. Spacing and size are deliberately uneven — the big toe is much
+   * larger and sits slightly apart. An even row of same-sized beads reads as a
+   * flipper, not a foot. Each is rotated with the foot.
    */
   const TOES: [number, number, number, number][] = [
     [-0.27, 0.8, 0.085, 0.21],
@@ -60,9 +79,25 @@ function foot(cx: number, w: number, top: number, bottom: number, s: 1 | -1): st
     [0.14, 0.795, 0.048, 0.134],
     [0.235, 0.775, 0.042, 0.115],
   ];
-  const toes = TOES.map(([ox, oy, orx, ory]) =>
-    ellipse(cx + s * w * ox, top + h * oy, w * orx, h * ory),
-  );
+
+  const toes = TOES.map(([ox, oy, orx, ory]) => {
+    const [ecx, ecy] = at(ox, oy);
+    const rx = w * orx;
+    const ry = h * ory;
+    // the ellipse turns with the foot, so its own x-axis carries the rotation
+    const dx = rx * cos;
+    const dy = rx * sin;
+    const x1 = n(ecx - dx);
+    const y1 = n(ecy - dy);
+    const x2 = n(ecx + dx);
+    const y2 = n(ecy + dy);
+    return (
+      `M${x1} ${y1}` +
+      `a${n(rx)} ${n(ry)} ${rot} 1 0 ${n(x2 - x1)} ${n(y2 - y1)}` +
+      `a${n(rx)} ${n(ry)} ${rot} 1 0 ${n(x1 - x2)} ${n(y1 - y2)}` +
+      `Z`
+    );
+  });
 
   return [body, ...toes];
 }
