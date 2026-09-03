@@ -30,13 +30,23 @@ export const CANONICAL_LIFT: Record<MuscleGroup, string> = {
 export const TIERS = ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Titan"] as const;
 export type Tier = (typeof TIERS)[number];
 
-/** Chosen for dark mode: each one has to read as a glow against a black body. */
+/**
+ * Chosen for dark mode: each one has to read as a glow against a black body,
+ * and each has to be tellable from the rung either side of it at a glance.
+ *
+ * That second requirement is what sets Platinum and Diamond. A cyan and a blue
+ * sat 39 degrees apart on adjacent rungs, so both just read as "cool glow" and
+ * the ladder lost its middle. Silver already holds the neutral slot and Gold
+ * the yellow, which leaves green and blue as the two well-separated hues going
+ * spare — so the ascent now runs orange, neutral, yellow, green, blue, violet,
+ * with no adjacent pair closer than 60 degrees.
+ */
 export const TIER_COLOR: Record<Tier, string> = {
   Bronze: "#CD7F32",
   Silver: "#C0C0C0",
   Gold: "#FFD700",
-  Platinum: "#00D2D3",
-  Diamond: "#70A1FF",
+  Platinum: "#35D66B",
+  Diamond: "#2E9BFF",
   Titan: "#8A2BE2",
 };
 
