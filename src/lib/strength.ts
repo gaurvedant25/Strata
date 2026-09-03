@@ -34,19 +34,19 @@ export type Tier = (typeof TIERS)[number];
  * Chosen for dark mode: each one has to read as a glow against a black body,
  * and each has to be tellable from the rung either side of it at a glance.
  *
- * That second requirement is what sets Platinum and Diamond. A cyan and a blue
- * sat 39 degrees apart on adjacent rungs, so both just read as "cool glow" and
- * the ladder lost its middle. Silver already holds the neutral slot and Gold
- * the yellow, which leaves green and blue as the two well-separated hues going
- * spare — so the ascent now runs orange, neutral, yellow, green, blue, violet,
- * with no adjacent pair closer than 60 degrees.
+ * Platinum and Diamond share a hue — 175 and 179 degrees, near enough the same
+ * teal — and are told apart by brightness instead, Diamond being some three
+ * times the luminance of Platinum. That is a deliberate pairing rather than the
+ * accident it replaced: the earlier cyan and blue differed slightly in both
+ * hue and brightness and so resolved in neither, where a dim teal against a
+ * brilliant one separates cleanly and reads as the same metal, brighter.
  */
 export const TIER_COLOR: Record<Tier, string> = {
   Bronze: "#CD7F32",
   Silver: "#C0C0C0",
   Gold: "#FFD700",
-  Platinum: "#35D66B",
-  Diamond: "#2E9BFF",
+  Platinum: "#0E8C82",
+  Diamond: "#00FFF9",
   Titan: "#8A2BE2",
 };
 
