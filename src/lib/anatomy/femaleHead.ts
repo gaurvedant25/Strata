@@ -1,8 +1,9 @@
 import type { BodyPart } from "./types";
+import type { BodyView } from "./index";
 
 /**
  * The vendored female figure wears long flowing hair and a fairly large head.
- * The hair is dropped and the face scaled down here, without touching the
+ * The hair is dropped and the head replaced with a plain oval here, without touching the
  * third-party path data.
  *
  * Measured from the female figure's own coordinate space:
@@ -20,22 +21,23 @@ function ellipse(cx: number, cy: number, rx: number, ry: number) {
   return `M${n(cx - rx)} ${n(cy)}a${n(rx)} ${n(ry)} 0 1 0 ${n(rx * 2)} 0a${n(rx)} ${n(ry)} 0 1 0 ${n(-rx * 2)} 0Z`;
 }
 
-/** Plain skull for the back view, sized to the head the front view shows. */
-export function femaleBackHead(): BodyPart {
+/**
+ * Plain oval heads for both views.
+ *
+ * The vendored head path is drawn *with* a hairline, so its scalp carries a
+ * cutout where the hair used to sit. With the hair gone that notch is exposed,
+ * and scaling the path just scales the notch — so the head is replaced outright
+ * rather than resized. Each oval is sized to the head it replaces and reaches
+ * far enough down to meet the neck.
+ */
+export function femaleHead(view: BodyView): BodyPart {
+  // front neck starts at y250, back neck at y218 — the ovals overlap them
+  const o =
+    view === "front"
+      ? { cx: 320, cy: 174, rx: 60, ry: 80 }
+      : { cx: 1109, cy: 158, rx: 63, ry: 84 };
   return {
     slug: "head",
-    path: { common: [ellipse(1109, 158, 66, 88)] },
+    path: { common: [ellipse(o.cx, o.cy, o.rx, o.ry)] },
   };
-}
-
-/**
- * Shrinks the face about the neck join, so it scales down without floating off
- * the neck. translate(c(1-s)) scale(s) is the compact form of
- * translate(c) scale(s) translate(-c).
- */
-export function femaleHeadTransform(): string {
-  const s = 0.88;
-  const cx = 320; // head centre
-  const cy = 248; // where the head meets the neck
-  return `translate(${n(cx * (1 - s))} ${n(cy * (1 - s))}) scale(${s})`;
 }

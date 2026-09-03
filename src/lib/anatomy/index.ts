@@ -5,7 +5,7 @@ import { bodyFemaleBack } from "./bodyFemaleBack";
 import { bodyFemaleFront } from "./bodyFemaleFront";
 import { bodyFront } from "./bodyFront";
 import { feetPart } from "./feet";
-import { femaleBackHead, femaleHeadTransform } from "./femaleHead";
+import { femaleHead } from "./femaleHead";
 import type { BodyPart } from "./types";
 
 export type { BodyPart };
@@ -70,16 +70,16 @@ export function anatomy(gender: Gender, view: BodyView) {
       ? source.map((p) => (p.slug === "feet" ? feetPart(gender) : p))
       : source.filter((p) => p.slug !== "feet");
 
-  // The female figure loses its hair and gets a slightly smaller face. On the
-  // back there is no head part — the hair is the head — so that view swaps in a
-  // plain skull rather than dropping the part and going headless.
+  // The female figure loses its hair and gets a plain oval head. Front drops the
+  // hair and replaces the head; back has no head part at all — the hair is the
+  // head from behind — so there the hair slot becomes the head.
   if (gender === "female") {
     parts =
       view === "front"
         ? parts
             .filter((p) => p.slug !== "hair")
-            .map((p) => (p.slug === "head" ? { ...p, transform: femaleHeadTransform() } : p))
-        : parts.map((p) => (p.slug === "hair" ? femaleBackHead() : p));
+            .map((p) => (p.slug === "head" ? femaleHead("front") : p))
+        : parts.map((p) => (p.slug === "hair" ? femaleHead("back") : p));
   }
 
   return { parts, viewBox: VIEWBOX[gender][view] };
