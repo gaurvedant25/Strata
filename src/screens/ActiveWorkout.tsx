@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useConfirm } from "../components/confirm";
 import { ExercisePicker } from "../components/ExercisePicker";
 import { Button, Empty, Eyebrow, Sheet, StatBand } from "../components/ui";
 import { e1rm, lastPerformance, personalRecords, sessionSetCount, sessionVolume } from "../lib/stats";
@@ -9,6 +10,14 @@ import type { SessionEntry, SetLog } from "../types";
 export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   const s = useStore();
   const session = s.active!;
+  const ask = useConfirm();
+  const askDiscard = () =>
+    ask({
+      title: "Discard this workout?",
+      body: "Nothing logged in it is saved.",
+      confirmLabel: "Discard",
+      danger: true,
+    });
   const [picker, setPicker] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [confirmFinish, setConfirmFinish] = useState(false);
@@ -70,10 +79,8 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
                 <Button onClick={() => setPicker(true)}>Add exercise</Button>
                 <Button
                   variant="quiet"
-                  onClick={() => {
-                    if (confirm("Discard this workout? It will not be saved.")) {
-                      void s.discardSession();
-                    }
+                  onClick={async () => {
+                    if (await askDiscard()) void s.discardSession();
                   }}
                 >
                   Discard workout
@@ -172,8 +179,8 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
             </Button>
             <Button
               variant="danger"
-              onClick={() => {
-                if (confirm("Discard this workout? It will not be saved.")) {
+              onClick={async () => {
+                if (await askDiscard()) {
                   void s.discardSession();
                   setConfirmFinish(false);
                 }

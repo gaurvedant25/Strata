@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../auth";
+import { useConfirm } from "../components/confirm";
 import { Button, Eyebrow, Segmented, Sheet, inputCls } from "../components/ui";
 import { exportBackup, importBackup, wipe } from "../lib/db";
 import { fmtRelative, todayKey } from "../lib/util";
@@ -9,6 +10,7 @@ import type { Gender, Unit } from "../types";
 export function Settings({ onBack }: { onBack: () => void }) {
   const s = useStore();
   const auth = useAuth();
+  const ask = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [exOpen, setExOpen] = useState(false);
@@ -99,13 +101,12 @@ export function Settings({ onBack }: { onBack: () => void }) {
               <button
                 disabled={signingOut}
                 onClick={async () => {
-                  if (
-                    !confirm(
-                      "Sign out? Your workouts stay in your account and sync back when you sign in again.",
-                    )
-                  ) {
-                    return;
-                  }
+                  const yes = await ask({
+                    title: "Sign out?",
+                    body: "Your workouts stay in your account and sync back when you sign in again.",
+                    confirmLabel: "Sign out",
+                  });
+                  if (!yes) return;
                   setSigningOut(true);
                   try {
                     await auth.signOut();
@@ -193,14 +194,14 @@ export function Settings({ onBack }: { onBack: () => void }) {
         }}
       />
       <button
-        onClick={() => {
-          if (
-            confirm(
-              "Erase every workout, routine and exercise on this device? This cannot be undone.",
-            )
-          ) {
-            void wipe().then(() => location.reload());
-          }
+        onClick={async () => {
+          const yes = await ask({
+            title: "Erase everything on this device?",
+            body: "Every workout, routine and exercise stored here. This cannot be undone.",
+            confirmLabel: "Erase all data",
+            danger: true,
+          });
+          if (yes) void wipe().then(() => location.reload());
         }}
         className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b]"
       >
@@ -291,6 +292,7 @@ function ActionRow({
 
 function ExerciseManager({ open, onClose }: { open: boolean; onClose: () => void }) {
   const s = useStore();
+  const ask = useConfirm();
   const [q, setQ] = useState("");
   const list = s.exercises
     .filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase()))
@@ -322,8 +324,14 @@ function ExerciseManager({ open, onClose }: { open: boolean; onClose: () => void
               </span>
             ) : (
               <button
-                onClick={() => {
-                  if (confirm(`Delete "${e.name}" from your library?`)) void s.deleteExercise(e.id);
+                onClick={async () => {
+                  const yes = await ask({
+                    title: `Delete "${e.name}"?`,
+                    body: "It is removed from your exercise library.",
+                    confirmLabel: "Delete",
+                    danger: true,
+                  });
+                  if (yes) void s.deleteExercise(e.id);
                 }}
                 className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-danger"
               >

@@ -2,6 +2,7 @@ import { StrictMode, useCallback, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AuthProvider } from "./auth";
+import { ConfirmProvider } from "./components/confirm";
 import "./index.css";
 import { StoreProvider, useStore } from "./store";
 
@@ -16,7 +17,9 @@ function Shell() {
   const onSynced = useCallback(() => void reload.current(), []);
   return (
     <AuthProvider onSynced={onSynced}>
-      <App />
+      <ConfirmProvider>
+        <App />
+      </ConfirmProvider>
     </AuthProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useConfirm } from "../components/confirm";
 import { Button, Empty, Eyebrow, StatBand, TextTabs } from "../components/ui";
 import { e1rm, personalRecords, sessionSetCount, sessionVolume, working } from "../lib/stats";
 import { fmtDuration, num, parseKey } from "../lib/util";
@@ -121,6 +122,7 @@ export function History() {
 /** One logged workout, as a page. */
 function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
   const s = useStore();
+  const ask = useConfirm();
   const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
   const d = parseKey(session.date);
 
@@ -236,8 +238,14 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
         </Button>
         <Button
           variant="danger"
-          onClick={() => {
-            if (confirm("Delete this workout permanently?")) {
+          onClick={async () => {
+            const yes = await ask({
+              title: "Delete this workout?",
+              body: "It is removed permanently, and the lifts in it stop counting toward your scores.",
+              confirmLabel: "Delete workout",
+              danger: true,
+            });
+            if (yes) {
               void s.deleteSession(session.id);
               onBack();
             }

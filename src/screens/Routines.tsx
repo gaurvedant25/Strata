@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useConfirm } from "../components/confirm";
 import { ExercisePicker } from "../components/ExercisePicker";
 import { Button, Empty, Eyebrow, Row, Sheet, inputCls } from "../components/ui";
 import { PRESETS, type Preset } from "../lib/presets";
@@ -119,6 +120,7 @@ export function Routines() {
  */
 function SplitEditor({ split, onClose }: { split: Split; onClose: () => void }) {
   const s = useStore();
+  const ask = useConfirm();
   const [name, setName] = useState(split.name);
   const days = s.splitRoutines.length;
 
@@ -141,12 +143,14 @@ function SplitEditor({ split, onClose }: { split: Split; onClose: () => void }) 
           </Button>
           <Button
             variant="danger"
-            onClick={() => {
-              if (
-                confirm(
-                  `Delete "${split.name}" and its ${days} ${days === 1 ? "day" : "days"}? Logged workouts are kept.`,
-                )
-              ) {
+            onClick={async () => {
+              const yes = await ask({
+                title: `Delete "${split.name}"?`,
+                body: `Its ${days} ${days === 1 ? "day goes" : "days go"} with it. Logged workouts are kept.`,
+                confirmLabel: "Delete split",
+                danger: true,
+              });
+              if (yes) {
                 void s.deleteSplit(split.id);
                 onClose();
               }
@@ -300,6 +304,7 @@ function SplitChooser({ onDone, canCancel }: { onDone: () => void; canCancel: bo
 
 function RoutineEditor({ routine, onClose }: { routine: Routine; onClose: () => void }) {
   const s = useStore();
+  const ask = useConfirm();
   const [name, setName] = useState(routine.name);
   const [items, setItems] = useState<RoutineItem[]>(routine.items);
   const [picker, setPicker] = useState(false);
@@ -338,8 +343,14 @@ function RoutineEditor({ routine, onClose }: { routine: Routine; onClose: () => 
           {exists && (
             <Button
               variant="danger"
-              onClick={() => {
-                if (confirm(`Delete "${routine.name}"? Logged workouts are kept.`)) {
+              onClick={async () => {
+                const yes = await ask({
+                  title: `Delete "${routine.name}"?`,
+                  body: "The day is removed from this split. Logged workouts are kept.",
+                  confirmLabel: "Delete day",
+                  danger: true,
+                });
+                if (yes) {
                   void s.deleteRoutine(routine.id);
                   onClose();
                 }
