@@ -47,6 +47,11 @@ export const STAGE_ASPECT = 0.92;
 export const VB_W = 110;
 export const VB_H = 100;
 
+/** How long the leader line takes to reach the box. */
+const LINE_MS = 300;
+/** How long the box takes to open once it does. */
+const BOX_MS = 180;
+
 const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789×@#%";
 const dots = (s: string) => s.replace(/[^ ]/g, "·");
 
@@ -165,19 +170,18 @@ export function Callout({
 
   useEffect(() => {
     if (reduced()) return;
-    const compute = () => {
-      const t = performance.now() - start.current;
-      const p = t >= 315 ? 2 : 1;
-      setPhase(p);
-      return p === 2;
-    };
-    const raf = requestAnimationFrame(compute);
-    const id = setInterval(() => {
-      if (compute()) clearInterval(id);
-    }, 60);
+    // Timed, not polled. This used to check the clock every 60ms, so the box
+    // waited for whichever tick came after the line landed — up to a frame and
+    // a half of nothing happening, which is the pause that was visible. Firing
+    // at exactly the line's own duration hands one straight to the other.
+    const raf = requestAnimationFrame(() => setPhase(1));
+    const id = setTimeout(
+      () => setPhase(2),
+      Math.max(0, LINE_MS - (performance.now() - start.current)),
+    );
     return () => {
       cancelAnimationFrame(raf);
-      clearInterval(id);
+      clearTimeout(id);
     };
   }, []);
 
@@ -210,7 +214,7 @@ export function Callout({
            * stroke — invisible against black, obvious across a lit muscle.
            */
           clipPath: reveal,
-          transition: "clip-path 300ms cubic-bezier(.3,.7,.3,1)",
+          transition: `clip-path ${LINE_MS}ms cubic-bezier(.3,.7,.3,1)`,
         }}
       >
         {/* a black casing under the hairline, so it stays legible over a lit muscle */}
@@ -250,7 +254,7 @@ export function Callout({
           transformOrigin: isLeft ? "top right" : "top left",
           transform: phase > 1 ? "scale(1)" : "scale(.18)",
           opacity: phase > 1 ? 1 : 0,
-          transition: "transform 180ms cubic-bezier(.22,.61,.36,1), opacity 135ms ease-out",
+          transition: `transform ${BOX_MS}ms cubic-bezier(.22,.61,.36,1), opacity ${Math.round(BOX_MS * 0.75)}ms ease-out`,
           zIndex: 4,
         }}
       >
