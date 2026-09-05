@@ -45,8 +45,11 @@ export function Sparkline({
   labels?: [string, string];
   /** Index of the point being inspected, or null for none. */
   selected?: number | null;
-  /** Omit to make the chart non-interactive. */
-  onSelect?: (i: number | null) => void;
+  /**
+   * Omit to make the chart non-interactive. `via` says which gesture produced
+   * the selection: a tap lands on one session, a drag sweeps across many.
+   */
+  onSelect?: (i: number, via: "tap" | "drag") => void;
   width?: number;
   height?: number;
   padT?: number;
@@ -57,7 +60,10 @@ export function Sparkline({
   showPoints?: boolean;
 }) {
   const svg = useRef<SVGSVGElement>(null);
-  const dragging = useRef(false);
+  const down = useRef(false);
+  const startX = useRef(0);
+  /** Set once the pointer has travelled far enough to be a drag, not a tap. */
+  const moved = useRef(false);
 
   /**
    * The series being travelled away from, and how far along we are.
@@ -151,13 +157,13 @@ export function Sparkline({
   const arriving = morphing ? handover : 1;
 
   /** Maps a pointer position onto the nearest session. */
-  function pick(ev: PointerEvent<SVGSVGElement>) {
+  function pick(ev: PointerEvent<SVGSVGElement>, via: "tap" | "drag") {
     if (!onSelect) return;
     const rect = svg.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return;
     const ratio = (ev.clientX - rect.left) / rect.width;
     const i = Math.round(ratio * (values.length - 1));
-    onSelect(Math.max(0, Math.min(values.length - 1, i)));
+    onSelect(Math.max(0, Math.min(values.length - 1, i)), via);
   }
 
   // Points crowd together on a long history, so they thin out rather than
@@ -178,18 +184,25 @@ export function Sparkline({
       }}
       onPointerDown={(ev) => {
         if (!onSelect) return;
-        dragging.current = true;
+        down.current = true;
+        moved.current = false;
+        startX.current = ev.clientX;
         ev.currentTarget.setPointerCapture(ev.pointerId);
-        pick(ev);
+        // Nothing is selected yet: until the pointer moves this could still be
+        // a tap, and the two are reported differently.
       }}
       onPointerMove={(ev) => {
-        if (dragging.current) pick(ev);
+        if (!down.current) return;
+        if (!moved.current && Math.abs(ev.clientX - startX.current) > 4) moved.current = true;
+        if (moved.current) pick(ev, "drag");
       }}
-      onPointerUp={() => {
-        dragging.current = false;
+      onPointerUp={(ev) => {
+        if (!down.current) return;
+        down.current = false;
+        if (!moved.current) pick(ev, "tap");
       }}
       onPointerCancel={() => {
-        dragging.current = false;
+        down.current = false;
       }}
     >
       {showBaseline && (

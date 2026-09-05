@@ -52,6 +52,10 @@ export function Progress() {
   // Which session the finger is on. Cleared whenever the series underneath it
   // changes, so an index can never point at a different lift's history.
   const [scrub, setScrub] = useState<number | null>(null);
+  // A tap replays the scramble; a drag suppresses it until the next tap or
+  // series change, since the figure has to keep up with the finger.
+  const [sweeping, setSweeping] = useState(false);
+  const [tapSeq, setTapSeq] = useState(0);
   const current = tracked.find((e) => e.id === exId) ?? tracked[0];
 
   const points = useMemo(() => {
@@ -139,6 +143,7 @@ export function Progress() {
                   onClick={() => {
                     setMetric(m.id);
                     setScrub(null);
+                    setSweeping(false);
                   }}
                   className={`border-b pb-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] transition-colors ${
                     metric === m.id ? "border-fg text-fg" : "border-transparent text-faint"
@@ -155,6 +160,7 @@ export function Progress() {
                 onChange={(r) => {
                   setRange(r);
                   setScrub(null);
+                  setSweeping(false);
                 }}
               />
             </div>
@@ -166,10 +172,18 @@ export function Progress() {
                 // to keep up with the finger, and a value resolving out of
                 // noise cannot be read at the speed it is being changed.
                 value={
-                  at ? (
+                  sweeping ? (
                     num(shown, 1)
                   ) : (
-                    <Scramble text={num(shown, 1)} delay={0} hold={110} perChar={40} />
+                    // keyed on the tap so landing on a session replays the
+                    // reveal even when the figure happens to be unchanged
+                    <Scramble
+                      key={tapSeq}
+                      text={num(shown, 1)}
+                      delay={0}
+                      hold={110}
+                      perChar={40}
+                    />
                   )
                 }
                 unit={unitLabel}
@@ -194,7 +208,11 @@ export function Progress() {
             <Sparkline
               values={values}
               selected={scrub}
-              onSelect={setScrub}
+              onSelect={(i, via) => {
+                setScrub(i);
+                setSweeping(via === "drag");
+                if (via === "tap") setTapSeq((n) => n + 1);
+              }}
               labels={
                 points.length > 1
                   ? [shortDate(points[0].date), shortDate(points[points.length - 1].date)]
@@ -202,7 +220,7 @@ export function Progress() {
               }
             />
             <p className="pt-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-faint">
-              {at ? "Drag to read another session · tap away to reset" : "Drag the curve to read a session"}
+              {at ? "Tap a point to read it · drag to sweep" : "Tap or drag the curve to read a session"}
             </p>
           </div>
 
