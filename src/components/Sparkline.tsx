@@ -12,7 +12,7 @@ import { useEffect, useRef, useState, type PointerEvent } from "react";
  */
 
 /** How long a change of series takes to settle. */
-const MORPH_MS = 350;
+const MORPH_MS = 263;
 /** Samples the morphing line is drawn through, independent of either series. */
 const PATH_STEPS = 64;
 /** Point in the morph where the old markers start leaving and the new arrive. */

@@ -255,9 +255,9 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                       <Scramble
                         key={active}
                         text={num(detail.best1rm)}
-                        delay={40}
-                        hold={130}
-                        perChar={45}
+                        delay={30}
+                        hold={98}
+                        perChar={34}
                       />
                     }
                     unit={`${unitLabel} est. 1RM`}
@@ -313,7 +313,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                       strokeWidth="2.4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className={`shrink-0 text-muted transition-transform duration-200 ${
+                      className={`shrink-0 text-muted transition-transform duration-150 ${
                         open ? "rotate-90" : ""
                       }`}
                     >

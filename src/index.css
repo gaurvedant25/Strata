@@ -22,6 +22,12 @@
 
   --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Everything that animates does so a quarter faster than the defaults it was
+     built on. This covers the bare `transition-colors` and `transition-transform`
+     utilities, which would otherwise still run at Tailwind's own 150ms and be
+     left out of step with the timings set explicitly elsewhere. */
+  --default-transition-duration: 112ms;
 }
 
 :root {
@@ -87,7 +93,7 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 .animate-pop {
-  animation: pop 0.14s ease-out;
+  animation: pop 0.105s ease-out;
 }
 
 @keyframes rise {
@@ -101,5 +107,5 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 .animate-rise {
-  animation: rise 0.18s ease-out;
+  animation: rise 0.135s ease-out;
 }

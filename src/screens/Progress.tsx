@@ -181,8 +181,8 @@ export function Progress() {
                       key={tapSeq}
                       text={num(shown, 1)}
                       delay={0}
-                      hold={110}
-                      perChar={40}
+                      hold={83}
+                      perChar={30}
                     />
                   )
                 }

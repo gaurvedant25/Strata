@@ -59,7 +59,7 @@ const reduced = () =>
 export function Scramble({
   text,
   delay = 0,
-  perChar = 55,
+  perChar = 41,
   hold = 0,
 }: {
   text: string;
@@ -153,7 +153,7 @@ export function Callout({
     if (reduced()) return;
     const compute = () => {
       const t = performance.now() - start.current;
-      const p = t >= 420 ? 2 : 1;
+      const p = t >= 315 ? 2 : 1;
       setPhase(p);
       return p === 2;
     };
@@ -184,7 +184,7 @@ export function Callout({
           transformOrigin: `${((ax / VB_W) * 100).toFixed(1)}% ${((ay / VB_H) * 100).toFixed(1)}%`,
           transform: phase ? "scale(1)" : "scale(.06)",
           opacity: phase ? 1 : 0,
-          transition: "transform 400ms cubic-bezier(.3,.7,.3,1), opacity 200ms ease-out",
+          transition: "transform 300ms cubic-bezier(.3,.7,.3,1), opacity 150ms ease-out",
         }}
       >
         {/* a black casing under the hairline, so it stays legible over a lit muscle */}
@@ -222,7 +222,7 @@ export function Callout({
           transformOrigin: isLeft ? "top left" : "top right",
           transform: phase > 1 ? "scale(1)" : "scale(.18)",
           opacity: phase > 1 ? 1 : 0,
-          transition: "transform 240ms cubic-bezier(.22,.61,.36,1), opacity 180ms ease-out",
+          transition: "transform 180ms cubic-bezier(.22,.61,.36,1), opacity 135ms ease-out",
           zIndex: 4,
         }}
       >
@@ -242,7 +242,7 @@ export function Callout({
               overflowWrap: "break-word",
             }}
           >
-            {l.scramble === false ? l.text : <Scramble text={l.text} delay={640 + i * 70} />}
+            {l.scramble === false ? l.text : <Scramble text={l.text} delay={480 + i * 53} />}
           </div>
         ))}
       </div>

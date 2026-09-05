@@ -107,7 +107,7 @@ function Figure({
         opacity,
         transform: `translateZ(${DEPTH}px)`,
         pointerEvents: opacity > 0.5 ? "auto" : "none",
-        transition: "opacity 300ms ease",
+        transition: "opacity 225ms ease",
       }}
     >
       <defs>
@@ -137,7 +137,7 @@ function Figure({
               filter: sc
                 ? `drop-shadow(0 0 ${3 + sc.score * 7}px ${sc.color}) drop-shadow(0 0 ${9 + sc.score * 20}px ${sc.color})`
                 : undefined,
-              transition: "filter 220ms ease",
+              transition: "filter 165ms ease",
             }}
           >
             {partPaths(part).map((d, i) => (
@@ -148,7 +148,7 @@ function Figure({
                 fillOpacity={sc ? 0.8 + sc.score * 0.2 : 1}
                 stroke={isSel ? "#fff" : EDGE}
                 strokeWidth={isSel ? 4 : 1.5}
-                style={{ transition: "fill 220ms ease, fill-opacity 220ms ease" }}
+                style={{ transition: "fill 165ms ease, fill-opacity 165ms ease" }}
               />
             ))}
           </g>
@@ -247,7 +247,7 @@ export function BodyMap({
     setP(0);
   }
 
-  const settle = dragging.current ? "none" : "transform 320ms cubic-bezier(.22,.61,.36,1)";
+  const settle = dragging.current ? "none" : "transform 240ms cubic-bezier(.22,.61,.36,1)";
 
   const anchor = (selected && ANCHOR[view][selected]) || ANCHOR[view].chest!;
   // Callouts need room either side, so the figure gives up the outer 60% of the
