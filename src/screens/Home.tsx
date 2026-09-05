@@ -133,7 +133,13 @@ export function Home({ onSettings }: { onSettings: () => void }) {
     return {
       left: [
         { text: CANONICAL_LIFT[active], size: 8, weight: 600, dim: true },
-        { text: `${num(pr.heaviest)} × ${pr.heaviestReps}`, size: 14, weight: 500, tight: true },
+        {
+          text: `${num(pr.heaviest)} × ${pr.heaviestReps}`,
+          size: 14,
+          weight: 500,
+          tight: true,
+          scramble: true,
+        },
         {
           text: parseKey(pr.date).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
           size: 8,
@@ -142,7 +148,13 @@ export function Home({ onSettings }: { onSettings: () => void }) {
         },
       ],
       right: [
-        { text: `Top ${percentile(detail.score)}%`, size: 14, weight: 600, tight: true },
+        {
+          text: `Top ${percentile(detail.score)}%`,
+          size: 14,
+          weight: 600,
+          tight: true,
+          scramble: true,
+        },
         { text: "estimated", size: 8, weight: 600, dim: true },
       ],
     };

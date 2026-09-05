@@ -21,7 +21,12 @@ export type CalloutLine = {
   /** Sentence case and no tracking, for a value rather than a label. */
   tight?: boolean;
   dim?: boolean;
-  /** Off for text that should appear whole. */
+  /**
+   * Resolve this line out of noise. Off by default: only the values in a
+   * callout change from region to region, and scrambling the labels around
+   * them made the whole box look like it was reloading rather than drawing
+   * attention to the one thing that had actually changed.
+   */
   scramble?: boolean;
 };
 
@@ -242,7 +247,7 @@ export function Callout({
               overflowWrap: "break-word",
             }}
           >
-            {l.scramble === false ? l.text : <Scramble text={l.text} delay={480 + i * 53} />}
+            {l.scramble ? <Scramble text={l.text} delay={480 + i * 53} /> : l.text}
           </div>
         ))}
       </div>
