@@ -48,8 +48,19 @@ export type Callouts = { left?: CalloutLine[]; right?: CalloutLine[] };
 
 export type { BodyView };
 
-const SKIN = "#3b3b45"; // body with no scored muscle behind it
-const INERT = "#45454f"; // drawn muscle that has no benchmark lift (abs, obliques)
+/**
+ * The two unlit tones.
+ *
+ * `SKIN` is a muscle that could be lit but has not been scored yet. `STRUCTURE`
+ * is everything that never lights at all — head, neck, knees — and sits a shade
+ * darker so a joint recedes instead of competing with the glow either side of
+ * it. They used to be the other way round: the second tone was the *lighter* of
+ * the two, because it was written for abs and obliques back when those were
+ * drawn but unscorable. Those are scored regions now, so all it did was make
+ * the knees the brightest thing on an unlit leg.
+ */
+const SKIN = "#3b3b45";
+const STRUCTURE = "#34343d";
 const EDGE = "rgba(0,0,0,.72)";
 
 /** Mixes a hex colour toward white (positive) or black (negative) for the sheen. */
@@ -123,7 +134,7 @@ function Figure({
         const group = groupForSlug(part.slug);
         const sc = group ? scores[group] : undefined;
         const isSel = !!selected && group === selected;
-        const fill = sc ? `url(#${gradId(sc.color)})` : group ? SKIN : INERT;
+        const fill = sc ? `url(#${gradId(sc.color)})` : group ? SKIN : STRUCTURE;
         return (
           <g
             key={part.slug}
