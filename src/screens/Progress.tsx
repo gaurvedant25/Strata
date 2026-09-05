@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Sparkline } from "../components/Sparkline";
-import { BigNumber, Empty, Eyebrow, Sheet, StatBand } from "../components/ui";
+import { BigNumber, Empty, Eyebrow, Sheet, StatBand, TextTabs } from "../components/ui";
 import { exerciseHistory, personalRecords, sessionVolume } from "../lib/stats";
 import { num, parseKey } from "../lib/util";
 import { useStore } from "../store";
@@ -14,6 +14,18 @@ const METRICS: { id: Metric; label: string }[] = [
 
 const shortDate = (key: string) =>
   parseKey(key).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+const longDate = (key: string) =>
+  parseKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+
+/** How far back the curve reaches. Matches the windows History offers. */
+type Range = "all" | "30d" | "90d" | "year";
+const RANGES: { id: Range; label: string; days: number }[] = [
+  { id: "all", label: "All", days: Infinity },
+  { id: "30d", label: "30d", days: 30 },
+  { id: "90d", label: "90d", days: 90 },
+  { id: "year", label: "1y", days: 365 },
+];
 
 export function Progress() {
   const s = useStore();
@@ -35,12 +47,18 @@ export function Progress() {
   // tracked or the list reordering as PRs land.
   const [exId, setExId] = useState<string>("");
   const [picker, setPicker] = useState(false);
+  const [range, setRange] = useState<Range>("all");
+  // Which session the finger is on. Cleared whenever the series underneath it
+  // changes, so an index can never point at a different lift's history.
+  const [scrub, setScrub] = useState<number | null>(null);
   const current = tracked.find((e) => e.id === exId) ?? tracked[0];
 
-  const points = useMemo(
-    () => (current ? exerciseHistory(done, current.id) : []),
-    [done, current],
-  );
+  const points = useMemo(() => {
+    if (!current) return [];
+    const days = RANGES.find((r) => r.id === range)!.days;
+    const since = days === Infinity ? 0 : Date.now() - days * 864e5;
+    return exerciseHistory(done, current.id).filter((p) => p.at >= since);
+  }, [done, current, range]);
 
   const totals = useMemo(
     () => ({
@@ -69,6 +87,8 @@ export function Progress() {
   const first = values[0] ?? 0;
   const last = values[values.length - 1] ?? 0;
   const change = first > 0 ? ((last - first) / first) * 100 : 0;
+  const at = scrub != null && points[scrub] ? points[scrub] : null;
+  const shown = at ? at[metric] : last;
   const bwValues = s.bodyweight.map((b) => b.weight);
 
   return (
@@ -110,11 +130,15 @@ export function Progress() {
               </svg>
             </button>
 
-            <div className="flex gap-5 pt-4.5">
+            <div className="flex items-baseline justify-between gap-4 pt-4.5">
+              <div className="flex gap-5">
               {METRICS.map((m) => (
                 <button
                   key={m.id}
-                  onClick={() => setMetric(m.id)}
+                  onClick={() => {
+                    setMetric(m.id);
+                    setScrub(null);
+                  }}
                   className={`border-b pb-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] transition-colors ${
                     metric === m.id ? "border-fg text-fg" : "border-transparent text-faint"
                   }`}
@@ -122,28 +146,49 @@ export function Progress() {
                   {m.label}
                 </button>
               ))}
+              </div>
+              <TextTabs
+                gap="gap-3.5"
+                options={RANGES.map((r) => ({ id: r.id, label: r.label }))}
+                value={range}
+                onChange={(r) => {
+                  setRange(r);
+                  setScrub(null);
+                }}
+              />
             </div>
 
             <div className="pt-6">
-              <BigNumber value={num(last, 1)} unit={unitLabel} size={46} />
+              <BigNumber value={num(shown, 1)} unit={unitLabel} size={46} />
             </div>
-            {points.length > 1 && (
-              <p className="mt-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
-                {change >= 0 ? "+" : ""}
-                {num(change, 1)}% since {shortDate(points[0].date)}
-              </p>
-            )}
+            <p className="mt-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+              {at ? (
+                <span className="text-fg">{longDate(at.date)}</span>
+              ) : points.length > 1 ? (
+                <>
+                  {change >= 0 ? "+" : ""}
+                  {num(change, 1)}% since {shortDate(points[0].date)}
+                </>
+              ) : (
+                `${points.length} session${points.length === 1 ? "" : "s"} in range`
+              )}
+            </p>
           </div>
 
           <div className="px-5 pt-5">
             <Sparkline
               values={values}
+              selected={scrub}
+              onSelect={setScrub}
               labels={
                 points.length > 1
                   ? [shortDate(points[0].date), shortDate(points[points.length - 1].date)]
                   : undefined
               }
             />
+            <p className="pt-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-faint">
+              {at ? "Drag to read another session · tap away to reset" : "Drag the curve to read a session"}
+            </p>
           </div>
 
           {pr && (
@@ -171,6 +216,7 @@ export function Progress() {
                 key={e.id}
                 onClick={() => {
                   setExId(e.id);
+                  setScrub(null);
                   setPicker(false);
                 }}
                 className={`flex w-full items-center gap-3 border-b border-subrule py-3 text-left transition-colors ${
