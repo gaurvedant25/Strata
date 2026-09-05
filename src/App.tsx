@@ -4,25 +4,32 @@ import { fmtDuration } from "./lib/util";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
+import { Onboarding } from "./screens/Onboarding";
 import { Progress } from "./screens/Progress";
 import { Routines } from "./screens/Routines";
 import { Settings } from "./screens/Settings";
 import { useStore } from "./store";
 
-export type Tab = "home" | "routines" | "history" | "progress" | "settings";
+export type Tab = "home" | "routines" | "history" | "progress";
 
-// icon-only bottom nav, matching the dashboard reference — no labels, no active pill
 type IconT = ComponentType<{ className?: string; size?: number }>;
 
+/**
+ * Four labelled tabs, down from five unlabelled icons.
+ *
+ * Settings was the fifth and is now reached from the Strength header: it is a
+ * place you visit rarely, and giving it a fifth of the bar cost the four you
+ * use constantly the room for labels. Icons alone were never legible enough to
+ * carry a nav on their own.
+ */
 const TABS: { id: Tab; label: string; Icon: IconT }[] = [
   { id: "home", label: "Strength", Icon: BodyIcon },
   { id: "routines", label: "Routines", Icon: ListIcon },
   { id: "history", label: "History", Icon: CalendarIcon },
   { id: "progress", label: "Progress", Icon: ChartIcon },
-  { id: "settings", label: "Settings", Icon: GearIcon },
 ];
 
-function BodyIcon({ className, size = 23 }: { className?: string; size?: number }) {
+function BodyIcon({ className, size = 20 }: { className?: string; size?: number }) {
   return (
     <svg
       width={size}
@@ -30,7 +37,7 @@ function BodyIcon({ className, size = 23 }: { className?: string; size?: number 
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={1.6}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -41,7 +48,7 @@ function BodyIcon({ className, size = 23 }: { className?: string; size?: number 
   );
 }
 
-function ListIcon({ className, size = 23 }: { className?: string; size?: number }) {
+function ListIcon({ className, size = 20 }: { className?: string; size?: number }) {
   return (
     <svg
       width={size}
@@ -49,7 +56,7 @@ function ListIcon({ className, size = 23 }: { className?: string; size?: number 
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth={1.8}
+      strokeWidth={1.6}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -62,34 +69,26 @@ function ListIcon({ className, size = 23 }: { className?: string; size?: number 
   );
 }
 
-function GearIcon({ className, size = 23 }: { className?: string; size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7 16 16M8 8 6.3 6.3" />
-    </svg>
-  );
-}
-
 export default function App() {
   const s = useStore();
   const [tab, setTab] = useState<Tab>("home");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // Whether the full-screen logger is the thing on top right now. Starting or
   // resuming a session opens it; navigating away (nav taps, the header back
   // button) only minimizes it — the session keeps running underneath and a
   // "Workout in progress" pill is how you get back in.
   const [viewLogger, setViewLogger] = useState(false);
   const prevActiveId = useRef<string | null>(null);
+
+  // First run is anything with no bodyweight and no split — the two things the
+  // app cannot show anything without. Dismissing it sets `onboarded` so a user
+  // who skips is not asked again on every launch.
+  const [onboarding, setOnboarding] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!s.ready || onboarding !== null) return;
+    const fresh = !s.bodyweight.length && !s.splits.length && !s.sessions.length;
+    setOnboarding(fresh && localStorage.getItem("gymlog.onboarded") !== "1");
+  }, [s.ready, s.bodyweight.length, s.splits.length, s.sessions.length, onboarding]);
 
   const inWorkout = !!s.active;
 
@@ -103,12 +102,28 @@ export default function App() {
   }, [s.activeSessionId]);
 
   // each tab should open at its own top, not inherit the last tab's scroll
-  useEffect(() => window.scrollTo(0, 0), [tab, viewLogger]);
+  useEffect(() => window.scrollTo(0, 0), [tab, viewLogger, settingsOpen]);
 
   if (!s.ready) {
     return (
-      <div className="grid h-full place-items-center text-muted">
-        <div className="animate-pulse text-sm">Loading…</div>
+      <div className="grid h-full place-items-center">
+        <div className="animate-pulse font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+          Loading
+        </div>
+      </div>
+    );
+  }
+
+  function dismissOnboarding() {
+    localStorage.setItem("gymlog.onboarded", "1");
+    setOnboarding(false);
+  }
+
+  // Onboarding and the logger are full-screen: no tab bar, nothing behind them.
+  if (onboarding) {
+    return (
+      <div className="mx-auto flex min-h-full max-w-lg flex-col">
+        <Onboarding onDone={dismissOnboarding} />
       </div>
     );
   }
@@ -118,48 +133,60 @@ export default function App() {
   function goTab(id: Tab) {
     setTab(id);
     setViewLogger(false);
+    setSettingsOpen(false);
+  }
+
+  if (showLogger) {
+    return (
+      <div className="mx-auto min-h-full max-w-lg">
+        <ActiveWorkout onBack={() => setViewLogger(false)} />
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto min-h-full max-w-lg">
-      {showLogger ? (
-        <ActiveWorkout onBack={() => setViewLogger(false)} />
+      {settingsOpen ? (
+        <Settings onBack={() => setSettingsOpen(false)} />
       ) : (
         <>
-          {tab === "home" && <Home go={goTab} />}
+          {tab === "home" && <Home onSettings={() => setSettingsOpen(true)} />}
           {tab === "routines" && <Routines />}
           {tab === "history" && <History />}
           {tab === "progress" && <Progress />}
-          {tab === "settings" && <Settings />}
         </>
       )}
 
-      {inWorkout && !showLogger && (
-        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+72px)] z-40 mx-auto max-w-lg px-3">
-          <button
-            onClick={() => setViewLogger(true)}
-            className="flex w-full items-center justify-between rounded-2xl border border-line bg-panel/95 px-4 py-3 backdrop-blur-xl"
-          >
-            <span className="text-[14px] font-semibold text-white">Workout in progress</span>
-            <span className="text-[13px] tabular-nums text-muted">
-              {fmtDuration(s.now - s.active!.startedAt)} →
-            </span>
-          </button>
-        </div>
+      {inWorkout && (
+        <button
+          onClick={() => setViewLogger(true)}
+          className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+69px)] z-40 mx-auto flex max-w-lg items-center justify-between border-y border-rule bg-ink/95 px-5 py-3 backdrop-blur-xl"
+        >
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-fg">
+            Workout in progress
+          </span>
+          <span className="font-mono text-[13px] text-muted">
+            {fmtDuration(s.now - s.active!.startedAt)} →
+          </span>
+        </button>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-ink/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-ink/96 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
         <div className="mx-auto flex max-w-lg">
           {TABS.map(({ id, label, Icon }) => {
-            const active = !showLogger && tab === id;
+            const active = !settingsOpen && tab === id;
             return (
               <button
                 key={id}
-                aria-label={label}
                 onClick={() => goTab(id)}
-                className="flex flex-1 items-center justify-center py-4"
+                className={`flex flex-1 flex-col items-center gap-1.5 pb-[15px] pt-[13px] transition-colors ${
+                  active ? "text-fg" : "text-faint"
+                }`}
               >
-                <Icon className={active ? "text-white" : "text-muted"} />
+                <Icon size={20} />
+                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em]">
+                  {label}
+                </span>
               </button>
             );
           })}

@@ -1,33 +1,68 @@
 import { useEffect, type MouseEvent, type ReactNode } from "react";
 import { cls } from "../lib/util";
 
+/**
+ * The vocabulary the redesign is built from.
+ *
+ * There are no panels and no cards. A screen is black, and its structure comes
+ * from hairline rules (`border-rule` between sections, `border-subrule` between
+ * rows) and from type scale. Radii collapse to two values: 0 for anything in a
+ * row, 999px for pills. Numerals and labels are mono; language is sans.
+ */
+
+/** Small uppercase mono label. The only thing that titles a section. */
+export function Eyebrow({
+  children,
+  tone = "muted",
+  className,
+}: {
+  children: ReactNode;
+  tone?: "muted" | "faint" | "fg";
+  className?: string;
+}) {
+  return (
+    <span
+      className={cls(
+        "font-mono text-[10px] font-semibold uppercase tracking-[0.2em]",
+        tone === "fg" ? "text-fg" : tone === "faint" ? "text-faint" : "text-muted",
+        className,
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function Button({
   children,
   onClick,
   variant = "solid",
-  size = "md",
   className,
   disabled,
   type = "button",
 }: {
   children: ReactNode;
   onClick?: () => void;
-  variant?: "solid" | "ghost" | "outline" | "danger";
-  size?: "sm" | "md" | "lg";
+  /**
+   * `solid` is the one filled control on a screen — a white pill.
+   * `quiet` is the same shape unfilled, `link` is an underlined mono word, and
+   * `danger` is the only place another colour is allowed.
+   */
+  variant?: "solid" | "quiet" | "outline" | "link" | "danger";
   className?: string;
   disabled?: boolean;
   type?: "button" | "submit";
 }) {
   const variants = {
-    solid: "bg-accent text-ink font-semibold active:bg-accentdim",
-    ghost: "bg-panel2 text-white/90 active:bg-line",
-    outline: "border border-line text-white/90 active:bg-panel2",
-    danger: "bg-red-500/15 text-red-300 border border-red-500/30 active:bg-red-500/25",
-  };
-  const sizes = {
-    sm: "h-9 px-3 text-[13px] rounded-lg",
-    md: "h-11 px-4 text-[15px] rounded-xl",
-    lg: "h-13 px-5 text-base rounded-2xl",
+    solid:
+      "h-13 w-full rounded-full bg-fg px-5 font-mono text-[12px] font-semibold uppercase tracking-[0.14em] text-black active:bg-white",
+    quiet:
+      "h-11 w-full bg-transparent font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted active:text-fg",
+    outline:
+      "h-13 w-full rounded-full border border-rule bg-transparent px-5 font-mono text-[12px] font-semibold uppercase tracking-[0.14em] text-fg active:border-faint",
+    link: "border-b border-fg pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-fg",
+    danger:
+      "h-11 w-full bg-transparent font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-danger active:opacity-70",
   };
   return (
     <button
@@ -37,7 +72,6 @@ export function Button({
       className={cls(
         "inline-flex select-none items-center justify-center gap-2 transition-colors disabled:opacity-40",
         variants[variant],
-        sizes[size],
         className,
       )}
     >
@@ -46,91 +80,213 @@ export function Button({
   );
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cls("rounded-2xl bg-panel", className)}>{children}</div>;
-}
-
-/** The larger, border-less bento card used on the dashboard. Tappable as a whole when onClick is given. */
-export function DashCard({
-  children,
-  className,
-  onClick,
-}: {
-  children: ReactNode;
-  className?: string;
-  onClick?: () => void;
-}) {
-  return (
-    <div
-      onClick={onClick}
-      className={cls(
-        "rounded-[28px] bg-panel",
-        onClick && "cursor-pointer transition-transform active:scale-[0.98]",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** Small round button used for per-card affordances (tune, close, add). Stops propagation
- *  by default so tapping one inside a tappable DashCard doesn't also fire the card's onClick. */
-export function IconButton({
-  children,
-  onClick,
-  size = 36,
-  tone = "muted",
-  className,
-}: {
-  children: ReactNode;
-  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
-  size?: number;
-  tone?: "muted" | "light";
-  className?: string;
-}) {
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.(e);
-      }}
-      style={{ width: size, height: size }}
-      className={cls(
-        "grid shrink-0 place-items-center rounded-full transition-colors active:scale-95",
-        tone === "light" ? "bg-accent text-ink" : "bg-panel2 text-muted",
-        className,
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
+/**
+ * A screen. The title is a mono eyebrow rather than a heading — the biggest
+ * type on these screens belongs to the data, not the chrome.
+ */
 export function Screen({
   title,
   right,
   children,
-  subtitle,
+  pad = true,
 }: {
   title: string;
-  subtitle?: string;
   right?: ReactNode;
   children: ReactNode;
+  /** Off when the screen draws its own full-bleed rows. */
+  pad?: boolean;
 }) {
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-20 border-b border-line/70 bg-ink/85 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
-        <div className="flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="truncate text-[26px] font-bold leading-tight tracking-tight">{title}</h1>
-            {subtitle && <p className="mt-0.5 truncate text-[13px] text-muted">{subtitle}</p>}
-          </div>
+      <header className="sticky top-0 z-20 bg-ink/95 px-5 pb-3.5 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-3">
+          <Eyebrow>{title}</Eyebrow>
           {right}
         </div>
       </header>
-      <div className="px-4 pb-40 pt-4">{children}</div>
+      <div className={cls("pb-40", pad && "px-5")}>{children}</div>
     </div>
+  );
+}
+
+/**
+ * The empty state. A statement set large, not a centred icon and an apology —
+ * with the eyebrow naming what is missing.
+ */
+export function Empty({
+  eyebrow,
+  title,
+  body,
+  action,
+}: {
+  eyebrow: string;
+  title: string;
+  body?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="pt-[70px]">
+      <Eyebrow tone="faint">{eyebrow}</Eyebrow>
+      <h2 className="mt-4 text-[27px] font-bold leading-[1.15] tracking-[-0.025em] text-pretty">
+        {title}
+      </h2>
+      {body && <p className="mt-3.5 text-[14px] leading-relaxed text-muted text-pretty">{body}</p>}
+      {action && <div className="mt-8">{action}</div>}
+    </div>
+  );
+}
+
+/**
+ * A row of figures divided by vertical hairlines. The last cell drops its
+ * divider so the group reads as one band rather than a table.
+ */
+export function StatBand({
+  stats,
+  size = "md",
+}: {
+  stats: { label: string; value: ReactNode }[];
+  size?: "sm" | "md";
+}) {
+  return (
+    <div
+      className="grid border-y border-rule"
+      style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0,1fr))` }}
+    >
+      {stats.map((s, i) => (
+        <div
+          key={s.label}
+          className={cls(
+            "flex flex-col items-start gap-1.5 px-5 py-3.5",
+            i < stats.length - 1 && "border-r border-rule",
+          )}
+        >
+          <span
+            className={cls(
+              "font-mono font-medium tracking-[-0.015em]",
+              size === "sm" ? "text-[15px]" : "text-[21px]",
+            )}
+          >
+            {s.value}
+          </span>
+          <span className="font-mono text-[9px] font-semibold uppercase leading-snug tracking-[0.18em] text-muted">
+            {s.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The large mono figure a screen is built around, with its unit alongside. */
+export function BigNumber({
+  value,
+  unit,
+  size = 46,
+}: {
+  value: string;
+  unit: string;
+  size?: number;
+}) {
+  return (
+    <div className="flex items-end gap-2.5">
+      <span
+        className="font-mono font-medium leading-[0.9] tracking-[-0.035em]"
+        style={{ fontSize: size }}
+      >
+        {value}
+      </span>
+      <span className="pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+        {unit}
+      </span>
+    </div>
+  );
+}
+
+/** Underlined mono tabs. Used for view, metric and filter switches alike. */
+export function TextTabs<T extends string>({
+  options,
+  value,
+  onChange,
+  className,
+  gap = "gap-5",
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+  className?: string;
+  gap?: string;
+}) {
+  return (
+    <div className={cls("flex", gap, className)}>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          className={cls(
+            "border-b pb-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] transition-colors",
+            value === o.id ? "border-fg text-fg" : "border-transparent text-faint",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A pill segmented control, for settings-style either/or choices. */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex rounded-full border border-rule p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          onClick={() => onChange(o.id)}
+          className={cls(
+            "min-w-[52px] rounded-full px-3.5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors",
+            value === o.id ? "bg-fg text-black" : "text-muted",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A full-bleed tappable row. The workhorse of every list in the app. */
+export function Row({
+  children,
+  onClick,
+  className,
+  rule = "rule",
+}: {
+  children: ReactNode;
+  onClick?: () => void;
+  className?: string;
+  rule?: "rule" | "subrule" | "none";
+}) {
+  const cn = cls(
+    "w-full px-5 text-left",
+    rule === "rule" && "border-b border-rule",
+    rule === "subrule" && "border-b border-subrule",
+    onClick && "active:bg-[#0b0b0b]",
+    className,
+  );
+  return onClick ? (
+    <button onClick={onClick} className={cn}>
+      {children}
+    </button>
+  ) : (
+    <div className={cn}>{children}</div>
   );
 }
 
@@ -162,21 +318,18 @@ export function Sheet({
       <button
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/65 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/80 backdrop-blur-[2px]"
       />
-      <div className="animate-rise relative mx-auto flex max-h-[88vh] w-full max-w-lg flex-col rounded-t-3xl border-t border-line bg-panel">
-        <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button
-            onClick={onClose}
-            className="grid size-9 place-items-center rounded-full bg-panel2 text-muted active:bg-line"
-          >
+      <div className="animate-rise relative mx-auto flex max-h-[88vh] w-full max-w-lg flex-col border-t border-rule bg-ink">
+        <div className="flex items-center justify-between border-b border-rule px-5 py-3.5">
+          <Eyebrow>{title}</Eyebrow>
+          <button onClick={onClose} className="font-mono text-[15px] text-muted active:text-fg">
             ✕
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
         {footer && (
-          <div className="border-t border-line px-4 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3">
+          <div className="border-t border-rule px-5 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3.5">
             {footer}
           </div>
         )}
@@ -196,43 +349,48 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[13px] font-medium text-muted">{label}</span>
+      <Eyebrow className="mb-2 block">{label}</Eyebrow>
       {children}
-      {hint && <span className="mt-1 block text-[12px] text-muted/80">{hint}</span>}
+      {hint && <span className="mt-1.5 block text-[12px] text-muted">{hint}</span>}
     </label>
   );
 }
 
+/** Inputs are a hairline underline, not a filled box. */
 export const inputCls =
-  "w-full rounded-xl border border-line bg-panel2 px-3.5 py-3 text-white outline-none placeholder:text-muted/60 focus:border-accent/60";
+  "w-full border-b border-rule bg-transparent px-0 py-2.5 text-fg outline-none placeholder:text-faint focus:border-fg";
 
-export function Empty({
-  icon,
-  title,
-  body,
-  action,
+/** Same, for a value the user types as a numeral. */
+export const numInputCls = `${inputCls} font-mono`;
+
+/** Small round button used for per-row affordances. */
+export function IconButton({
+  children,
+  onClick,
+  size = 34,
+  className,
+  label,
 }: {
-  icon: string;
-  title: string;
-  body: string;
-  action?: ReactNode;
+  children: ReactNode;
+  onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
+  size?: number;
+  className?: string;
+  label?: string;
 }) {
   return (
-    <div className="mt-10 flex flex-col items-center px-6 text-center">
-      <div className="mb-3 text-4xl opacity-70">{icon}</div>
-      <p className="text-base font-semibold">{title}</p>
-      <p className="mt-1 max-w-xs text-sm text-muted">{body}</p>
-      {action && <div className="mt-5">{action}</div>}
-    </div>
-  );
-}
-
-export function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Card className="px-3 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 text-xl font-bold tabular-nums leading-none">{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-muted">{sub}</p>}
-    </Card>
+    <button
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.(e);
+      }}
+      style={{ width: size, height: size }}
+      className={cls(
+        "grid shrink-0 place-items-center rounded-full text-muted transition-colors active:text-fg",
+        className,
+      )}
+    >
+      {children}
+    </button>
   );
 }

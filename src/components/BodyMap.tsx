@@ -130,6 +130,8 @@ export function BodyMap({
   onSelect,
   view,
   onViewChange,
+  showToggle = true,
+  maxWidth = 250,
 }: {
   gender: Gender;
   scores: Partial<Record<MuscleGroup, MuscleScore>>;
@@ -137,6 +139,9 @@ export function BodyMap({
   onSelect: (m: MuscleGroup) => void;
   view: BodyView;
   onViewChange: (v: BodyView) => void;
+  /** Off when the screen supplies its own view switch. */
+  showToggle?: boolean;
+  maxWidth?: number;
 }) {
   const [p, setP] = useState(0); // drag progress, -1..1
   const startX = useRef(0);
@@ -208,7 +213,7 @@ export function BodyMap({
           touchAction: "pan-y",
           cursor: "grab",
           margin: "0 auto",
-          maxWidth: 250,
+          maxWidth,
           aspectRatio: `${vbW} / ${vbH}`,
           position: "relative",
         }}
@@ -264,19 +269,21 @@ export function BodyMap({
         </div>
       </div>
 
-      <div className="mt-1 flex items-center justify-center gap-1">
-        {(["front", "back"] as BodyView[]).map((v) => (
-          <button
-            key={v}
-            onClick={() => onViewChange(v)}
-            className={`rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
-              view === v ? "bg-panel2 text-white" : "text-muted"
-            }`}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
+      {showToggle && (
+        <div className="mt-1 flex items-center justify-center gap-1">
+          {(["front", "back"] as BodyView[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => onViewChange(v)}
+              className={`rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
+                view === v ? "bg-rule text-fg" : "text-muted"
+              }`}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

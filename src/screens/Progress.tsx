@@ -1,16 +1,6 @@
 import { useMemo, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { Card, Empty, Screen, Stat } from "../components/ui";
+import { Sparkline } from "../components/Sparkline";
+import { BigNumber, Empty, Eyebrow, StatBand } from "../components/ui";
 import { exerciseHistory, personalRecords, sessionVolume } from "../lib/stats";
 import { num, parseKey } from "../lib/util";
 import { useStore } from "../store";
@@ -22,11 +12,12 @@ const METRICS: { id: Metric; label: string }[] = [
   { id: "volume", label: "Volume" },
 ];
 
-const axis = { stroke: "#8e8e93", fontSize: 11 };
+const shortDate = (key: string) =>
+  parseKey(key).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 export function Progress() {
   const s = useStore();
-  const unit = s.settings.unit;
+  const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
   const [metric, setMetric] = useState<Metric>("e1rm");
 
   const done = useMemo(() => s.sessions.filter((x) => x.endedAt), [s.sessions]);
@@ -40,192 +31,158 @@ export function Progress() {
     [s.exercises, prs],
   );
 
-  const [exId, setExId] = useState<string>("");
-  const current = tracked.find((e) => e.id === exId) ?? tracked[0];
+  // The exercise is stepped through rather than picked from a menu: a native
+  // select is a system-chrome box, which is exactly what this screen removed.
+  const [exIdx, setExIdx] = useState(0);
+  const current = tracked[exIdx % Math.max(1, tracked.length)];
 
   const points = useMemo(
     () => (current ? exerciseHistory(done, current.id) : []),
     [done, current],
   );
 
-  const chartData = points.map((p) => ({
-    x: parseKey(p.date).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-    value: Number(p[metric].toFixed(1)),
-  }));
-
   const totals = useMemo(
     () => ({
       workouts: done.length,
       volume: done.reduce((t, x) => t + sessionVolume(x), 0),
-      prs: prs.size,
+      tracked: prs.size,
     }),
     [done, prs],
   );
 
-  const bwData = s.bodyweight.map((b) => ({
-    x: parseKey(b.date).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
-    value: b.weight,
-  }));
-
   if (!done.length) {
     return (
-      <Screen title="Progress">
+      <div className="min-h-full px-5 pb-40 pt-[calc(env(safe-area-inset-top)+14px)]">
+        <Eyebrow>Progress</Eyebrow>
         <Empty
-          icon="📈"
-          title="No data to chart yet"
-          body="Finish a couple of workouts and your strength curve per exercise shows up here."
+          eyebrow="No curve yet"
+          title="Two finished workouts and a lift has a trend."
+          body="Every number on this screen comes from your own logs — nothing is estimated from anyone else."
         />
-      </Screen>
+      </div>
     );
   }
 
   const pr = current ? prs.get(current.id) : undefined;
-  const first = points[0]?.[metric] ?? 0;
-  const last = points[points.length - 1]?.[metric] ?? 0;
+  const values = points.map((p) => p[metric]);
+  const first = values[0] ?? 0;
+  const last = values[values.length - 1] ?? 0;
   const change = first > 0 ? ((last - first) / first) * 100 : 0;
+  const bwValues = s.bodyweight.map((b) => b.weight);
 
   return (
-    <Screen title="Progress" subtitle="Every number comes from your own logs">
-      <div className="mb-5 grid grid-cols-3 gap-2">
-        <Stat label="Workouts" value={String(totals.workouts)} sub="all time" />
-        <Stat label="Volume" value={num(totals.volume / 1000, 1) + "k"} sub={unit} />
-        <Stat label="Exercises" value={String(totals.prs)} sub="tracked" />
+    <div className="min-h-full pb-40">
+      <div className="px-5 pt-[calc(env(safe-area-inset-top)+14px)]">
+        <Eyebrow>Progress</Eyebrow>
+      </div>
+
+      <div className="mt-3.5">
+        <StatBand
+          stats={[
+            { label: "Workouts", value: String(totals.workouts) },
+            { label: unitLabel, value: `${num(totals.volume / 1000, 1)}k` },
+            { label: "Tracked", value: String(totals.tracked) },
+          ]}
+        />
       </div>
 
       {current && (
-        <Card className="overflow-hidden">
-          <div className="border-b border-line px-3.5 py-3">
-            <select
-              value={current.id}
-              onChange={(e) => setExId(e.target.value)}
-              className="w-full rounded-lg bg-panel2 px-3 py-2.5 font-semibold text-white outline-none"
+        <>
+          <div className="px-5 pt-6">
+            <button
+              onClick={() => setExIdx((i) => (i + 1) % tracked.length)}
+              className="flex items-center gap-2.5 text-left"
+              aria-label="Next exercise"
             >
-              {tracked.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
-            <div className="mt-2.5 flex gap-1.5">
+              <span className="text-[23px] font-bold tracking-[-0.024em]">{current.name}</span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#666"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            <div className="flex gap-5 pt-4.5">
               {METRICS.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setMetric(m.id)}
-                  className={`flex-1 rounded-lg py-2 text-[13px] font-medium ${
-                    metric === m.id ? "bg-accent text-ink" : "bg-panel2 text-muted"
+                  className={`border-b pb-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] transition-colors ${
+                    metric === m.id ? "border-fg text-fg" : "border-transparent text-faint"
                   }`}
                 >
                   {m.label}
                 </button>
               ))}
             </div>
+
+            <div className="pt-6">
+              <BigNumber value={num(last, 1)} unit={unitLabel} size={46} />
+            </div>
+            {points.length > 1 && (
+              <p className="mt-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+                {change >= 0 ? "+" : ""}
+                {num(change, 1)}% since {shortDate(points[0].date)}
+              </p>
+            )}
           </div>
 
-          <div className="px-1 pb-2 pt-4">
-            <div className="mb-1 flex items-baseline gap-2 px-3">
-              <span className="text-2xl font-bold tabular-nums">
-                {num(last, 1)} <span className="text-sm font-medium text-muted">{unit}</span>
-              </span>
-              {points.length > 1 && (
-                <span
-                  className={`text-[13px] font-semibold tabular-nums ${
-                    change >= 0 ? "text-accent" : "text-red-400"
-                  }`}
-                >
-                  {change >= 0 ? "+" : ""}
-                  {num(change, 1)}% since {chartData[0]?.x}
-                </span>
-              )}
-            </div>
-            <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 12, right: 16, left: -8, bottom: 4 }}>
-                  <CartesianGrid stroke="#29292c" vertical={false} />
-                  <XAxis dataKey="x" tick={axis} tickLine={false} axisLine={false} minTickGap={24} />
-                  <YAxis tick={axis} tickLine={false} axisLine={false} width={44} domain={["auto", "auto"]} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#161618",
-                      border: "1px solid #29292c",
-                      borderRadius: 12,
-                      fontSize: 13,
-                    }}
-                    labelStyle={{ color: "#8e8e93" }}
-                    formatter={(v) => [`${num(Number(v), 1)} ${unit}`, METRICS.find((m) => m.id === metric)!.label]}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="value"
-                    stroke="#ffffff"
-                    strokeWidth={2.5}
-                    dot={{ r: 3, fill: "#ffffff", strokeWidth: 0 }}
-                    activeDot={{ r: 5 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+          <div className="px-5 pt-5">
+            <Sparkline
+              values={values}
+              labels={
+                points.length > 1
+                  ? [shortDate(points[0].date), shortDate(points[points.length - 1].date)]
+                  : undefined
+              }
+            />
           </div>
 
           {pr && (
-            <div className="grid grid-cols-3 border-t border-line text-center">
-              <PRCell label="Best est. 1RM" value={`${num(pr.bestE1rm, 1)} ${unit}`} />
-              <PRCell
-                label="Heaviest set"
-                value={`${num(pr.heaviest)} × ${pr.heaviestReps}`}
-                divider
+            <div className="mt-6">
+              <StatBand
+                size="sm"
+                stats={[
+                  { label: "Best est. 1RM", value: `${num(pr.bestE1rm, 1)}` },
+                  { label: "Heaviest set", value: `${num(pr.heaviest)}×${pr.heaviestReps}` },
+                  { label: "Best session", value: `${num(pr.bestVolume, 0)}` },
+                ]}
               />
-              <PRCell label="Best session volume" value={`${num(pr.bestVolume, 0)} ${unit}`} divider />
             </div>
           )}
-        </Card>
+        </>
       )}
 
-      {bwData.length > 1 && (
-        <Card className="mt-5 px-1 pb-2 pt-4">
-          <p className="mb-1 px-3 text-[15px] font-semibold">Body weight</p>
-          <div className="h-44 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={bwData} margin={{ top: 10, right: 16, left: -8, bottom: 4 }}>
-                <defs>
-                  <linearGradient id="bwFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity={0.35} />
-                    <stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="#29292c" vertical={false} />
-                <XAxis dataKey="x" tick={axis} tickLine={false} axisLine={false} minTickGap={24} />
-                <YAxis tick={axis} tickLine={false} axisLine={false} width={44} domain={["auto", "auto"]} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#161618",
-                    border: "1px solid #29292c",
-                    borderRadius: 12,
-                    fontSize: 13,
-                  }}
-                  labelStyle={{ color: "#8e8e93" }}
-                  formatter={(v) => [`${num(Number(v))} ${unit}`, "Body weight"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#ffffff"
-                  strokeWidth={2.5}
-                  fill="url(#bwFill)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+      {bwValues.length > 1 && (
+        <div className="px-5 pt-6">
+          <div className="flex items-baseline justify-between">
+            <Eyebrow className="tracking-[0.18em]">Body weight</Eyebrow>
+            <span className="font-mono text-[15px] font-medium">
+              {num(bwValues[bwValues.length - 1])}{" "}
+              <span className="text-[9px] uppercase tracking-[0.16em] text-muted">{unitLabel}</span>
+            </span>
           </div>
-        </Card>
+          <div className="mt-3">
+            <Sparkline
+              values={bwValues}
+              width={348}
+              height={84}
+              padT={6}
+              padB={8}
+              stroke="#666"
+              strokeWidth={1.4}
+              showBaseline={false}
+            />
+          </div>
+        </div>
       )}
-    </Screen>
-  );
-}
-
-function PRCell({ label, value, divider }: { label: string; value: string; divider?: boolean }) {
-  return (
-    <div className={`px-2 py-3 ${divider ? "border-l border-line" : ""}`}>
-      <p className="text-[10px] font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-1 text-[15px] font-bold tabular-nums">{value}</p>
     </div>
   );
 }

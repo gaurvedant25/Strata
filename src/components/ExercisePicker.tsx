@@ -84,14 +84,18 @@ export function ExercisePicker({
             onChange={(e) => setName(e.target.value)}
           />
           <div>
-            <p className="mb-2 text-[13px] font-medium text-muted">Muscle group</p>
+            <p className="mb-2.5 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-muted">
+              Muscle group
+            </p>
             <div className="flex flex-wrap gap-2">
               {MUSCLES.map((m) => (
                 <button
                   key={m}
                   onClick={() => setMuscle(m)}
-                  className={`rounded-full px-3.5 py-2 text-[13px] ${
-                    muscle === m ? "bg-accent font-semibold text-ink" : "bg-panel2 text-white/80"
+                  className={`rounded-full border px-3.5 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.1em] transition-colors ${
+                    muscle === m
+                      ? "border-fg bg-fg text-black"
+                      : "border-rule text-muted"
                   }`}
                 >
                   {m}
@@ -99,11 +103,11 @@ export function ExercisePicker({
               ))}
             </div>
           </div>
-          <label className="flex items-center justify-between rounded-xl bg-panel2 px-3.5 py-3">
+          <label className="flex items-center justify-between border-y border-rule py-3">
             <span className="text-[15px]">Bodyweight exercise</span>
             <input
               type="checkbox"
-              className="size-5 accent-[var(--color-accent)]"
+              className="size-5 accent-white"
               checked={bodyweight}
               onChange={(e) => setBodyweight(e.target.checked)}
             />
@@ -118,27 +122,27 @@ export function ExercisePicker({
             onChange={(e) => setQ(e.target.value)}
           />
           {groups.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted">
-              No match. Create it with the button below.
-            </p>
+            <p className="py-6 text-[13px] text-muted">No match. Create it with the button below.</p>
           )}
           <div className="space-y-5">
             {groups.map(([m, list]) => (
               <div key={m}>
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                <p className="mb-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-muted">
                   {m}
                 </p>
-                <div className="overflow-hidden rounded-xl border border-line">
-                  {list.map((e, i) => (
+                <div className="border-t border-rule">
+                  {list.map((e) => (
                     <button
                       key={e.id}
                       onClick={() => onPick(e)}
-                      className={`flex w-full items-center justify-between px-3.5 py-3 text-left active:bg-panel2 ${
-                        i ? "border-t border-line" : ""
-                      }`}
+                      className="flex w-full items-center justify-between border-b border-subrule py-3 text-left active:bg-[#0b0b0b]"
                     >
                       <span className="text-[15px]">{e.name}</span>
-                      {e.bodyweight && <span className="text-[11px] text-muted">bodyweight</span>}
+                      {e.bodyweight && (
+                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+                          bodyweight
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>

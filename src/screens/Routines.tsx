@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ExercisePicker } from "../components/ExercisePicker";
-import { Button, Card, Empty, Screen, Sheet, inputCls } from "../components/ui";
+import { Button, Empty, Eyebrow, Row, Sheet, inputCls } from "../components/ui";
 import { PRESETS, type Preset } from "../lib/presets";
 import { uid } from "../lib/util";
 import { useStore } from "../store";
@@ -31,71 +31,84 @@ export function Routines() {
   }
 
   const days = s.splitRoutines;
+  const exCount = days.reduce((t, d) => t + d.items.length, 0);
 
   return (
-    <Screen
-      title="Routines"
-      subtitle={s.activeSplit.name}
-      right={
-        <Button size="sm" onClick={() => setEditing(blank())}>
-          + New
-        </Button>
-      }
-    >
+    <div className="min-h-full pb-40">
+      <div className="px-5 pt-[calc(env(safe-area-inset-top)+14px)]">
+        <div className="flex items-baseline justify-between">
+          <Eyebrow>Routines</Eyebrow>
+          <Button variant="link" onClick={() => setChoosing(true)}>
+            Change split
+          </Button>
+        </div>
+        <h1 className="mt-5 text-[27px] font-bold leading-none tracking-[-0.025em]">
+          {s.activeSplit.name}
+        </h1>
+        <button onClick={() => setEditSplit(true)} className="mb-5 mt-2 block">
+          <Eyebrow className="tracking-[0.14em]">
+            {days.length} {days.length === 1 ? "day" : "days"} · {exCount} exercises · Edit
+          </Eyebrow>
+        </button>
+      </div>
+
       {days.length === 0 ? (
-        <Empty
-          icon="📋"
-          title="No days yet"
-          body="A day is a saved list of exercises with target sets and reps. Start a workout from one and it comes pre-filled."
-          action={<Button onClick={() => setEditing(blank())}>Add a day</Button>}
-        />
+        <div className="border-t border-rule px-5">
+          <Empty
+            eyebrow="No days yet"
+            title="A day is a list of exercises with target sets and reps."
+            body="Start a workout from one and it comes pre-filled."
+            action={<Button onClick={() => setEditing(blank())}>Add a day</Button>}
+          />
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="border-t border-rule">
           {days.map((r) => (
-            <Card key={r.id} className="overflow-hidden">
-              <div className="px-4 pb-3 pt-3.5">
-                <p className="text-[17px] font-semibold">{r.name}</p>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                  {r.items.length === 0
-                    ? "No exercises yet"
-                    : r.items
-                        .map(
-                          (i) =>
-                            `${s.exerciseById.get(i.exerciseId)?.name ?? "?"} ${i.sets}×${i.reps}`,
-                        )
-                        .join(" · ")}
-                </p>
-              </div>
-              <div className="flex gap-2 border-t border-line px-3 py-2.5">
+            <div key={r.id} className="border-b border-rule px-5 py-[18px]">
+              <div className="flex items-baseline justify-between gap-3">
+                <button onClick={() => setEditing(r)} className="min-w-0 text-left">
+                  <p className="truncate text-[17px] font-medium tracking-[-0.01em]">{r.name}</p>
+                </button>
                 <Button
-                  size="sm"
-                  className="flex-1"
+                  variant="link"
                   onClick={() => void s.startSession(r)}
-                  disabled={!r.items.length}
+                  className={r.items.length ? "" : "pointer-events-none opacity-30"}
                 >
                   Start
                 </Button>
-                <Button size="sm" variant="ghost" className="flex-1" onClick={() => setEditing(r)}>
-                  Edit
-                </Button>
               </div>
-            </Card>
+              <div className="mt-3">
+                {r.items.length === 0 ? (
+                  <p className="text-[13px] text-faint">No exercises yet</p>
+                ) : (
+                  r.items.map((i, n) => (
+                    <div
+                      key={`${i.exerciseId}-${n}`}
+                      className="flex items-baseline justify-between gap-3 py-[5px]"
+                    >
+                      <span className="min-w-0 truncate text-[13px] text-muted">
+                        {s.exerciseById.get(i.exerciseId)?.name ?? "?"}
+                      </span>
+                      <span className="shrink-0 font-mono text-[12px] text-muted">
+                        {i.sets}×{i.reps}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           ))}
+          <Row onClick={() => setEditing(blank())} className="py-[22px]">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-fg">
+              + New day
+            </span>
+          </Row>
         </div>
       )}
 
-      <div className="mt-4 flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => setChoosing(true)}>
-          Change split
-        </Button>
-        <Button variant="outline" className="flex-1" onClick={() => setEditSplit(true)}>
-          Edit split
-        </Button>
-      </div>
-
       {editing && <RoutineEditor routine={editing} onClose={() => setEditing(null)} />}
       {editSplit && <SplitEditor split={s.activeSplit} onClose={() => setEditSplit(false)} />}
-    </Screen>
+    </div>
   );
 }
 
@@ -122,13 +135,12 @@ function SplitEditor({ split, onClose }: { split: Split; onClose: () => void }) 
       onClose={onClose}
       title="Edit split"
       footer={
-        <div className="space-y-2">
-          <Button className="w-full" size="lg" onClick={() => void save()} disabled={!name.trim()}>
+        <div className="space-y-2.5">
+          <Button onClick={() => void save()} disabled={!name.trim()}>
             Save split
           </Button>
           <Button
             variant="danger"
-            className="w-full"
             onClick={() => {
               if (
                 confirm(
@@ -151,7 +163,7 @@ function SplitEditor({ split, onClose }: { split: Split; onClose: () => void }) 
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <p className="mt-3 text-[12px] leading-relaxed text-muted">
+      <p className="mt-3.5 text-[12px] leading-relaxed text-muted">
         {days} {days === 1 ? "day" : "days"}. Deleting the split removes its days too — your logged
         workouts and history are untouched.
       </p>
@@ -186,72 +198,78 @@ function SplitChooser({ onDone, canCancel }: { onDone: () => void; canCancel: bo
   }
 
   return (
-    <Screen
-      title="Choose a split"
-      subtitle="How your training week is organised"
-      right={
-        canCancel ? (
-          <Button size="sm" variant="ghost" onClick={onDone}>
-            Cancel
-          </Button>
-        ) : undefined
-      }
-    >
-      <div className="space-y-3">
+    <div className="min-h-full pb-40">
+      <div className="px-5 pb-5 pt-[calc(env(safe-area-inset-top)+14px)]">
+        <div className="flex items-baseline justify-between">
+          <Eyebrow>Choose a split</Eyebrow>
+          {canCancel && (
+            <button onClick={onDone}>
+              <Eyebrow tone="fg" className="tracking-[0.16em]">
+                Cancel
+              </Eyebrow>
+            </button>
+          )}
+        </div>
+        <h1 className="mt-5 text-[27px] font-bold leading-[1.1] tracking-[-0.025em] text-pretty">
+          How your training week is organised.
+        </h1>
+      </div>
+
+      <div className="border-t border-rule">
         {PRESETS.map((p) => {
           const inUse = usedPresets.has(p.key);
           const active = s.activeSplit?.preset === p.key;
           return (
-            <Card key={p.key} className="overflow-hidden">
-              <button
-                onClick={() => void pick(p)}
-                className="w-full px-4 pb-3.5 pt-3.5 text-left active:bg-panel2"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[17px] font-semibold">{p.name}</p>
-                  {active ? (
-                    <span className="shrink-0 text-[11px] font-semibold text-white">Current</span>
-                  ) : inUse ? (
-                    <span className="shrink-0 text-[11px] text-muted">Saved</span>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted">{p.blurb}</p>
-                <p className="mt-2 text-[12px] leading-relaxed text-muted">
-                  {p.days.map(([d]) => d).join(" · ")}
-                </p>
-              </button>
-            </Card>
+            <Row key={p.key} onClick={() => void pick(p)} className="py-[18px]">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-[17px] font-medium tracking-[-0.01em]">{p.name}</p>
+                {active ? (
+                  <Eyebrow tone="fg" className="shrink-0 tracking-[0.16em]">
+                    Current
+                  </Eyebrow>
+                ) : inUse ? (
+                  <Eyebrow className="shrink-0 tracking-[0.16em]">Saved</Eyebrow>
+                ) : null}
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{p.blurb}</p>
+              <p className="mt-2 font-mono text-[11px] leading-relaxed text-faint">
+                {p.days.map(([d]) => d).join(" · ")}
+              </p>
+            </Row>
           );
         })}
 
-        {custom.map((sp) => (
-          <Card key={sp.id} className="overflow-hidden">
-            <button
+        {custom.map((sp) => {
+          const n = s.routines.filter((r) => r.splitId === sp.id).length;
+          return (
+            <Row
+              key={sp.id}
               onClick={() => void s.setActiveSplit(sp.id).then(onDone)}
-              className="w-full px-4 pb-3.5 pt-3.5 text-left active:bg-panel2"
+              className="py-[18px]"
             >
               <div className="flex items-baseline justify-between gap-3">
-                <p className="text-[17px] font-semibold">{sp.name}</p>
+                <p className="text-[17px] font-medium tracking-[-0.01em]">{sp.name}</p>
                 {s.activeSplitId === sp.id && (
-                  <span className="shrink-0 text-[11px] font-semibold text-white">Current</span>
+                  <Eyebrow tone="fg" className="shrink-0 tracking-[0.16em]">
+                    Current
+                  </Eyebrow>
                 )}
               </div>
-              <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                {(() => {
-                  const n = s.routines.filter((r) => r.splitId === sp.id).length;
-                  return `${n} ${n === 1 ? "day" : "days"} · your own`;
-                })()}
+              <p className="mt-1.5 font-mono text-[11px] text-muted">
+                {n} {n === 1 ? "day" : "days"} · your own
               </p>
-            </button>
-          </Card>
-        ))}
+            </Row>
+          );
+        })}
+
+        <Row onClick={() => setNaming(true)} className="py-[22px]">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-fg">
+            + Build your own
+          </span>
+        </Row>
       </div>
 
-      <Button variant="outline" className="mt-4 w-full" onClick={() => setNaming(true)}>
-        + Build your own
-      </Button>
-
-      <p className="mt-3 px-1 text-[12px] leading-relaxed text-muted">
+      <p className="px-5 pt-5 text-[12px] leading-relaxed text-muted text-pretty">
         Every preset is just a starting point — once chosen, its days are yours to edit, add to or
         delete.
       </p>
@@ -261,7 +279,7 @@ function SplitChooser({ onDone, canCancel }: { onDone: () => void; canCancel: bo
         onClose={() => setNaming(false)}
         title="New split"
         footer={
-          <Button className="w-full" size="lg" onClick={() => void create()} disabled={!name.trim()}>
+          <Button onClick={() => void create()} disabled={!name.trim()}>
             Create split
           </Button>
         }
@@ -272,11 +290,11 @@ function SplitChooser({ onDone, canCancel }: { onDone: () => void; canCancel: bo
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <p className="mt-3 text-[12px] leading-relaxed text-muted">
+        <p className="mt-3.5 text-[12px] leading-relaxed text-muted">
           You'll add the days yourself afterwards.
         </p>
       </Sheet>
-    </Screen>
+    </div>
   );
 }
 
@@ -313,14 +331,13 @@ function RoutineEditor({ routine, onClose }: { routine: Routine; onClose: () => 
       onClose={onClose}
       title={exists ? "Edit day" : "New day"}
       footer={
-        <div className="space-y-2">
-          <Button className="w-full" size="lg" onClick={() => void save()} disabled={!name.trim()}>
+        <div className="space-y-2.5">
+          <Button onClick={() => void save()} disabled={!name.trim()}>
             Save day
           </Button>
           {exists && (
             <Button
               variant="danger"
-              className="w-full"
               onClick={() => {
                 if (confirm(`Delete "${routine.name}"? Logged workouts are kept.`)) {
                   void s.deleteRoutine(routine.id);
@@ -335,43 +352,55 @@ function RoutineEditor({ routine, onClose }: { routine: Routine; onClose: () => 
       }
     >
       <input
-        className={`${inputCls} mb-4`}
+        className={`${inputCls} mb-5`}
         placeholder="Day name (e.g. Push A)"
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
 
-      <div className="space-y-2">
+      <div className="border-t border-rule">
         {items.map((item, i) => (
-          <Card key={`${item.exerciseId}-${i}`} className="p-3">
-            <div className="flex items-center gap-2">
+          <div key={`${item.exerciseId}-${i}`} className="border-b border-subrule py-3">
+            <div className="flex items-center gap-1">
               <p className="min-w-0 flex-1 truncate text-[15px] font-medium">
                 {s.exerciseById.get(item.exerciseId)?.name ?? "Unknown exercise"}
               </p>
-              <button onClick={() => move(i, -1)} className="size-8 rounded-lg text-muted active:bg-panel2">
+              <button onClick={() => move(i, -1)} className="size-8 text-muted active:text-fg">
                 ↑
               </button>
-              <button onClick={() => move(i, 1)} className="size-8 rounded-lg text-muted active:bg-panel2">
+              <button onClick={() => move(i, 1)} className="size-8 text-muted active:text-fg">
                 ↓
               </button>
               <button
                 onClick={() => setItems((l) => l.filter((_, j) => j !== i))}
-                className="size-8 rounded-lg text-red-400 active:bg-panel2"
+                className="size-8 text-danger active:opacity-70"
               >
                 ✕
               </button>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <Counter label="Sets" value={item.sets} min={1} onChange={(v) => patch(i, { sets: v })} />
-              <Counter label="Reps" value={item.reps} min={1} onChange={(v) => patch(i, { reps: v })} />
+            <div className="mt-1.5 grid grid-cols-2 gap-6">
+              <Counter
+                label="Sets"
+                value={item.sets}
+                min={1}
+                onChange={(v) => patch(i, { sets: v })}
+              />
+              <Counter
+                label="Reps"
+                value={item.reps}
+                min={1}
+                onChange={(v) => patch(i, { reps: v })}
+              />
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 
-      <Button variant="outline" className="mt-3 w-full" onClick={() => setPicker(true)}>
-        + Add exercise
-      </Button>
+      <button onClick={() => setPicker(true)} className="w-full py-5 text-left">
+        <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-fg">
+          + Add exercise
+        </span>
+      </button>
 
       <ExercisePicker
         open={picker}
@@ -397,19 +426,22 @@ function Counter({
   min?: number;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-panel2 px-1">
-      <button
-        onClick={() => onChange(Math.max(min, value - 1))}
-        className="h-10 w-9 text-muted active:text-white"
-      >
-        −
-      </button>
-      <span className="text-center text-[13px] text-muted">
-        {label} <b className="ml-1 text-[15px] tabular-nums text-white">{value}</b>
+    <div className="flex items-center justify-between">
+      <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.16em] text-muted">
+        {label}
       </span>
-      <button onClick={() => onChange(value + 1)} className="h-10 w-9 text-muted active:text-white">
-        +
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(Math.max(min, value - 1))}
+          className="h-9 w-8 text-muted active:text-fg"
+        >
+          −
+        </button>
+        <span className="w-6 text-center font-mono text-[15px]">{value}</span>
+        <button onClick={() => onChange(value + 1)} className="h-9 w-8 text-muted active:text-fg">
+          +
+        </button>
+      </div>
     </div>
   );
 }

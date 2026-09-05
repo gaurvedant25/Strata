@@ -1,15 +1,27 @@
 @import "tailwindcss";
 
+/* Self-hosted rather than pulled from Google Fonts: the app has to render
+   correctly in airplane mode, so the faces are bundled and precached with
+   everything else. Only the weights the design actually uses are imported. */
+@import "@fontsource-variable/dm-sans";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
 @theme {
+  /* Ground. There is one surface colour and it is black — no panels, no cards. */
   --color-ink: #000000;
-  --color-panel: #161618;
-  --color-panel2: #212124;
-  --color-faint: #2c2c2f;
-  --color-line: #29292c;
-  --color-muted: #8e8e93;
-  --color-accent: #ffffff;
-  --color-accentdim: #d1d1d6;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* The only two greys that draw anything: a section rule and a row rule. */
+  --color-rule: #1a1a1a;
+  --color-subrule: #111111;
+  /* Hierarchy is three text tones, never a lighter box. */
+  --color-fg: #f5f5f5;
+  --color-muted: #666666;
+  --color-faint: #3a3a3a;
+  --color-danger: #ff453a;
+
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 :root {
@@ -25,7 +37,7 @@ body,
 body {
   margin: 0;
   background: var(--color-ink);
-  color: #ffffff;
+  color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
