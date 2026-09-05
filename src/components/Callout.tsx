@@ -125,6 +125,25 @@ export function Scramble({
   return <>{out}</>;
 }
 
+/**
+ * Extends the line from the muscle outwards.
+ *
+ * pathLength normalises the geometry to 1 so the dash maths needs no
+ * measurement of the real path — which matters here, because the SVG is
+ * stretched by preserveAspectRatio="none" and its rendered length does not
+ * match its coordinates.
+ */
+function draw(phase: number) {
+  return {
+    fill: "none" as const,
+    vectorEffect: "non-scaling-stroke" as const,
+    pathLength: 1,
+    strokeDasharray: 1,
+    strokeDashoffset: phase ? 0 : 1,
+    style: { transition: "stroke-dashoffset 300ms cubic-bezier(.3,.7,.3,1)" },
+  };
+}
+
 export function Callout({
   side,
   lines,
@@ -141,13 +160,16 @@ export function Callout({
   const rx = isLeft || !anchor[2] ? rx0 : 1 - rx0;
   const ax = (0.5 - FIG_FRAC / 2 + rx * FIG_FRAC) * VB_W;
   const ay = ry * VB_H;
-  const edge = isLeft ? 0.245 * VB_W : 0.755 * VB_W;
-  // The horizontal run lands on the box's top inner edge, so it never crosses
-  // a row of glyphs while still passing behind the box.
+  // The box's corner nearest the body. The line stops here rather than running
+  // on across the box's top edge: arrival and expansion then happen in the same
+  // place, so the two read as one gesture instead of the box opening from the
+  // opposite end to the one the line reached.
+  const corner = isLeft ? 0.245 * VB_W : 0.755 * VB_W;
   const boxY = Math.min(72, Math.max(8, ay - 9));
-  const elbow = isLeft ? edge + 5.5 : edge - 5.5;
-  const farEdge = isLeft ? 0 : VB_W;
-  const leader = `M${ax.toFixed(1)} ${ay.toFixed(1)} L${elbow.toFixed(1)} ${boxY.toFixed(1)} H${farEdge}`;
+  // A short horizontal before the corner keeps the elbow, giving the eye
+  // somewhere to land between the diagonal and the box.
+  const bend = isLeft ? corner + 6 : corner - 6;
+  const leader = `M${ax.toFixed(1)} ${ay.toFixed(1)} L${bend.toFixed(1)} ${boxY.toFixed(1)} H${corner.toFixed(1)}`;
 
   // 0 = nothing, 1 = line drawn, 2 = box in.
   const start = useRef(0);
@@ -186,28 +208,11 @@ export function Callout({
           pointerEvents: "none",
           overflow: "visible",
           zIndex: 3,
-          transformOrigin: `${((ax / VB_W) * 100).toFixed(1)}% ${((ay / VB_H) * 100).toFixed(1)}%`,
-          transform: phase ? "scale(1)" : "scale(.06)",
-          opacity: phase ? 1 : 0,
-          transition: "transform 300ms cubic-bezier(.3,.7,.3,1), opacity 150ms ease-out",
         }}
       >
         {/* a black casing under the hairline, so it stays legible over a lit muscle */}
-        <path
-          d={leader}
-          fill="none"
-          stroke="#000"
-          strokeWidth="3.5"
-          strokeOpacity="0.9"
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          d={leader}
-          fill="none"
-          stroke="#8b8b90"
-          strokeWidth="1.2"
-          vectorEffect="non-scaling-stroke"
-        />
+        <path d={leader} {...draw(phase)} stroke="#000" strokeWidth="3.5" strokeOpacity="0.9" />
+        <path d={leader} {...draw(phase)} stroke="#8b8b90" strokeWidth="1.2" />
       </svg>
 
       <div
@@ -224,7 +229,9 @@ export function Callout({
           borderRadius: 3,
           background: "transparent",
           pointerEvents: "none",
-          transformOrigin: isLeft ? "top left" : "top right",
+          // Opens from the corner the line arrives at, so the box unfolds away
+          // from the body rather than towards it.
+          transformOrigin: isLeft ? "top right" : "top left",
           transform: phase > 1 ? "scale(1)" : "scale(.18)",
           opacity: phase > 1 ? 1 : 0,
           transition: "transform 180ms cubic-bezier(.22,.61,.36,1), opacity 135ms ease-out",
