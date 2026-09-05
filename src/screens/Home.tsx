@@ -16,11 +16,14 @@ import {
   CANONICAL_LIFT,
   FRONT_GROUPS,
   MUSCLE_LABEL,
+  TIERS,
+  TIER_COLOR,
   TIER_LEVEL,
   REGION_SECTIONS,
   computeMuscleScores,
   type MuscleGroup,
   type MuscleScore,
+  type Tier,
 } from "../lib/strength";
 import { personalRecords } from "../lib/stats";
 import { fmtRelative, num, parseKey, todayKey } from "../lib/util";
@@ -72,34 +75,87 @@ function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
   );
 }
 
-/** One scored region. Identical whether it sits in a section or on its own. */
-function RegionRow({
-  group,
-  score,
-  active,
-  onPick,
+/** The bar colour for a region with nothing logged against it yet. */
+const UNSCORED = "#3a3a41";
+
+/** Highest tier among a section's scored regions, or null if none are scored. */
+function bestTier(
+  groups: MuscleGroup[],
+  scores: Partial<Record<MuscleGroup, MuscleScore>>,
+): Tier | null {
+  let best: Tier | null = null;
+  for (const g of groups) {
+    const t = scores[g]?.tier;
+    if (t && (!best || TIERS.indexOf(t) > TIERS.indexOf(best))) best = t;
+  }
+  return best;
+}
+
+/**
+ * One row of the muscle-group list.
+ *
+ * A card rather than a hairline row, carrying its tier as a bar down the
+ * leading edge — which is what lets a closed section still show something of
+ * what is inside it, and what makes a list this long scannable by colour
+ * before it is read.
+ */
+function Row({
+  name,
+  sub,
+  tierText,
+  tierColor,
+  nameSize,
+  nameColor,
+  background,
+  minHeight,
   indent,
+  chevron,
+  onClick,
 }: {
-  group: MuscleGroup;
-  score?: MuscleScore;
-  active: boolean;
-  onPick: (m: MuscleGroup) => void;
+  name: string;
+  sub?: string | null;
+  tierText?: string;
+  tierColor: string;
+  nameSize: number;
+  nameColor: string;
+  background: string;
+  minHeight: number;
   indent?: boolean;
+  /** Present on a section; rotates when it is open. */
+  chevron?: "closed" | "open";
+  onClick: () => void;
 }) {
   return (
     <button
-      onClick={() => onPick(group)}
-      className={`flex w-full items-center gap-3 border-b border-subrule py-3 transition-colors ${
-        indent ? "pl-7 pr-1" : "px-1"
-      } ${active ? "bg-[#0c0c0c] text-fg" : "text-[#8b8b90]"}`}
+      onClick={onClick}
+      style={{ minHeight, marginLeft: indent ? 22 : 0, background }}
+      className="relative grid w-full grid-cols-[minmax(0,1fr)_auto_16px] items-center gap-2.5 overflow-hidden rounded-[9px] pl-4 pr-3 text-left"
     >
-      <Dot score={score} />
-      <span className="flex-1 text-left text-[14px] font-medium">{MUSCLE_LABEL[group]}</span>
-      <span className="w-14 text-right font-mono text-[13px] text-muted">
-        {score ? `${num(score.ratio, 2)}×` : "—"}
+      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: tierColor }} />
+      <span className="flex min-w-0 flex-col gap-[5px] py-[11px]">
+        <span
+          className="truncate leading-[1.15]"
+          style={{ fontSize: nameSize, color: nameColor }}
+        >
+          {name}
+        </span>
+        {sub && (
+          <span className="font-mono text-[10.5px] uppercase leading-none tracking-[0.16em] text-[#969696]">
+            {sub}
+          </span>
+        )}
       </span>
-      <span className="w-[74px] text-right font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
-        {score ? score.tier : ""}
+      <span
+        className="whitespace-nowrap font-mono text-[9.5px] font-medium uppercase leading-none tracking-[0.16em]"
+        style={{ color: tierColor }}
+      >
+        {tierText}
+      </span>
+      <span
+        className="inline-block text-right font-mono text-[14px] leading-none text-[#8d8d8d] transition-transform duration-[180ms]"
+        style={{ transform: chevron === "open" ? "rotate(90deg)" : "rotate(0deg)" }}
+      >
+        {chevron ? "›" : ""}
       </span>
     </button>
   );
@@ -247,7 +303,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           <div className="border-t border-rule pt-[18px]">
             <div className="flex items-center gap-2.5">
               <Dot score={detail} size={9} />
-              <h2 className="text-[23px] font-bold leading-none tracking-[-0.02em]">
+              <h2 className="text-[27px] leading-none tracking-[-0.015em]">
                 {MUSCLE_LABEL[active]}
               </h2>
               {detail && (
@@ -261,6 +317,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
               <>
                 <div className="pt-3.5">
                   <BigNumber
+                    size={52}
                     // keyed on the region so switching regions replays the reveal,
                     // in step with the callouts settling on the figure above
                     value={
@@ -273,7 +330,6 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                       />
                     }
                     unit={`${unitLabel} est. 1RM`}
-                    size={48}
                   />
                 </div>
                 <p className="mt-2.5 text-[13px] text-muted">
@@ -288,24 +344,50 @@ export function Home({ onSettings }: { onSettings: () => void }) {
             )}
           </div>
 
-          <div className="mt-6 border-t border-rule">
+          {/* Inset less than the header, so the cards read as the wider band */}
+          <div className="-mx-1.5 mt-6 flex flex-col gap-1.5">
+            <span className="px-2 pb-1.5 font-mono text-[10.5px] uppercase leading-none tracking-[0.18em] text-[#9a9a9a]">
+              Muscle groups
+            </span>
+
             {REGION_SECTIONS.map((section) => {
               if (section.kind === "single") {
+                const sc = scores[section.group];
+                const on = active === section.group;
                 return (
-                  <RegionRow
+                  <Row
                     key={section.group}
-                    group={section.group}
-                    score={scores[section.group]}
-                    active={active === section.group}
-                    onPick={pick}
+                    name={MUSCLE_LABEL[section.group]}
+                    tierText={sc ? sc.tier : ""}
+                    tierColor={sc ? sc.color : UNSCORED}
+                    nameSize={16}
+                    nameColor={on ? "#ffffff" : "#e4e4e4"}
+                    background={on ? "#161616" : "#111111"}
+                    minHeight={56}
+                    onClick={() => pick(section.group)}
                   />
                 );
               }
+
               const open = openIds.includes(section.id);
-              const scored = section.children.filter((c) => scores[c]).length;
+              const best = bestTier(section.children, scores);
+              const holdsActive = section.children.includes(active);
               return (
-                <div key={section.id}>
-                  <button
+                <div key={section.id} className="flex flex-col gap-1.5">
+                  <Row
+                    name={section.label}
+                    sub={`${section.children.length} muscles`}
+                    // "Best" rather than a tier of its own: a section is not
+                    // scored, and naming the highest of its regions says where
+                    // the colour on the bar came from instead of implying the
+                    // group earned it.
+                    tierText={best ? `Best ${best}` : ""}
+                    tierColor={best ? TIER_COLOR[best] : UNSCORED}
+                    nameSize={16}
+                    nameColor={holdsActive ? "#ffffff" : "#e4e4e4"}
+                    background={holdsActive ? "#161616" : "#111111"}
+                    minHeight={56}
+                    chevron={open ? "open" : "closed"}
                     onClick={() =>
                       setOpenIds((o) =>
                         o.includes(section.id)
@@ -313,48 +395,26 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                           : [...o, section.id],
                       )
                     }
-                    aria-expanded={open}
-                    className="flex w-full items-center gap-3 border-b border-subrule px-1 py-3 text-left transition-colors"
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={`shrink-0 text-muted transition-transform duration-150 ${
-                        open ? "rotate-90" : ""
-                      }`}
-                    >
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
-                    <span className="flex-1 text-[14px] font-medium text-fg">{section.label}</span>
-                    {/* one dot per region inside, so the spread is visible without
-                        inventing a score for the section as a whole */}
-                    <span className="flex items-center gap-1.5">
-                      {section.children.map((c) => (
-                        <Dot key={c} score={scores[c]} size={6} />
-                      ))}
-                    </span>
-                    <span className="w-[74px] text-right font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
-                      {scored}/{section.children.length}
-                    </span>
-                  </button>
+                  />
 
                   {open &&
-                    section.children.map((c) => (
-                      <RegionRow
-                        key={c}
-                        group={c}
-                        score={scores[c]}
-                        active={active === c}
-                        onPick={pick}
-                        indent
-                      />
-                    ))}
+                    section.children.map((c) => {
+                      const sc = scores[c];
+                      return (
+                        <Row
+                          key={c}
+                          name={MUSCLE_LABEL[c]}
+                          tierText={sc ? sc.tier : ""}
+                          tierColor={sc ? sc.color : UNSCORED}
+                          nameSize={14}
+                          nameColor={active === c ? "#ffffff" : "#a8a8a8"}
+                          background={active === c ? "#161616" : "#0d0d0d"}
+                          minHeight={44}
+                          indent
+                          onClick={() => pick(c)}
+                        />
+                      );
+                    })}
                 </div>
               );
             })}
