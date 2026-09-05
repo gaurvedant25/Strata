@@ -125,25 +125,6 @@ export function Scramble({
   return <>{out}</>;
 }
 
-/**
- * Extends the line from the muscle outwards.
- *
- * pathLength normalises the geometry to 1 so the dash maths needs no
- * measurement of the real path — which matters here, because the SVG is
- * stretched by preserveAspectRatio="none" and its rendered length does not
- * match its coordinates.
- */
-function draw(phase: number) {
-  return {
-    fill: "none" as const,
-    vectorEffect: "non-scaling-stroke" as const,
-    pathLength: 1,
-    strokeDasharray: 1,
-    strokeDashoffset: phase ? 0 : 1,
-    style: { transition: "stroke-dashoffset 300ms cubic-bezier(.3,.7,.3,1)" },
-  };
-}
-
 export function Callout({
   side,
   lines,
@@ -171,6 +152,12 @@ export function Callout({
   const bend = isLeft ? corner + 6 : corner - 6;
   const leader = `M${ax.toFixed(1)} ${ay.toFixed(1)} L${bend.toFixed(1)} ${boxY.toFixed(1)} H${corner.toFixed(1)}`;
 
+  // Swept from the muscle end towards the corner: at rest the clip sits on the
+  // anchor and hides the whole line, and it opens out to the box's corner.
+  const axPct = (ax / VB_W) * 100;
+  const cornerPct = (corner / VB_W) * 100;
+  const edgePct = (p: number) => (isLeft ? `inset(0 0 0 ${p.toFixed(2)}%)` : `inset(0 ${(100 - p).toFixed(2)}% 0 0)`);
+
   // 0 = nothing, 1 = line drawn, 2 = box in.
   const start = useRef(0);
   if (!start.current) start.current = performance.now();
@@ -194,6 +181,8 @@ export function Callout({
     };
   }, []);
 
+  const reveal = edgePct(phase ? cornerPct : axPct);
+
   return (
     <>
       <svg
@@ -208,11 +197,38 @@ export function Callout({
           pointerEvents: "none",
           overflow: "visible",
           zIndex: 3,
+          /**
+           * The line is revealed by sweeping a clip out from the muscle.
+           *
+           * The obvious way — a dash the length of the path, offset to nothing
+           * and animated to zero — cannot work here. The stroke has to be
+           * non-scaling, because preserveAspectRatio="none" stretches this SVG
+           * unevenly and a scaled stroke would come out lopsided; but a
+           * non-scaling stroke also measures its dashes in screen pixels, while
+           * pathLength normalises to user units. The two do not meet, and the
+           * result was a 1px-on, 1px-off dotted line rather than one drawn
+           * stroke — invisible against black, obvious across a lit muscle.
+           */
+          clipPath: reveal,
+          transition: "clip-path 300ms cubic-bezier(.3,.7,.3,1)",
         }}
       >
         {/* a black casing under the hairline, so it stays legible over a lit muscle */}
-        <path d={leader} {...draw(phase)} stroke="#000" strokeWidth="3.5" strokeOpacity="0.9" />
-        <path d={leader} {...draw(phase)} stroke="#8b8b90" strokeWidth="1.2" />
+        <path
+          d={leader}
+          fill="none"
+          stroke="#000"
+          strokeWidth="3.5"
+          strokeOpacity="0.9"
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          d={leader}
+          fill="none"
+          stroke="#8b8b90"
+          strokeWidth="1.2"
+          vectorEffect="non-scaling-stroke"
+        />
       </svg>
 
       <div
