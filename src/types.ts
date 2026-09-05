@@ -1,7 +1,21 @@
 export type Unit = "kg" | "lb";
+
+/**
+ * Fields every stored record carries so it can be synced.
+ *
+ * `updatedAt` is stamped centrally on write, and conflicts between a device and
+ * the server are resolved by taking the later one. `deleted` is a tombstone:
+ * a removed record is kept as a marker rather than dropped, because a row that
+ * simply vanishes locally is indistinguishable from one the server has never
+ * heard of, and would be resurrected on the next pull.
+ */
+export type Synced = {
+  updatedAt?: number;
+  deleted?: boolean;
+};
 export type Gender = "male" | "female";
 
-export type Exercise = {
+export type Exercise = Synced & {
   id: string;
   name: string;
   muscle: string;
@@ -18,7 +32,7 @@ export type RoutineItem = {
 };
 
 /** One training day. Belongs to the split it was created under. */
-export type Routine = {
+export type Routine = Synced & {
   id: string;
   name: string;
   /** The split this day belongs to. Absent only on data from before splits existed. */
@@ -32,7 +46,7 @@ export type Routine = {
  * A training programme: a named set of days you rotate through. One split is
  * active at a time, and the Routines screen shows that split's days.
  */
-export type Split = {
+export type Split = Synced & {
   id: string;
   name: string;
   /** One line describing who the split suits, shown when choosing. */
@@ -58,7 +72,7 @@ export type SessionEntry = {
   note?: string;
 };
 
-export type Session = {
+export type Session = Synced & {
   id: string;
   name: string;
   routineId?: string;
@@ -70,7 +84,7 @@ export type Session = {
   note?: string;
 };
 
-export type BodyWeight = {
+export type BodyWeight = Synced & {
   /** YYYY-MM-DD, one entry per day */
   date: string;
   weight: number;

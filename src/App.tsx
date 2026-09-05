@@ -5,9 +5,11 @@ import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
 import { Onboarding } from "./screens/Onboarding";
+import { SignIn } from "./screens/SignIn";
 import { Progress } from "./screens/Progress";
 import { Routines } from "./screens/Routines";
 import { Settings } from "./screens/Settings";
+import { useAuth } from "./auth";
 import { useStore } from "./store";
 
 export type Tab = "home" | "routines" | "history" | "progress";
@@ -71,6 +73,12 @@ function ListIcon({ className, size = 20 }: { className?: string; size?: number 
 
 export default function App() {
   const s = useStore();
+  const auth = useAuth();
+  // Declining an account is remembered, so "use without an account" is a
+  // decision rather than a question asked on every launch.
+  const [skippedAuth, setSkippedAuth] = useState(
+    () => localStorage.getItem("gymlog.noAccount") === "1",
+  );
   const [tab, setTab] = useState<Tab>("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Whether the full-screen logger is the thing on top right now. Starting or
@@ -104,12 +112,28 @@ export default function App() {
   // each tab should open at its own top, not inherit the last tab's scroll
   useEffect(() => window.scrollTo(0, 0), [tab, viewLogger, settingsOpen]);
 
-  if (!s.ready) {
+  if (!s.ready || !auth.ready) {
     return (
       <div className="grid h-full place-items-center">
         <div className="animate-pulse font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
           Loading
         </div>
+      </div>
+    );
+  }
+
+  // Sign-in comes before onboarding: the answers onboarding collects are
+  // account data, and gathering them first would mean either discarding them
+  // or merging them into whichever account signed in afterwards.
+  if (auth.cloud && !auth.session && !skippedAuth) {
+    return (
+      <div className="mx-auto flex min-h-full max-w-lg flex-col">
+        <SignIn
+          onSkip={() => {
+            localStorage.setItem("gymlog.noAccount", "1");
+            setSkippedAuth(true);
+          }}
+        />
       </div>
     );
   }

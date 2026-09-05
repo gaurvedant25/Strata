@@ -1,0 +1,34 @@
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+/**
+ * The cloud connection, or nothing at all.
+ *
+ * Both values are public by design — the anon key is safe in a bundle because
+ * every table is guarded by row-level security, so a key on its own can read
+ * nobody's data. Without them the app runs exactly as it always has: local
+ * IndexedDB, no account, no network. That is deliberate rather than a
+ * degraded mode, because a fork of this repo with no Supabase project of its
+ * own should still be a working gym log.
+ */
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+export const cloudConfigured = Boolean(url && anonKey);
+
+export const supabase: SupabaseClient | null = cloudConfigured
+  ? createClient(url!, anonKey!, {
+      auth: {
+        // The session has to outlive a closed tab: the app is installed to a
+        // home screen and launched cold, and being asked to sign in on every
+        // launch would defeat the point of signing in once.
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
+
+/** Where Google should send the user back to after they approve. */
+export function redirectTo() {
+  return `${window.location.origin}${import.meta.env.BASE_URL ?? "/"}`;
+}

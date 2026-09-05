@@ -50,9 +50,50 @@ Screen*. It then launches fullscreen with no browser UI and runs offline.
 
 After the first load the service worker has cached the whole app, so it opens in airplane mode.
 
+## Accounts and sync (optional)
+
+Out of the box this app has no accounts and no server: it runs on IndexedDB and
+never makes a network request after loading. Point it at a Supabase project and
+it additionally keeps every record in your account, so a lost phone or a cleared
+browser is no longer a lost training history.
+
+The device stays the source of truth. Screens always read local storage and
+never wait on the network, so the app works in a gym with no signal exactly as
+it did before; sync is a background reconciliation on top. Conflicts are
+resolved last-write-wins by timestamp, which is the right trade for one person
+on two devices but can lose an edit if the same record is changed on both while
+both are offline.
+
+### Setting it up
+
+1. Create a project at [supabase.com](https://supabase.com) (the free tier is
+   ample — this stores a few hundred KB per user).
+2. Run [`supabase/schema.sql`](supabase/schema.sql) in the project's SQL editor.
+   It creates one table and, critically, the row-level security policy that
+   stops one account reading another's.
+3. Create a Google OAuth client at
+   [console.cloud.google.com](https://console.cloud.google.com/apis/credentials):
+   *Create credentials → OAuth client ID → Web application*. Add
+   `https://<your-project>.supabase.co/auth/v1/callback` as an authorised
+   redirect URI.
+4. In Supabase, *Authentication → Providers → Google*, paste the client ID and
+   secret from step 3 and enable it.
+5. In Supabase, *Authentication → URL Configuration*, add the URL you deploy to
+   (and `http://localhost:5173` for development) to the redirect allow-list.
+6. Copy `.env.example` to `.env.local` and fill in the project URL and anon key
+   from *Project Settings → Data API*.
+
+Both values are public by design and safe in the bundle: row-level security
+means the anon key on its own can read nobody's data.
+
+Leave `.env.local` out and none of the above applies — no sign-in screen, no
+network, exactly the local-only app described below.
+
 ## Data & storage notes
 
-- Nothing is ever uploaded. There are no accounts and no network requests after the initial load.
+- With no Supabase project configured, nothing is ever uploaded: no accounts, and no network
+  requests after the initial load. Signed in, records are mirrored to your account and nowhere
+  else.
 - Data lives in IndexedDB, scoped to that browser on that device. Clearing site data, deleting the
   installed app, or switching browsers loses it — export a backup from Settings periodically.
 - iOS evicts storage for *websites* left unused for 7 days, but **installed** home-screen PWAs are

@@ -1,12 +1,14 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Eyebrow, Segmented, Sheet, inputCls } from "../components/ui";
+import { useAuth } from "../auth";
+import { Button, Eyebrow, Segmented, Sheet, inputCls } from "../components/ui";
 import { exportBackup, importBackup, wipe } from "../lib/db";
-import { todayKey } from "../lib/util";
+import { fmtRelative, todayKey } from "../lib/util";
 import { useStore } from "../store";
 import type { Gender, Unit } from "../types";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const s = useStore();
+  const auth = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [exOpen, setExOpen] = useState(false);
@@ -67,6 +69,63 @@ export function Settings({ onBack }: { onBack: () => void }) {
           </span>
         </button>
       </div>
+
+      {auth.cloud && (
+        <>
+          <Group title="Account" />
+          {auth.session ? (
+            <>
+              <div className="flex items-center justify-between gap-4 border-b border-subrule px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px]">{auth.name ?? auth.email}</p>
+                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                    {auth.sync === "syncing"
+                      ? "Syncing…"
+                      : auth.sync === "error"
+                        ? "Offline · will catch up"
+                        : auth.lastSyncedAt
+                          ? `Synced ${fmtRelative(auth.lastSyncedAt, Date.now())}`
+                          : "Synced"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => void auth.push()}
+                  className="shrink-0 border-b border-fg pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+                >
+                  Sync now
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  if (confirm("Sign out? Your workouts stay in your account and sync back when you sign in again.")) {
+                    void auth.signOut();
+                  }
+                }}
+                className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b]"
+              >
+                <span className="text-[15px]">Sign out</span>
+                <span className="text-muted">→</span>
+              </button>
+            </>
+          ) : (
+            <div className="border-b border-rule px-5 py-4">
+              <p className="text-[13px] leading-relaxed text-muted text-pretty">
+                You are using Gym Log without an account, so these logs live only on this device.
+              </p>
+              <div className="pt-3.5">
+                <Button
+                  onClick={() => {
+                    localStorage.removeItem("gymlog.noAccount");
+                    void auth.signInWithGoogle();
+                  }}
+                >
+                  Sign in with Google
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       <Group title="Units" />
       <SettingRow label="Weight unit" rule="subrule">
@@ -138,8 +197,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
       </button>
 
       <p className="px-5 pt-6 text-[12px] leading-[1.7] text-muted text-pretty">
-        Everything lives on this device only — nothing is uploaded. Clearing your browser data or
-        deleting the app also deletes your logs, so back up regularly.
+        {auth.session
+          ? "Your workouts are stored on this device and in your account, and the two reconcile whenever you have a connection. Everything keeps working offline; clearing your browser data only clears this device."
+          : "Everything lives on this device only — nothing is uploaded. Clearing your browser data or deleting the app also deletes your logs, so back up regularly."}
       </p>
 
       {msg && (

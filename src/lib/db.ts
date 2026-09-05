@@ -15,12 +15,12 @@ let dbp: Promise<IDBPDatabase<GymDB>> | null = null;
 
 export function db() {
   if (!dbp) {
-    dbp = openDB<GymDB>("gymlog", 2, {
+    dbp = openDB<GymDB>("gymlog", 3, {
       // Each step is guarded by oldVersion so an existing database only runs
       // the steps it has not seen. Routines created before v2 have no splitId;
       // they are adopted into a split on load rather than here, since that
       // needs to look at them as a set.
-      upgrade(d, oldVersion) {
+      upgrade(d, oldVersion, _newVersion, tx) {
         if (oldVersion < 1) {
           d.createObjectStore("exercises", { keyPath: "id" });
           d.createObjectStore("routines", { keyPath: "id" });
@@ -31,6 +31,32 @@ export function db() {
         }
         if (oldVersion < 2) {
           d.createObjectStore("splits", { keyPath: "id" });
+        }
+        if (oldVersion < 3) {
+          // Records written before accounts existed carry no updatedAt, and
+          // sync only pushes rows newer than the last mark — which for a first
+          // sync is zero. Left alone, everything logged before signing in would
+          // be judged "not newer than nothing" and silently never upload.
+          // Backfilling from whatever timestamp each record already has keeps
+          // their relative order rather than flattening them all to now.
+          for (const name of ["exercises", "routines", "splits", "sessions", "bodyweight"] as const) {
+            const store = tx.objectStore(name) as unknown as {
+              openCursor(): Promise<{
+                value: Record<string, unknown>;
+                update(v: unknown): Promise<unknown>;
+                continue(): Promise<unknown>;
+              } | null>;
+            };
+            void store.openCursor().then(function walk(cursor): unknown {
+              if (!cursor) return;
+              const v = cursor.value;
+              if (v.updatedAt == null) {
+                const born = v.startedAt ?? v.createdAt ?? v.at ?? Date.now();
+                void cursor.update({ ...v, updatedAt: Number(born) });
+              }
+              return (cursor.continue() as Promise<unknown>).then(walk as never);
+            });
+          }
         }
       },
     });
@@ -52,36 +78,72 @@ export async function loadAll() {
       d.get("meta", "activeSplitId") as Promise<string | undefined>,
     ]);
   return {
-    exercises,
+    exercises: live(exercises),
     // days keep the order they were created in, which is the order of the split
-    routines: routines.sort((a, b) => a.createdAt - b.createdAt),
-    splits: splits.sort((a, b) => a.createdAt - b.createdAt),
-    sessions: sessions.sort((a, b) => b.startedAt - a.startedAt),
-    bodyweight: bodyweight.sort((a, b) => a.date.localeCompare(b.date)),
+    routines: live(routines).sort((a, b) => a.createdAt - b.createdAt),
+    splits: live(splits).sort((a, b) => a.createdAt - b.createdAt),
+    sessions: live(sessions).sort((a, b) => b.startedAt - a.startedAt),
+    bodyweight: live(bodyweight).sort((a, b) => a.date.localeCompare(b.date)),
     settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) } as Settings,
     activeSessionId: activeId ?? null,
     activeSplitId: splitId ?? null,
   };
 }
 
+/**
+ * Every write is stamped, so a record always knows when it last changed and
+ * sync has something to compare. Doing it here rather than at each call site
+ * means no screen can forget to.
+ */
+const stamp = <T extends object>(v: T): T & { updatedAt: number } => ({
+  ...v,
+  updatedAt: Date.now(),
+});
+
 export const put = {
-  exercise: async (v: Exercise) => (await db()).put("exercises", v),
-  routine: async (v: Routine) => (await db()).put("routines", v),
-  split: async (v: Split) => (await db()).put("splits", v),
-  session: async (v: Session) => (await db()).put("sessions", v),
-  bodyweight: async (v: BodyWeight) => (await db()).put("bodyweight", v),
-  settings: async (v: Settings) => (await db()).put("meta", v, "settings"),
+  exercise: async (v: Exercise) => (await db()).put("exercises", stamp(v)),
+  routine: async (v: Routine) => (await db()).put("routines", stamp(v)),
+  split: async (v: Split) => (await db()).put("splits", stamp(v)),
+  session: async (v: Session) => (await db()).put("sessions", stamp(v)),
+  bodyweight: async (v: BodyWeight) => (await db()).put("bodyweight", stamp(v)),
+  settings: async (v: Settings) => (await db()).put("meta", stamp(v), "settings"),
   activeSessionId: async (v: string | null) => (await db()).put("meta", v, "activeSessionId"),
   activeSplitId: async (v: string | null) => (await db()).put("meta", v, "activeSplitId"),
 };
 
-export const del = {
-  exercise: async (id: string) => (await db()).delete("exercises", id),
-  routine: async (id: string) => (await db()).delete("routines", id),
-  split: async (id: string) => (await db()).delete("splits", id),
-  session: async (id: string) => (await db()).delete("sessions", id),
-  bodyweight: async (date: string) => (await db()).delete("bodyweight", date),
+/**
+ * Deletes leave a tombstone instead of removing the row.
+ *
+ * A row that simply disappears locally looks identical to one the server has
+ * not seen yet, so the next pull would hand it straight back. Keeping a marker
+ * with a newer timestamp is what lets a deletion win the same comparison an
+ * edit would. Tombstones are filtered out of everything the app reads.
+ */
+const bury = async (
+  store: "exercises" | "routines" | "splits" | "sessions",
+  id: string,
+) => {
+  const d = await db();
+  const prev = await d.get(store, id);
+  if (!prev) return;
+  await d.put(store, { ...prev, deleted: true, updatedAt: Date.now() });
 };
+
+export const del = {
+  exercise: (id: string) => bury("exercises", id),
+  routine: (id: string) => bury("routines", id),
+  split: (id: string) => bury("splits", id),
+  session: (id: string) => bury("sessions", id),
+  bodyweight: async (date: string) => {
+    const d = await db();
+    const prev = await d.get("bodyweight", date);
+    if (!prev) return;
+    await d.put("bodyweight", { ...prev, deleted: true, updatedAt: Date.now() });
+  },
+};
+
+/** Rows the app should act as if it never had. */
+const live = <T extends { deleted?: boolean }>(rows: T[]) => rows.filter((r) => !r.deleted);
 
 export type Backup = {
   format: "gymlog";

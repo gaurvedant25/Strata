@@ -1,0 +1,121 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import type { Session } from "@supabase/supabase-js";
+import { cloudConfigured, redirectTo, supabase } from "./lib/supabase";
+import { syncNow, type SyncState } from "./lib/sync";
+
+type Auth = {
+  /** False when the app was built without a Supabase project, i.e. local-only. */
+  cloud: boolean;
+  ready: boolean;
+  session: Session | null;
+  email: string | null;
+  name: string | null;
+  sync: SyncState;
+  lastSyncedAt: number | null;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+  /** Reconcile now. Safe to call when signed out — it does nothing. */
+  push: () => Promise<void>;
+};
+
+const Ctx = createContext<Auth | null>(null);
+
+export function AuthProvider({ children, onSynced }: { children: ReactNode; onSynced: () => void }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(!cloudConfigured);
+  const [sync, setSync] = useState<SyncState>(cloudConfigured ? "idle" : "off");
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const running = useRef(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      setReady(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const run = useCallback(async () => {
+    const uid = session?.user.id;
+    if (!supabase || !uid || running.current) return;
+    running.current = true;
+    setSync("syncing");
+    try {
+      await syncNow(uid);
+      setLastSyncedAt(Date.now());
+      setSync("idle");
+      onSynced();
+    } catch {
+      // Offline or the server is unhappy. The local copy is untouched and
+      // authoritative, so this is a state to report, never one to recover from.
+      setSync("error");
+    } finally {
+      running.current = false;
+    }
+  }, [session?.user.id, onSynced]);
+
+  // Reconcile on sign-in, whenever the network comes back, and when the app is
+  // brought to the foreground — the three moments where this device is most
+  // likely to be holding something the server has not seen.
+  useEffect(() => {
+    if (!session) return;
+    void run();
+    const onOnline = () => void run();
+    const onVisible = () => document.visibilityState === "visible" && void run();
+    window.addEventListener("online", onOnline);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [session, run]);
+
+  const value: Auth = {
+    cloud: cloudConfigured,
+    ready,
+    session,
+    email: session?.user.email ?? null,
+    name:
+      (session?.user.user_metadata?.full_name as string | undefined) ??
+      (session?.user.user_metadata?.name as string | undefined) ??
+      null,
+    sync,
+    lastSyncedAt,
+    async signInWithGoogle() {
+      if (!supabase) return;
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectTo() },
+      });
+    },
+    async signOut() {
+      if (!supabase) return;
+      // A last reconciliation before letting go, so anything logged since the
+      // previous one is not stranded on a device that is about to forget it.
+      await run();
+      await supabase.auth.signOut();
+    },
+    push: run,
+  };
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+export function useAuth() {
+  const v = useContext(Ctx);
+  if (!v) throw new Error("useAuth must be used inside <AuthProvider>");
+  return v;
+}
