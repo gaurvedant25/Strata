@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { BodyMap, type BodyView, type Callouts } from "../components/BodyMap";
+import { Scramble } from "../components/Callout";
 import { Tune } from "../components/icons";
 import {
   BigNumber,
@@ -200,7 +201,21 @@ export function Home({ onSettings }: { onSettings: () => void }) {
             {detail ? (
               <>
                 <div className="pt-3.5">
-                  <BigNumber value={num(detail.best1rm)} unit={`${unitLabel} est. 1RM`} size={48} />
+                  <BigNumber
+                    // keyed on the region so switching regions replays the reveal,
+                    // in step with the callouts settling on the figure above
+                    value={
+                      <Scramble
+                        key={active}
+                        text={num(detail.best1rm)}
+                        delay={80}
+                        hold={260}
+                        perChar={90}
+                      />
+                    }
+                    unit={`${unitLabel} est. 1RM`}
+                    size={48}
+                  />
                 </div>
                 <p className="mt-2.5 text-[13px] text-muted">
                   {CANONICAL_LIFT[active]} ·{" "}

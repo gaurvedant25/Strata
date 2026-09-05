@@ -48,7 +48,34 @@ const dots = (s: string) => s.replace(/[^ ]/g, "·");
 const reduced = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-function Scramble({ text, delay = 0 }: { text: string; delay?: number }) {
+/**
+ * Resolves text out of noise, one character at a time.
+ *
+ * Give it a `key` that changes with the value to replay it — progress is read
+ * off a clock captured on mount, so a remount is what restarts it. Pair it with
+ * a monospace face: the substituted glyphs are arbitrary, and in a proportional
+ * one the text would jitter its own width while it settles.
+ */
+export function Scramble({
+  text,
+  delay = 0,
+  perChar = 55,
+  hold = 0,
+}: {
+  text: string;
+  /** Wait before anything happens, e.g. for a box to finish arriving. */
+  delay?: number;
+  /** How long each character takes to settle. */
+  perChar?: number;
+  /**
+   * Churn every character for this long before any of them settle.
+   *
+   * A long label resolves slowly enough to read simply because it has many
+   * characters. A two-digit number is finished in about a tenth of a second and
+   * registers as a flicker, so short values need to be held in noise first.
+   */
+  hold?: number;
+}) {
   const full = String(text);
   const [out, setOut] = useState(() => (reduced() ? full : dots(full)));
   const start = useRef(0);
@@ -60,24 +87,16 @@ function Scramble({ text, delay = 0 }: { text: string; delay?: number }) {
       return;
     }
     const chars = full.split("");
-    const perChar = 55;
+    const noise = () => SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
     const tick = () => {
       const t = performance.now() - start.current - delay;
       if (t < 0) return false;
-      const revealed = Math.floor(t / perChar);
+      const revealed = Math.floor((t - hold) / perChar);
       if (revealed >= chars.length) {
         setOut(full);
         return true;
       }
-      setOut(
-        chars
-          .map((c, i) =>
-            i < revealed || c === " "
-              ? c
-              : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)],
-          )
-          .join(""),
-      );
+      setOut(chars.map((c, i) => (i < revealed || c === " " ? c : noise())).join(""));
       return false;
     };
     if (tick()) return;
@@ -85,7 +104,7 @@ function Scramble({ text, delay = 0 }: { text: string; delay?: number }) {
       if (tick()) clearInterval(id);
     }, 40);
     return () => clearInterval(id);
-  }, [full, delay]);
+  }, [full, delay, perChar, hold]);
 
   return <>{out}</>;
 }

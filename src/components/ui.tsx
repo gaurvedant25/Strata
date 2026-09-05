@@ -183,7 +183,7 @@ export function BigNumber({
   unit,
   size = 46,
 }: {
-  value: string;
+  value: ReactNode;
   unit: string;
   size?: number;
 }) {
