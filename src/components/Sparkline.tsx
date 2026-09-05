@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 
 /**
  * The only chart in the app: a hairline through the points, a rule at the
@@ -10,6 +10,22 @@ import { useRef, type PointerEvent } from "react";
  * doing real work, so reading a single session back is handled here instead:
  * drag across the plot and the caller is told which point is under the finger.
  */
+
+/** How long a change of series takes to settle. */
+const MORPH_MS = 350;
+/** Samples the morphing line is drawn through, independent of either series. */
+const PATH_STEPS = 64;
+/** Point in the morph where the old markers start leaving and the new arrive. */
+const HANDOVER = 0.55;
+
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+type Pt = { x: number; y: number };
+
+const reduced = () =>
+  typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function Sparkline({
   values,
   labels,
@@ -43,28 +59,103 @@ export function Sparkline({
   const svg = useRef<SVGSVGElement>(null);
   const dragging = useRef(false);
 
+  /**
+   * The series being travelled away from, and how far along we are.
+   *
+   * Two series rarely have the same number of sessions, so they cannot move
+   * one-to-one. Instead each old marker is given a destination *on* the new
+   * curve at its own position along it, travels there, and then fades out as
+   * the real new markers fade in — which is why the line can reshape between
+   * counts without any marker jumping.
+   */
+  const from = useRef<number[] | null>(null);
+  const shownKey = useRef<string>("");
+  const [p, setP] = useState(1);
+  const raf = useRef(0);
+
+  const key = values.join(",");
+  if (shownKey.current !== key) {
+    // Anything but the very first render has a series to travel away from.
+    from.current = shownKey.current === "" ? null : parseKeyed(shownKey.current);
+    shownKey.current = key;
+  }
+
+  useEffect(() => {
+    if (!from.current || reduced() || !values.length) {
+      setP(1);
+      return;
+    }
+    setP(0);
+    const t0 = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - t0) / MORPH_MS);
+      setP(t);
+      if (t < 1) raf.current = requestAnimationFrame(step);
+    };
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+    // the joined key is what actually identifies a series change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
   if (!values.length) return null;
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  // A flat series would divide by zero; give it a span and it draws a level line.
-  const span = max - min || 1;
   const inner = height - padT - padB;
-  const x = (i: number) => (values.length === 1 ? width / 2 : (i / (values.length - 1)) * width);
-  const y = (v: number) => padT + inner - ((v - min) / span) * inner;
 
-  const pts = values.map((v, i) => ({ x: +x(i).toFixed(1), y: +y(v).toFixed(1) }));
-  const d = pts.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join("");
-  const last = pts[pts.length - 1];
+  /** Positions for one series, in this chart's pixel space, on its own scale. */
+  function geom(vals: number[]) {
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    // A flat series would divide by zero; give it a span and it draws level.
+    const span = max - min || 1;
+    const px = (i: number) => (vals.length === 1 ? width / 2 : (i / (vals.length - 1)) * width);
+    const py = (v: number) => padT + inner - ((v - min) / span) * inner;
+    const pts: Pt[] = vals.map((v, i) => ({ x: +px(i).toFixed(1), y: +py(v).toFixed(1) }));
+    /** The point a fraction `t` of the way along the series. */
+    const at = (t: number): Pt => {
+      if (vals.length === 1) return pts[0];
+      const f = t * (vals.length - 1);
+      const lo = Math.max(0, Math.min(vals.length - 2, Math.floor(f)));
+      const k = f - lo;
+      return { x: lerp(pts[lo].x, pts[lo + 1].x, k), y: lerp(pts[lo].y, pts[lo + 1].y, k) };
+    };
+    return { pts, at };
+  }
+
+  const to = geom(values);
+  const morphing = p < 1 && !!from.current && from.current.length > 0;
+  const old = morphing ? geom(from.current!) : null;
+  const e = easeOut(p);
+
+  // The line is sampled at a fixed resolution so it can morph between any two
+  // point counts without either series dictating the other's shape.
+  const path = (() => {
+    if (!morphing || !old) return to.pts.map((q, i) => `${i ? "L" : "M"}${q.x} ${q.y}`).join("");
+    let d = "";
+    for (let i = 0; i < PATH_STEPS; i++) {
+      const t = i / (PATH_STEPS - 1);
+      const a = old.at(t);
+      const b = to.at(t);
+      d += `${i ? "L" : "M"}${lerp(a.x, b.x, e).toFixed(1)} ${lerp(a.y, b.y, e).toFixed(1)}`;
+    }
+    return d;
+  })();
+
+  const last = to.pts[to.pts.length - 1];
   const baseline = padT + inner;
-  const sel = selected != null && pts[selected] ? pts[selected] : null;
+  const sel = !morphing && selected != null && to.pts[selected] ? to.pts[selected] : null;
+
+  // Old markers leave and new ones arrive over the tail of the morph.
+  const handover = Math.max(0, (p - HANDOVER) / (1 - HANDOVER));
+  const leaving = morphing ? 1 - handover : 0;
+  const arriving = morphing ? handover : 1;
 
   /** Maps a pointer position onto the nearest session. */
-  function pick(e: PointerEvent<SVGSVGElement>) {
+  function pick(ev: PointerEvent<SVGSVGElement>) {
     if (!onSelect) return;
     const rect = svg.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return;
-    const ratio = (e.clientX - rect.left) / rect.width;
+    const ratio = (ev.clientX - rect.left) / rect.width;
     const i = Math.round(ratio * (values.length - 1));
     onSelect(Math.max(0, Math.min(values.length - 1, i)));
   }
@@ -85,14 +176,14 @@ export function Sparkline({
         touchAction: onSelect ? "pan-y" : undefined,
         cursor: onSelect ? "crosshair" : undefined,
       }}
-      onPointerDown={(e) => {
+      onPointerDown={(ev) => {
         if (!onSelect) return;
         dragging.current = true;
-        e.currentTarget.setPointerCapture(e.pointerId);
-        pick(e);
+        ev.currentTarget.setPointerCapture(ev.pointerId);
+        pick(ev);
       }}
-      onPointerMove={(e) => {
-        if (dragging.current) pick(e);
+      onPointerMove={(ev) => {
+        if (dragging.current) pick(ev);
       }}
       onPointerUp={() => {
         dragging.current = false;
@@ -119,7 +210,7 @@ export function Sparkline({
       )}
 
       <path
-        d={d}
+        d={path}
         fill="none"
         stroke={stroke}
         strokeWidth={strokeWidth}
@@ -127,17 +218,38 @@ export function Sparkline({
         strokeLinecap="round"
       />
 
+      {/* markers of the series being left, travelling to where they belong on
+          the new curve before they go */}
       {markers &&
-        pts.map((p, i) => (
+        morphing &&
+        old &&
+        old.pts.map((a, i) => {
+          const b = to.at(old.pts.length === 1 ? 1 : i / (old.pts.length - 1));
+          return (
+            <circle
+              key={`leave-${i}`}
+              cx={lerp(a.x, b.x, e)}
+              cy={lerp(a.y, b.y, e)}
+              r={1.9}
+              fill="#000"
+              stroke={stroke}
+              strokeWidth="1"
+              opacity={leaving}
+            />
+          );
+        })}
+
+      {markers &&
+        to.pts.map((q, i) => (
           <circle
             key={i}
-            cx={p.x}
-            cy={p.y}
+            cx={q.x}
+            cy={q.y}
             r={1.9}
             fill="#000"
             stroke={stroke}
             strokeWidth="1"
-            opacity={sel && i !== selected ? 0.45 : 1}
+            opacity={(sel && i !== selected ? 0.45 : 1) * arriving}
           />
         ))}
 
@@ -146,6 +258,7 @@ export function Sparkline({
         cy={sel ? sel.y : last.y}
         r={strokeWidth > 1.5 ? 3.5 : 3}
         fill="#f5f5f5"
+        opacity={arriving}
       />
 
       {labels && !sel && (
@@ -157,6 +270,7 @@ export function Sparkline({
             fontSize="10"
             fontFamily="IBM Plex Mono, monospace"
             letterSpacing="1"
+            opacity={arriving}
           >
             {labels[0]}
           </text>
@@ -168,6 +282,7 @@ export function Sparkline({
             fontSize="10"
             fontFamily="IBM Plex Mono, monospace"
             letterSpacing="1"
+            opacity={arriving}
           >
             {labels[1]}
           </text>
@@ -175,4 +290,8 @@ export function Sparkline({
       )}
     </svg>
   );
+}
+
+function parseKeyed(key: string) {
+  return key.split(",").map(Number);
 }

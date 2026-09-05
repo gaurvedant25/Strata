@@ -81,6 +81,17 @@ export function Scramble({
   const start = useRef(0);
   if (!start.current) start.current = performance.now();
 
+  // Restarting on a changed value rather than on a remount matters when the
+  // value changes rapidly — dragging a chart, say. Remounting would reset the
+  // output to dots on every frame and the effect would never get far enough to
+  // show noise, so a fast series of changes would read as a stutter rather
+  // than as the value spinning.
+  const shown = useRef(full);
+  if (shown.current !== full) {
+    shown.current = full;
+    start.current = performance.now();
+  }
+
   useEffect(() => {
     if (reduced()) {
       setOut(full);

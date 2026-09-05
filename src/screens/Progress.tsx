@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Scramble } from "../components/Callout";
 import { Sparkline } from "../components/Sparkline";
 import { BigNumber, Empty, Eyebrow, Sheet, StatBand, TextTabs } from "../components/ui";
 import { exerciseHistory, personalRecords, sessionVolume } from "../lib/stats";
@@ -159,7 +160,14 @@ export function Progress() {
             </div>
 
             <div className="pt-6">
-              <BigNumber value={num(shown, 1)} unit={unitLabel} size={46} />
+              <BigNumber
+                // scrambles on every change, scrubbing included: Scramble
+                // restarts from the value itself, so dragging the curve reads
+                // as the figure spinning rather than snapping
+                value={<Scramble text={num(shown, 1)} delay={0} hold={110} perChar={40} />}
+                unit={unitLabel}
+                size={46}
+              />
             </div>
             <p className="mt-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
               {at ? (
