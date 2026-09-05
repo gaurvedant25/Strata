@@ -81,8 +81,14 @@ export const REGION_SECTIONS: RegionSection[] = [
   { kind: "group", id: "arms", label: "Arms", children: ["biceps", "triceps", "forearms"] },
   { kind: "group", id: "back", label: "Back", children: ["traps", "lats", "lowerBack"] },
   { kind: "group", id: "core", label: "Core", children: ["abs", "obliques"] },
-  { kind: "group", id: "legs", label: "Legs", children: ["quadriceps", "hamstrings", "calves"] },
-  { kind: "single", group: "glutes" },
+  {
+    kind: "group",
+    id: "legs",
+    label: "Legs",
+    // Glutes sit here rather than alone: they are trained by the same sessions
+    // as the rest of the leg, and a section of one is not a section.
+    children: ["quadriceps", "hamstrings", "glutes", "calves"],
+  },
 ];
 
 /**

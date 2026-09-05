@@ -78,17 +78,27 @@ function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
 /** The bar colour for a region with nothing logged against it yet. */
 const UNSCORED = "#3a3a41";
 
-/** Highest tier among a section's scored regions, or null if none are scored. */
-function bestTier(
+/**
+ * A section's own tier: the average of the regions inside it.
+ *
+ * Averaging rather than taking the best, because a section is meant to say how
+ * the whole of it is doing — one strong region should not speak for two weak
+ * ones sitting next to it.
+ *
+ * Only scored regions are counted. An unscored one means nothing has been
+ * logged for it, not that it is weak, and folding it in as the bottom rung
+ * would let an untrained lift quietly drag down a section that is going fine.
+ * This is a label on a list; the body map still colours every region by its
+ * own score and is untouched by any of it.
+ */
+function averageTier(
   groups: MuscleGroup[],
   scores: Partial<Record<MuscleGroup, MuscleScore>>,
 ): Tier | null {
-  let best: Tier | null = null;
-  for (const g of groups) {
-    const t = scores[g]?.tier;
-    if (t && (!best || TIERS.indexOf(t) > TIERS.indexOf(best))) best = t;
-  }
-  return best;
+  const ranks = groups.map((g) => scores[g]?.tier).filter((t): t is Tier => !!t);
+  if (!ranks.length) return null;
+  const mean = ranks.reduce((t, r) => t + TIERS.indexOf(r), 0) / ranks.length;
+  return TIERS[Math.round(mean)];
 }
 
 /**
@@ -370,19 +380,15 @@ export function Home({ onSettings }: { onSettings: () => void }) {
               }
 
               const open = openIds.includes(section.id);
-              const best = bestTier(section.children, scores);
+              const avg = averageTier(section.children, scores);
               const holdsActive = section.children.includes(active);
               return (
                 <div key={section.id} className="flex flex-col gap-1.5">
                   <Row
                     name={section.label}
                     sub={`${section.children.length} muscles`}
-                    // "Best" rather than a tier of its own: a section is not
-                    // scored, and naming the highest of its regions says where
-                    // the colour on the bar came from instead of implying the
-                    // group earned it.
-                    tierText={best ? `Best ${best}` : ""}
-                    tierColor={best ? TIER_COLOR[best] : UNSCORED}
+                    tierText={avg ?? ""}
+                    tierColor={avg ? TIER_COLOR[avg] : UNSCORED}
                     nameSize={16}
                     nameColor={holdsActive ? "#ffffff" : "#e4e4e4"}
                     background={holdsActive ? "#161616" : "#111111"}
