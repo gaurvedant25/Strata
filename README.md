@@ -73,9 +73,20 @@ both are offline.
    stops one account reading another's.
 3. Create a Google OAuth client at
    [console.cloud.google.com](https://console.cloud.google.com/apis/credentials):
-   *Create credentials → OAuth client ID → Web application*. Add
-   `https://<your-project>.supabase.co/auth/v1/callback` as an authorised
-   redirect URI.
+   *Create credentials → OAuth client ID → Web application*. Under **Authorised
+   redirect URIs** add your project's callback:
+
+   ```
+   https://REF.supabase.co/auth/v1/callback
+   ```
+
+   Substitute `REF` for your own project reference — the subdomain of the
+   Project URL in step 6, also shown as *Reference ID* under Project Settings →
+   General. Google rejects the URI outright if any placeholder punctuation is
+   left in it, and reports only "the attempted action failed".
+
+   Leave *Authorised JavaScript origins* empty: Supabase performs the exchange
+   itself, so the redirect URI is the only entry needed.
 4. In Supabase, *Authentication → Providers → Google*, paste the client ID and
    secret from step 3 and enable it.
 5. In Supabase, *Authentication → URL Configuration*, add the URL you deploy to
