@@ -2,6 +2,33 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { anatomy, groupForSlug, partPaths, type BodyView } from "../lib/anatomy";
 import type { MuscleGroup, MuscleScore } from "../lib/strength";
 import type { Gender } from "../types";
+import { Callout, FIG_FRAC, VB_H, VB_W, type Anchor, type CalloutLine } from "./Callout";
+
+/**
+ * Where each region's leader line lands, as a fraction of the figure's box.
+ * A third entry marks a bilateral region, whose right-hand callout mirrors the
+ * anchor so neither line has to cross the body.
+ */
+const ANCHOR: Record<BodyView, Partial<Record<MuscleGroup, Anchor>>> = {
+  front: {
+    chest: [0.5, 0.285],
+    shoulders: [0.255, 0.235, true],
+    arms: [0.17, 0.4, true],
+    legs: [0.395, 0.685, true],
+    back: [0.5, 0.3],
+    glutes: [0.5, 0.52],
+  },
+  back: {
+    back: [0.5, 0.3],
+    glutes: [0.5, 0.5],
+    legs: [0.4, 0.685, true],
+    shoulders: [0.255, 0.235, true],
+    arms: [0.17, 0.4, true],
+    chest: [0.5, 0.285],
+  },
+};
+
+export type Callouts = { left?: CalloutLine[]; right?: CalloutLine[] };
 
 export type { BodyView };
 
@@ -132,6 +159,7 @@ export function BodyMap({
   onViewChange,
   showToggle = true,
   maxWidth = 250,
+  callouts = null,
 }: {
   gender: Gender;
   scores: Partial<Record<MuscleGroup, MuscleScore>>;
@@ -142,6 +170,8 @@ export function BodyMap({
   /** Off when the screen supplies its own view switch. */
   showToggle?: boolean;
   maxWidth?: number;
+  /** Annotations drawn onto the figure for the selected region. */
+  callouts?: Callouts | null;
 }) {
   const [p, setP] = useState(0); // drag progress, -1..1
   const startX = useRef(0);
@@ -201,8 +231,20 @@ export function BodyMap({
 
   const settle = dragging.current ? "none" : "transform 320ms cubic-bezier(.22,.61,.36,1)";
 
+  const anchor = (selected && ANCHOR[view][selected]) || ANCHOR[view].chest!;
+  // Callouts need room either side, so the figure gives up the outer 60% of the
+  // frame and the boxes live in it. Without them the figure keeps the width.
+  const showCallouts = !!callouts && !!selected && !!ANCHOR[view][selected];
+
   return (
     <div className="select-none">
+      <div
+        style={
+          showCallouts
+            ? { position: "relative", width: "100%", aspectRatio: `${VB_W} / ${VB_H}` }
+            : undefined
+        }
+      >
       <div
         onPointerDown={down}
         onPointerMove={move}
@@ -212,10 +254,10 @@ export function BodyMap({
           perspective: 900,
           touchAction: "pan-y",
           cursor: "grab",
-          margin: "0 auto",
-          maxWidth,
-          aspectRatio: `${vbW} / ${vbH}`,
-          position: "relative",
+          position: showCallouts ? "absolute" : "relative",
+          ...(showCallouts
+            ? { left: `${(0.5 - FIG_FRAC / 2) * 100}%`, width: `${FIG_FRAC * 100}%`, top: 0, height: "100%" }
+            : { margin: "0 auto", maxWidth, aspectRatio: `${vbW} / ${vbH}` }),
         }}
       >
         <div
@@ -267,6 +309,18 @@ export function BodyMap({
             opacity={view === "back" ? outgoing : incoming}
           />
         </div>
+      </div>
+
+      {showCallouts && (
+        <>
+          {callouts!.left && (
+            <Callout key={`l-${view}-${selected}`} side="left" lines={callouts!.left} anchor={anchor} />
+          )}
+          {callouts!.right && (
+            <Callout key={`r-${view}-${selected}`} side="right" lines={callouts!.right} anchor={anchor} />
+          )}
+        </>
+      )}
       </div>
 
       {showToggle && (

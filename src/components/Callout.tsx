@@ -1,0 +1,210 @@
+import { useEffect, useRef, useState } from "react";
+
+/**
+ * The annotation that draws itself onto the figure: a leader line snaps out
+ * from the muscle, a box pops in at the edge of the frame, and its text
+ * resolves out of noise.
+ *
+ * Everything is timed off a wall clock captured on mount rather than off React
+ * state, because the Strength screen re-renders every second to keep relative
+ * timestamps fresh. Driving the animation from render would restart it on each
+ * tick; reading elapsed time means a re-render resumes where it left off.
+ */
+
+/** Where a leader line lands, as a fraction of the figure's own box. */
+export type Anchor = [x: number, y: number, bilateral?: boolean];
+
+export type CalloutLine = {
+  text: string;
+  size?: number;
+  weight?: number;
+  /** Sentence case and no tracking, for a value rather than a label. */
+  tight?: boolean;
+  dim?: boolean;
+  /** Off for text that should appear whole. */
+  scramble?: boolean;
+};
+
+/** Figure takes 40% of the callout container's width; the boxes flank it. */
+export const FIG_FRAC = 0.4;
+/** The callout frame the figure and its boxes are laid out inside. */
+export const VB_W = 110;
+export const VB_H = 100;
+
+const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789×@#%";
+const dots = (s: string) => s.replace(/[^ ]/g, "·");
+
+const reduced = () =>
+  typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function Scramble({ text, delay = 0 }: { text: string; delay?: number }) {
+  const full = String(text);
+  const [out, setOut] = useState(() => (reduced() ? full : dots(full)));
+  const start = useRef(0);
+  if (!start.current) start.current = performance.now();
+
+  useEffect(() => {
+    if (reduced()) {
+      setOut(full);
+      return;
+    }
+    const chars = full.split("");
+    const perChar = 55;
+    const tick = () => {
+      const t = performance.now() - start.current - delay;
+      if (t < 0) return false;
+      const revealed = Math.floor(t / perChar);
+      if (revealed >= chars.length) {
+        setOut(full);
+        return true;
+      }
+      setOut(
+        chars
+          .map((c, i) =>
+            i < revealed || c === " "
+              ? c
+              : SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)],
+          )
+          .join(""),
+      );
+      return false;
+    };
+    if (tick()) return;
+    const id = setInterval(() => {
+      if (tick()) clearInterval(id);
+    }, 40);
+    return () => clearInterval(id);
+  }, [full, delay]);
+
+  return <>{out}</>;
+}
+
+export function Callout({
+  side,
+  lines,
+  anchor,
+}: {
+  side: "left" | "right";
+  lines: CalloutLine[];
+  anchor: Anchor;
+}) {
+  const [rx0, ry] = anchor;
+  const isLeft = side === "left";
+  // Bilateral regions are drawn on both sides; mirror the anchor for the
+  // right-hand box so neither line crosses the body.
+  const rx = isLeft || !anchor[2] ? rx0 : 1 - rx0;
+  const ax = (0.5 - FIG_FRAC / 2 + rx * FIG_FRAC) * VB_W;
+  const ay = ry * VB_H;
+  const edge = isLeft ? 0.245 * VB_W : 0.755 * VB_W;
+  // The horizontal run lands on the box's top inner edge, so it never crosses
+  // a row of glyphs while still passing behind the box.
+  const boxY = Math.min(72, Math.max(8, ay - 9));
+  const elbow = isLeft ? edge + 5.5 : edge - 5.5;
+  const farEdge = isLeft ? 0 : VB_W;
+  const leader = `M${ax.toFixed(1)} ${ay.toFixed(1)} L${elbow.toFixed(1)} ${boxY.toFixed(1)} H${farEdge}`;
+
+  // 0 = nothing, 1 = line drawn, 2 = box in.
+  const start = useRef(0);
+  if (!start.current) start.current = performance.now();
+  const [phase, setPhase] = useState(() => (reduced() ? 2 : 0));
+
+  useEffect(() => {
+    if (reduced()) return;
+    const compute = () => {
+      const t = performance.now() - start.current;
+      const p = t >= 420 ? 2 : 1;
+      setPhase(p);
+      return p === 2;
+    };
+    const raf = requestAnimationFrame(compute);
+    const id = setInterval(() => {
+      if (compute()) clearInterval(id);
+    }, 60);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(id);
+    };
+  }, []);
+
+  return (
+    <>
+      <svg
+        viewBox={`0 0 ${VB_W} ${VB_H}`}
+        preserveAspectRatio="none"
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          overflow: "visible",
+          zIndex: 3,
+          transformOrigin: `${((ax / VB_W) * 100).toFixed(1)}% ${((ay / VB_H) * 100).toFixed(1)}%`,
+          transform: phase ? "scale(1)" : "scale(.06)",
+          opacity: phase ? 1 : 0,
+          transition: "transform 400ms cubic-bezier(.3,.7,.3,1), opacity 200ms ease-out",
+        }}
+      >
+        {/* a black casing under the hairline, so it stays legible over a lit muscle */}
+        <path
+          d={leader}
+          fill="none"
+          stroke="#000"
+          strokeWidth="3.5"
+          strokeOpacity="0.9"
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          d={leader}
+          fill="none"
+          stroke="#8b8b90"
+          strokeWidth="1.2"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+
+      <div
+        style={{
+          position: "absolute",
+          top: `${boxY}%`,
+          [isLeft ? "left" : "right"]: 0,
+          width: "24.5%",
+          maxWidth: 104,
+          textAlign: isLeft ? "left" : "right",
+          padding: "7px 8px",
+          boxSizing: "border-box",
+          border: "1px solid #1f1f1f",
+          borderRadius: 3,
+          background: "transparent",
+          pointerEvents: "none",
+          transformOrigin: isLeft ? "top left" : "top right",
+          transform: phase > 1 ? "scale(1)" : "scale(.18)",
+          opacity: phase > 1 ? 1 : 0,
+          transition: "transform 240ms cubic-bezier(.22,.61,.36,1), opacity 180ms ease-out",
+          zIndex: 4,
+        }}
+      >
+        {lines.map((l, i) => (
+          <div
+            key={i}
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: l.size ?? 10,
+              fontWeight: l.weight ?? 500,
+              letterSpacing: l.tight ? "0" : ".1em",
+              textTransform: l.tight ? "none" : "uppercase",
+              lineHeight: 1.35,
+              color: l.dim ? "#666" : "#f5f5f5",
+              marginTop: i ? 3 : 0,
+              whiteSpace: l.tight ? "nowrap" : "normal",
+              overflowWrap: "break-word",
+            }}
+          >
+            {l.scramble === false ? l.text : <Scramble text={l.text} delay={640 + i * 70} />}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}

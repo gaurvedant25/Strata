@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BodyMap, type BodyView } from "../components/BodyMap";
+import { BodyMap, type BodyView, type Callouts } from "../components/BodyMap";
 import { Tune } from "../components/icons";
 import {
   BigNumber,
@@ -20,10 +20,40 @@ import {
   type MuscleGroup,
   type MuscleScore,
 } from "../lib/strength";
-import { fmtRelative, num, todayKey } from "../lib/util";
+import { personalRecords } from "../lib/stats";
+import { fmtRelative, num, parseKey, todayKey } from "../lib/util";
 import { useStore } from "../store";
 
 const ALL_GROUPS: MuscleGroup[] = [...FRONT_GROUPS, ...BACK_GROUPS];
+
+/**
+ * Score to an approximate percentile.
+ *
+ * There is no population data in the app, so this is read off the same tier
+ * thresholds that produce the score in the first place — it says where the
+ * lift sits on our own ladder, not against real lifters, which is why the
+ * callout labels it an estimate rather than stating it as fact.
+ */
+const PCT: [number, number][] = [
+  [0, 90],
+  [0.2, 60],
+  [0.4, 35],
+  [0.6, 15],
+  [0.8, 5],
+  [1, 1],
+];
+
+function percentile(score: number) {
+  for (let i = 1; i < PCT.length; i++) {
+    if (score <= PCT[i][0] || i === PCT.length - 1) {
+      const [x0, y0] = PCT[i - 1];
+      const [x1, y1] = PCT[i];
+      const t = x1 === x0 ? 1 : (score - x0) / (x1 - x0);
+      return Math.max(1, Math.round(y0 + t * (y1 - y0)));
+    }
+  }
+  return 50;
+}
 
 /** The tier dot. The only colour on the screen besides the figure itself. */
 function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
@@ -57,6 +87,31 @@ export function Home({ onSettings }: { onSettings: () => void }) {
 
   const active = selected ?? ALL_GROUPS.find((m) => scores[m]) ?? "chest";
   const detail = scores[active];
+
+  // Annotations on the figure: what the best set of the region's lift actually
+  // was, and roughly where that sits. Absent until the region has been scored.
+  const callouts: Callouts | null = useMemo(() => {
+    if (!detail) return null;
+    const lift = s.exercises.find((e) => e.name === CANONICAL_LIFT[active]);
+    const pr = lift ? personalRecords(s.sessions.filter((x) => x.endedAt)).get(lift.id) : undefined;
+    if (!pr) return null;
+    return {
+      left: [
+        { text: CANONICAL_LIFT[active], size: 8, weight: 600, dim: true },
+        { text: `${num(pr.heaviest)} × ${pr.heaviestReps}`, size: 14, weight: 500, tight: true },
+        {
+          text: parseKey(pr.date).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+          size: 8,
+          weight: 600,
+          dim: true,
+        },
+      ],
+      right: [
+        { text: `Top ${percentile(detail.score)}%`, size: 14, weight: 600, tight: true },
+        { text: "estimated", size: 8, weight: 600, dim: true },
+      ],
+    };
+  }, [detail, active, s.exercises, s.sessions]);
 
   /** Selecting a region also spins the figure to the side that region is on. */
   function pick(m: MuscleGroup) {
@@ -114,6 +169,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
               onViewChange={setView}
               showToggle={false}
               maxWidth={268}
+              callouts={callouts}
             />
           </div>
 
