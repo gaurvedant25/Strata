@@ -48,14 +48,24 @@ async function localChanges(since: number) {
   for (const kind of KINDS) {
     const rows = (await d.getAll(kind)) as Record<string, unknown>[];
     for (const r of rows) {
-      const updatedAt = Number(r.updatedAt ?? 0);
-      if (updatedAt <= since) continue;
+      // A row with no timestamp at all has demonstrably never been through a
+      // sync, so it is always a candidate to push. Comparing its missing value
+      // as zero would instead bury it: nothing is newer than nothing, so it
+      // would sit in the database looking fine and never leave the device.
+      const stamped = r.updatedAt != null;
+      const updatedAt = stamped ? Number(r.updatedAt) : Date.now();
+      if (stamped && updatedAt <= since) continue;
+      if (!stamped) {
+        // Give it the timestamp it is being pushed with, so the next pass sees
+        // a normal row rather than rediscovering this one every time.
+        await (d.put as (s: string, v: unknown) => Promise<unknown>)(kind, { ...r, updatedAt });
+      }
       out.push({
         kind,
         id: String(r[KEY[kind]]),
         updated_at: updatedAt,
         deleted: Boolean(r.deleted),
-        data: r,
+        data: { ...r, updatedAt },
       });
     }
   }
