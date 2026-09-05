@@ -63,6 +63,29 @@ export const MUSCLE_LABEL: Record<MuscleGroup, string> = {
 };
 
 /**
+ * How the regions are grouped for reading.
+ *
+ * Fourteen rows is a wall of text, but the split exists precisely because these
+ * muscles progress separately, so rolling them back up into one score would
+ * undo it. Grouping is presentation only: a section is a heading you can open,
+ * never a score of its own, and chest, shoulders and glutes stay flat because
+ * they have nothing under them to hide.
+ */
+export type RegionSection =
+  | { kind: "single"; group: MuscleGroup }
+  | { kind: "group"; id: string; label: string; children: MuscleGroup[] };
+
+export const REGION_SECTIONS: RegionSection[] = [
+  { kind: "single", group: "chest" },
+  { kind: "single", group: "shoulders" },
+  { kind: "group", id: "arms", label: "Arms", children: ["biceps", "triceps", "forearms"] },
+  { kind: "group", id: "back", label: "Back", children: ["traps", "lats", "lowerBack"] },
+  { kind: "group", id: "core", label: "Core", children: ["abs", "obliques"] },
+  { kind: "group", id: "legs", label: "Legs", children: ["quadriceps", "hamstrings", "calves"] },
+  { kind: "single", group: "glutes" },
+];
+
+/**
  * The one lift each region is scored against.
  *
  * Every one has to be loadable: a bodyweight movement logs added weight, which

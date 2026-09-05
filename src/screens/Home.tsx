@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BodyMap, type BodyView, type Callouts } from "../components/BodyMap";
 import { Scramble } from "../components/Callout";
 import { Tune } from "../components/icons";
@@ -17,6 +17,7 @@ import {
   FRONT_GROUPS,
   MUSCLE_LABEL,
   TIER_LEVEL,
+  REGION_SECTIONS,
   computeMuscleScores,
   type MuscleGroup,
   type MuscleScore,
@@ -71,6 +72,39 @@ function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
   );
 }
 
+/** One scored region. Identical whether it sits in a section or on its own. */
+function RegionRow({
+  group,
+  score,
+  active,
+  onPick,
+  indent,
+}: {
+  group: MuscleGroup;
+  score?: MuscleScore;
+  active: boolean;
+  onPick: (m: MuscleGroup) => void;
+  indent?: boolean;
+}) {
+  return (
+    <button
+      onClick={() => onPick(group)}
+      className={`flex w-full items-center gap-3 border-b border-subrule py-3 transition-colors ${
+        indent ? "pl-7 pr-1" : "px-1"
+      } ${active ? "bg-[#0c0c0c] text-fg" : "text-[#8b8b90]"}`}
+    >
+      <Dot score={score} />
+      <span className="flex-1 text-left text-[14px] font-medium">{MUSCLE_LABEL[group]}</span>
+      <span className="w-14 text-right font-mono text-[13px] text-muted">
+        {score ? `${num(score.ratio, 2)}×` : "—"}
+      </span>
+      <span className="w-[74px] text-right font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+        {score ? score.tier : ""}
+      </span>
+    </button>
+  );
+}
+
 export function Home({ onSettings }: { onSettings: () => void }) {
   const s = useStore();
   const [bwOpen, setBwOpen] = useState(false);
@@ -113,6 +147,19 @@ export function Home({ onSettings }: { onSettings: () => void }) {
       ],
     };
   }, [detail, active, s.exercises, s.sessions]);
+
+  // A section opens when it holds the selected region, so tapping a muscle on
+  // the figure reveals it in the list rather than hiding it inside a heading.
+  const activeSection = REGION_SECTIONS.find(
+    (x) => x.kind === "group" && x.children.includes(active),
+  );
+  const [openIds, setOpenIds] = useState<string[]>(() =>
+    activeSection && activeSection.kind === "group" ? [activeSection.id] : [],
+  );
+  const activeId = activeSection && activeSection.kind === "group" ? activeSection.id : null;
+  useEffect(() => {
+    if (activeId) setOpenIds((o) => (o.includes(activeId) ? o : [...o, activeId]));
+  }, [activeId]);
 
   /** Selecting a region also spins the figure to the side that region is on. */
   function pick(m: MuscleGroup) {
@@ -230,28 +277,73 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           </div>
 
           <div className="mt-6 border-t border-rule">
-            {ALL_GROUPS.map((m) => {
-              const sc = scores[m];
-              const on = active === m;
+            {REGION_SECTIONS.map((section) => {
+              if (section.kind === "single") {
+                return (
+                  <RegionRow
+                    key={section.group}
+                    group={section.group}
+                    score={scores[section.group]}
+                    active={active === section.group}
+                    onPick={pick}
+                  />
+                );
+              }
+              const open = openIds.includes(section.id);
+              const scored = section.children.filter((c) => scores[c]).length;
               return (
-                <button
-                  key={m}
-                  onClick={() => pick(m)}
-                  className={`flex w-full items-center gap-3 border-b border-subrule px-1 py-3 transition-colors ${
-                    on ? "bg-[#0c0c0c] text-fg" : "text-[#8b8b90]"
-                  }`}
-                >
-                  <Dot score={sc} />
-                  <span className="flex-1 text-left text-[14px] font-medium">
-                    {MUSCLE_LABEL[m]}
-                  </span>
-                  <span className="w-14 text-right font-mono text-[13px] text-muted">
-                    {sc ? `${num(sc.ratio, 2)}×` : "—"}
-                  </span>
-                  <span className="w-[74px] text-right font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
-                    {sc ? sc.tier : ""}
-                  </span>
-                </button>
+                <div key={section.id}>
+                  <button
+                    onClick={() =>
+                      setOpenIds((o) =>
+                        o.includes(section.id)
+                          ? o.filter((x) => x !== section.id)
+                          : [...o, section.id],
+                      )
+                    }
+                    aria-expanded={open}
+                    className="flex w-full items-center gap-3 border-b border-subrule px-1 py-3 text-left transition-colors"
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={`shrink-0 text-muted transition-transform duration-200 ${
+                        open ? "rotate-90" : ""
+                      }`}
+                    >
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
+                    <span className="flex-1 text-[14px] font-medium text-fg">{section.label}</span>
+                    {/* one dot per region inside, so the spread is visible without
+                        inventing a score for the section as a whole */}
+                    <span className="flex items-center gap-1.5">
+                      {section.children.map((c) => (
+                        <Dot key={c} score={scores[c]} size={6} />
+                      ))}
+                    </span>
+                    <span className="w-[74px] text-right font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+                      {scored}/{section.children.length}
+                    </span>
+                  </button>
+
+                  {open &&
+                    section.children.map((c) => (
+                      <RegionRow
+                        key={c}
+                        group={c}
+                        score={scores[c]}
+                        active={active === c}
+                        onPick={pick}
+                        indent
+                      />
+                    ))}
+                </div>
               );
             })}
           </div>
