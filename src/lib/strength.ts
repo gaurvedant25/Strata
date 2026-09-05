@@ -1,28 +1,89 @@
 import type { Exercise, Gender, Session } from "../types";
 import { personalRecords } from "./stats";
 
-/** Regions the body map scores. Front view shows the first four; back view the last two. */
-export type MuscleGroup = "shoulders" | "chest" | "arms" | "legs" | "back" | "glutes";
+/**
+ * Regions the body map scores.
+ *
+ * Fourteen rather than six: an "arms" score that averaged a curl and a pushdown
+ * told you nothing about either, and the artwork already draws biceps, triceps
+ * and forearms as separate paths, so the map could always show more than the
+ * model did.
+ */
+export type MuscleGroup =
+  | "shoulders"
+  | "chest"
+  | "biceps"
+  | "triceps"
+  | "forearms"
+  | "abs"
+  | "obliques"
+  | "quadriceps"
+  | "hamstrings"
+  | "calves"
+  | "traps"
+  | "lats"
+  | "lowerBack"
+  | "glutes";
 
-export const FRONT_GROUPS: MuscleGroup[] = ["shoulders", "chest", "arms", "legs"];
-export const BACK_GROUPS: MuscleGroup[] = ["back", "glutes"];
+/** Which side of the figure each region reads best from. */
+export const FRONT_GROUPS: MuscleGroup[] = [
+  "chest",
+  "shoulders",
+  "biceps",
+  "forearms",
+  "abs",
+  "obliques",
+  "quadriceps",
+];
+export const BACK_GROUPS: MuscleGroup[] = [
+  "traps",
+  "lats",
+  "lowerBack",
+  "triceps",
+  "hamstrings",
+  "calves",
+  "glutes",
+];
 
 export const MUSCLE_LABEL: Record<MuscleGroup, string> = {
   shoulders: "Shoulders",
   chest: "Chest",
-  arms: "Arms",
-  legs: "Legs",
-  back: "Back",
+  biceps: "Biceps",
+  triceps: "Triceps",
+  forearms: "Forearms",
+  abs: "Abs",
+  obliques: "Obliques",
+  quadriceps: "Quads",
+  hamstrings: "Hamstrings",
+  calves: "Calves",
+  traps: "Traps",
+  lats: "Lats",
+  lowerBack: "Lower back",
   glutes: "Glutes",
 };
 
-/** The one lift each region is scored against — all present in the seeded library. */
+/**
+ * The one lift each region is scored against.
+ *
+ * Every one has to be loadable: a bodyweight movement logs added weight, which
+ * is usually zero, and a zero can never produce a ratio. That rules out the
+ * pull-up for lats and the hanging leg raise for abs, however well they train
+ * them.
+ */
 export const CANONICAL_LIFT: Record<MuscleGroup, string> = {
   shoulders: "Overhead Press",
   chest: "Barbell Bench Press",
-  arms: "Barbell Curl",
-  legs: "Back Squat",
-  back: "Deadlift",
+  biceps: "Barbell Curl",
+  triceps: "Triceps Pushdown",
+  forearms: "Hammer Curl",
+  abs: "Cable Crunch",
+  obliques: "Cable Woodchop",
+  quadriceps: "Back Squat",
+  hamstrings: "Romanian Deadlift",
+  calves: "Standing Calf Raise",
+  traps: "Barbell Shrug",
+  lats: "Lat Pulldown",
+  lowerBack: "Deadlift",
   glutes: "Hip Thrust",
 };
 
@@ -82,17 +143,33 @@ export function tierInk(hex: string): string {
 
 /**
  * Bodyweight multiples at the entry to each tier above Bronze, i.e.
- * [Silver, Gold, Platinum, Diamond, Titan]. Approximated from commonly published
- * strength-standard charts, split by sex because the distributions genuinely
- * differ. A rough compass for a personal log, not a certified table.
+ * [Silver, Gold, Platinum, Diamond, Titan].
+ *
+ * These are estimates, and worth being blunt about: they are not taken from any
+ * published dataset. The six original rows were approximated from commonly
+ * cited strength-standard charts; the eight added when the regions were split
+ * are looser still, because widely agreed figures for a shrug or a cable
+ * woodchop do not really exist the way they do for a squat. Treat a tier as a
+ * rough compass for your own progress over time, not as a ranking against
+ * anybody else.
  */
 const STANDARDS: Record<MuscleGroup, Record<Gender, number[]>> = {
+  // — approximated from published charts —
   chest: { male: [0.5, 0.75, 1.0, 1.5, 2.0], female: [0.27, 0.4, 0.6, 0.9, 1.25] },
-  legs: { male: [0.75, 1.0, 1.5, 2.0, 2.5], female: [0.5, 0.75, 1.0, 1.5, 2.0] },
   shoulders: { male: [0.35, 0.5, 0.7, 0.9, 1.2], female: [0.2, 0.3, 0.45, 0.6, 0.8] },
-  arms: { male: [0.25, 0.35, 0.5, 0.7, 0.9], female: [0.15, 0.2, 0.3, 0.45, 0.6] },
-  back: { male: [1.0, 1.5, 1.75, 2.25, 2.75], female: [0.6, 1.0, 1.25, 1.75, 2.25] },
+  biceps: { male: [0.25, 0.35, 0.5, 0.7, 0.9], female: [0.15, 0.2, 0.3, 0.45, 0.6] },
+  quadriceps: { male: [0.75, 1.0, 1.5, 2.0, 2.5], female: [0.5, 0.75, 1.0, 1.5, 2.0] },
+  lowerBack: { male: [1.0, 1.5, 1.75, 2.25, 2.75], female: [0.6, 1.0, 1.25, 1.75, 2.25] },
   glutes: { male: [1.0, 1.5, 2.0, 2.5, 3.0], female: [0.75, 1.25, 1.75, 2.25, 2.75] },
+  // — estimated, with no chart behind them —
+  triceps: { male: [0.3, 0.45, 0.6, 0.8, 1.0], female: [0.18, 0.25, 0.35, 0.5, 0.65] },
+  forearms: { male: [0.2, 0.3, 0.4, 0.55, 0.75], female: [0.12, 0.18, 0.25, 0.35, 0.5] },
+  abs: { male: [0.3, 0.45, 0.6, 0.85, 1.1], female: [0.2, 0.3, 0.45, 0.6, 0.8] },
+  obliques: { male: [0.25, 0.35, 0.5, 0.7, 0.9], female: [0.15, 0.25, 0.35, 0.5, 0.65] },
+  hamstrings: { male: [0.75, 1.1, 1.4, 1.8, 2.25], female: [0.45, 0.7, 0.9, 1.25, 1.6] },
+  calves: { male: [0.75, 1.25, 1.75, 2.25, 3.0], female: [0.5, 0.85, 1.25, 1.75, 2.25] },
+  traps: { male: [0.75, 1.25, 1.75, 2.25, 3.0], female: [0.5, 0.8, 1.2, 1.6, 2.1] },
+  lats: { male: [0.5, 0.75, 1.0, 1.25, 1.6], female: [0.35, 0.5, 0.7, 0.9, 1.2] },
 };
 
 /** Score at each threshold; below the first one it ramps from 0. */

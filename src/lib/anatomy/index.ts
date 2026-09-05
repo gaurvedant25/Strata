@@ -52,27 +52,31 @@ const DATA: Record<Gender, Record<BodyView, BodyPart[]>> = {
 
 /**
  * Which scored region each drawn muscle belongs to. Anything mapped to null is
- * structure (head, hands, joints) or has no benchmark lift behind it (abs,
- * obliques) — it renders neutral and isn't clickable.
+ * structure — a head or a joint — and renders neutral and unclickable. Since
+ * the regions were split, every actual muscle in the artwork now scores.
  */
 const SLUG_GROUP: Record<string, MuscleGroup | null> = {
   chest: "chest",
   deltoids: "shoulders",
-  trapezius: "back",
-  "upper-back": "back",
-  "lower-back": "back",
-  biceps: "arms",
-  triceps: "arms",
-  forearm: "arms",
-  quadriceps: "legs",
-  hamstring: "legs",
-  calves: "legs",
-  tibialis: "legs",
-  adductors: "legs",
+  trapezius: "traps",
+  // The vendored artwork calls the broad sheet either side of the spine
+  // "upper-back"; anatomically that shape is the latissimus dorsi.
+  "upper-back": "lats",
+  "lower-back": "lowerBack",
+  biceps: "biceps",
+  triceps: "triceps",
+  forearm: "forearms",
+  quadriceps: "quadriceps",
+  hamstring: "hamstrings",
+  calves: "calves",
+  // The shin sits with the calves rather than alone: nothing in the app trains
+  // it on its own, so scoring it separately would leave it permanently blank.
+  tibialis: "calves",
+  adductors: "quadriceps",
   gluteal: "glutes",
-  // structure / unscored
-  abs: null,
-  obliques: null,
+  abs: "abs",
+  obliques: "obliques",
+  // structure, with no muscle to score
   neck: null,
   head: null,
   hair: null,

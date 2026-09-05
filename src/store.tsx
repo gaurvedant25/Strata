@@ -10,6 +10,7 @@ import {
 import * as store from "./lib/db";
 import { buildPreset, type Preset } from "./lib/presets";
 import { seedExercises } from "./lib/seed";
+import { CANONICAL_LIFT } from "./lib/strength";
 import { todayKey, uid } from "./lib/util";
 import {
   DEFAULT_SETTINGS,
@@ -77,12 +78,47 @@ async function adoptLooseRoutines(data: Loaded): Promise<Loaded> {
   return store.loadAll();
 }
 
+/**
+ * Adds any benchmark lift the library is missing.
+ *
+ * A region is scored by exactly one lift, so a library without that lift leaves
+ * the region permanently blank with no way to fill it from inside the app. This
+ * only ever adds the fourteen benchmarks — it will not resurrect anything else
+ * that was deleted — and it is what lets the regions be split without stranding
+ * anyone whose library predates the new ones.
+ */
+async function ensureBenchmarkLifts(data: Loaded): Promise<Loaded> {
+  const have = new Set(data.exercises.map((e) => e.name));
+  const missing = Object.values(CANONICAL_LIFT).filter((n) => !have.has(n));
+  if (!missing.length) return data;
+
+  const muscle: Record<string, string> = {
+    "Barbell Shrug": "Back",
+    "Cable Woodchop": "Core",
+  };
+  const now = Date.now();
+  await Promise.all(
+    missing.map((name, i) =>
+      store.put.exercise({
+        id: uid(),
+        name,
+        muscle: muscle[name] ?? "Other",
+        bodyweight: false,
+        createdAt: now + i,
+      }),
+    ),
+  );
+  return store.loadAll();
+}
+
 function boot() {
   bootstrap ??= (async () => {
     const data = await store.loadAll();
     // The exercise library is seeded, but routines are not: a fresh install is
     // meant to reach the Routines screen with nothing chosen, and be asked.
-    if (data.exercises.length || data.sessions.length) return adoptLooseRoutines(data);
+    if (data.exercises.length || data.sessions.length) {
+      return ensureBenchmarkLifts(await adoptLooseRoutines(data));
+    }
     await Promise.all(seedExercises().map(store.put.exercise));
     return store.loadAll();
   })();

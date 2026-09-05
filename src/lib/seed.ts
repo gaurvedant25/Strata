@@ -11,6 +11,7 @@ const LIB: [string, string, boolean?][] = [
   ["Face Pull", "Shoulders"],
   ["Rear Delt Fly", "Shoulders"],
   ["Deadlift", "Back"],
+  ["Barbell Shrug", "Back"],
   ["Barbell Row", "Back"],
   ["Lat Pulldown", "Back"],
   ["Seated Cable Row", "Back"],
@@ -34,6 +35,7 @@ const LIB: [string, string, boolean?][] = [
   ["Plank", "Core", true],
   ["Hanging Leg Raise", "Core", true],
   ["Cable Crunch", "Core"],
+  ["Cable Woodchop", "Core"],
 ];
 
 export function seedExercises(): Exercise[] {
