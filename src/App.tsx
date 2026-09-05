@@ -79,6 +79,16 @@ export default function App() {
   const [skippedAuth, setSkippedAuth] = useState(
     () => localStorage.getItem("gymlog.noAccount") === "1",
   );
+
+  // Signing out clears the "no account" choice, but this copy of it was read
+  // once at mount. Without re-reading, someone who declined an account, signed
+  // in later and then signed out would be dropped back into the app rather than
+  // onto the sign-in screen, with no way to reach it again.
+  useEffect(() => {
+    if (!auth.session && localStorage.getItem("gymlog.noAccount") !== "1") {
+      setSkippedAuth(false);
+    }
+  }, [auth.session]);
   const [tab, setTab] = useState<Tab>("home");
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Whether the full-screen logger is the thing on top right now. Starting or

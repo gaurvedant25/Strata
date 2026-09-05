@@ -12,6 +12,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [exOpen, setExOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   async function doExport() {
     const data = await exportBackup();
@@ -96,15 +97,26 @@ export function Settings({ onBack }: { onBack: () => void }) {
                 </button>
               </div>
               <button
-                onClick={() => {
-                  if (confirm("Sign out? Your workouts stay in your account and sync back when you sign in again.")) {
-                    void auth.signOut();
+                disabled={signingOut}
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      "Sign out? Your workouts stay in your account and sync back when you sign in again.",
+                    )
+                  ) {
+                    return;
+                  }
+                  setSigningOut(true);
+                  try {
+                    await auth.signOut();
+                  } finally {
+                    setSigningOut(false);
                   }
                 }}
-                className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b]"
+                className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b] disabled:opacity-50"
               >
-                <span className="text-[15px]">Sign out</span>
-                <span className="text-muted">→</span>
+                <span className="text-[15px]">{signingOut ? "Signing out…" : "Sign out"}</span>
+                <span className="text-muted">{signingOut ? "" : "→"}</span>
               </button>
             </>
           ) : (

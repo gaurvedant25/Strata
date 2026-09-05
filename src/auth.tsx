@@ -32,6 +32,8 @@ type Auth = {
 
 const Ctx = createContext<Auth | null>(null);
 
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export function AuthProvider({ children, onSynced }: { children: ReactNode; onSynced: () => void }) {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(!cloudConfigured);
@@ -131,12 +133,35 @@ export function AuthProvider({ children, onSynced }: { children: ReactNode; onSy
       });
       if (error) throw error;
     },
+    /**
+     * Sign out, whatever the network is doing.
+     *
+     * Both halves of this used to be unbounded awaits — a full sync, then a
+     * request to the server to revoke the session — so on a slow or dead
+     * connection the button did nothing at all, with no way to tell whether it
+     * had been pressed. Being unable to leave an account because the server
+     * cannot be reached is never what anyone wants, so every step is now capped
+     * and the local session is dropped regardless of what the server says.
+     */
     async signOut() {
       if (!supabase) return;
-      // A last reconciliation before letting go, so anything logged since the
-      // previous one is not stranded on a device that is about to forget it.
-      await run();
-      await supabase.auth.signOut();
+      // A last reconciliation, so anything logged since the previous one is not
+      // stranded on a device about to forget it — but only if it is quick.
+      await Promise.race([run(), wait(4000)]);
+      try {
+        await Promise.race([
+          supabase.auth.signOut(),
+          wait(5000).then(() => Promise.reject(new Error("timeout"))),
+        ]);
+      } catch {
+        // Server unreachable or too slow. Forget the session on this device
+        // anyway; the server's copy expires on its own.
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      }
+      setSession(null);
+      // Signing out should land on the sign-in screen, even for someone who
+      // once chose to go without an account.
+      localStorage.removeItem("gymlog.noAccount");
     },
     push: run,
   };
