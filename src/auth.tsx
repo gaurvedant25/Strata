@@ -21,6 +21,10 @@ type Auth = {
   sync: SyncState;
   lastSyncedAt: number | null;
   signInWithGoogle: () => Promise<void>;
+  /** Resolves to a message to show, or null when the session is already live. */
+  signUp: (email: string, password: string) => Promise<string | null>;
+  signIn: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** Reconcile now. Safe to call when signed out — it does nothing. */
   push: () => Promise<void>;
@@ -100,6 +104,32 @@ export function AuthProvider({ children, onSynced }: { children: ReactNode; onSy
         provider: "google",
         options: { redirectTo: redirectTo() },
       });
+    },
+    async signUp(email, password) {
+      if (!supabase) throw new Error("No account service is configured.");
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: redirectTo() },
+      });
+      if (error) throw error;
+      // With email confirmation switched on, Supabase returns a user but no
+      // session until the link is clicked; the caller has to say so rather than
+      // silently appearing to have done nothing.
+      if (!data.session) return "Check your email to confirm the address, then sign in.";
+      return null;
+    },
+    async signIn(email, password) {
+      if (!supabase) throw new Error("No account service is configured.");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    },
+    async resetPassword(email) {
+      if (!supabase) throw new Error("No account service is configured.");
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo(),
+      });
+      if (error) throw error;
     },
     async signOut() {
       if (!supabase) return;

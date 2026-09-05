@@ -1,59 +1,184 @@
 import { useState } from "react";
 import { useAuth } from "../auth";
-import { Button, Eyebrow } from "../components/ui";
+import { Button, Eyebrow, TextTabs, inputCls } from "../components/ui";
 
 /**
- * The first screen on a new install, and the only one that needs a network.
+ * Create an account or sign in to one.
  *
- * Signing in happens once, at the point where you have just downloaded the app
- * and so demonstrably have signal. After that the session is persisted and
- * every other screen works offline — the account exists so a lost phone is not
- * a lost training history, not so the app can phone home.
+ * No passwords are stored or checked here — Supabase Auth owns all of that,
+ * including hashing, email confirmation and resets. This screen only collects
+ * two fields and reports what came back, which is the correct amount of
+ * authentication code to write by hand.
+ *
+ * It is the first screen on a new install, and the only one that needs a
+ * network. After it, the session persists and every other screen works offline.
  */
+
+type Mode = "in" | "up";
+
+/** Supabase's messages are terse and occasionally cryptic; these are not. */
+function explain(raw: string, mode: Mode) {
+  const m = raw.toLowerCase();
+  if (m.includes("invalid login")) return "That email and password don't match an account.";
+  if (m.includes("already registered") || m.includes("already been registered"))
+    return "There's already an account with that email. Try signing in instead.";
+  if (m.includes("email not confirmed"))
+    return "Confirm your email first — check your inbox for the link.";
+  if (m.includes("password") && m.includes("6"))
+    return "Passwords need to be at least 6 characters.";
+  if (m.includes("rate limit") || m.includes("too many"))
+    return "Too many attempts. Wait a minute and try again.";
+  if (m.includes("fetch") || m.includes("network"))
+    return `You appear to be offline. ${mode === "up" ? "Creating an account" : "Signing in"} needs a connection.`;
+  return raw;
+}
+
 export function SignIn({ onSkip }: { onSkip: () => void }) {
   const auth = useAuth();
+  const [mode, setMode] = useState<Mode>("in");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
-  async function go() {
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSubmit = emailOk && password.length >= 6 && !busy;
+
+  async function submit() {
+    setBusy(true);
+    setErr(null);
+    setNote(null);
+    try {
+      if (mode === "up") {
+        const msg = await auth.signUp(email.trim(), password);
+        if (msg) setNote(msg);
+      } else {
+        await auth.signIn(email.trim(), password);
+      }
+    } catch (e) {
+      setErr(explain(e instanceof Error ? e.message : String(e), mode));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function forgot() {
+    if (!emailOk) {
+      setErr("Enter your email address first, then tap this again.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
-      await auth.signInWithGoogle();
+      await auth.resetPassword(email.trim());
+      setNote("Password reset link sent. Check your email.");
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Could not reach Google. Check your connection.");
+      setErr(explain(e instanceof Error ? e.message : String(e), mode));
+    } finally {
       setBusy(false);
     }
   }
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+26px)] pt-[calc(env(safe-area-inset-top)+14px)]">
-      <div className="flex-1 pt-[22vh]">
-        <Eyebrow>Gym Log</Eyebrow>
-        <h1 className="mt-4 text-[30px] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
-          Sign in once, and your training is never only on this phone.
-        </h1>
-        <p className="mt-3.5 text-[14px] leading-relaxed text-muted text-pretty">
-          Every workout is saved to your account and to this device. Lose the phone, clear your
-          browser, switch to a tablet — it follows you.
-        </p>
-        <p className="mt-3.5 text-[14px] leading-relaxed text-muted text-pretty">
-          After this you never need signal again. The app logs, scores and charts entirely offline
-          and catches the account up whenever you next have a connection.
-        </p>
+      <div className="flex-1">
+        <div className="pt-[10vh]">
+          <Eyebrow>Gym Log</Eyebrow>
+          <h1 className="mt-4 text-[29px] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
+            {mode === "up"
+              ? "Create an account and your training is never only on this phone."
+              : "Welcome back."}
+          </h1>
+          <p className="mt-3 text-[14px] leading-relaxed text-muted text-pretty">
+            {mode === "up"
+              ? "Every workout is saved to your account and to this device. After this you never need signal again."
+              : "Sign in and this device catches up with everything you have logged elsewhere."}
+          </p>
+        </div>
 
-        {err && <p className="mt-5 text-[13px] leading-relaxed text-danger">{err}</p>}
+        <TextTabs
+          className="pt-7"
+          gap="gap-6"
+          options={[
+            { id: "in" as Mode, label: "Sign in" },
+            { id: "up" as Mode, label: "Create account" },
+          ]}
+          value={mode}
+          onChange={(m) => {
+            setMode(m);
+            setErr(null);
+            setNote(null);
+          }}
+        />
+
+        <div className="pt-5">
+          <label className="block">
+            <Eyebrow className="mb-1.5 block tracking-[0.18em]">Email</Eyebrow>
+            <input
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              className={inputCls}
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+
+          <label className="mt-5 block">
+            <Eyebrow className="mb-1.5 block tracking-[0.18em]">Password</Eyebrow>
+            <input
+              type="password"
+              autoComplete={mode === "up" ? "new-password" : "current-password"}
+              className={inputCls}
+              placeholder={mode === "up" ? "At least 6 characters" : "Your password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && canSubmit) void submit();
+              }}
+            />
+          </label>
+
+          {mode === "in" && (
+            <button
+              onClick={() => void forgot()}
+              className="mt-3.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted active:text-fg"
+            >
+              Forgot password
+            </button>
+          )}
+        </div>
+
+        {err && <p className="mt-5 text-[13px] leading-relaxed text-danger text-pretty">{err}</p>}
+        {note && <p className="mt-5 text-[13px] leading-relaxed text-fg text-pretty">{note}</p>}
       </div>
 
-      <div className="flex flex-col gap-3 pt-6">
-        <Button onClick={() => void go()} disabled={busy}>
-          <GoogleMark />
-          {busy ? "Opening Google…" : "Continue with Google"}
+      <div className="flex flex-col gap-3 pt-7">
+        <Button onClick={() => void submit()} disabled={!canSubmit}>
+          {busy ? "Working…" : mode === "up" ? "Create account" : "Sign in"}
         </Button>
+
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-rule" />
+          <Eyebrow tone="faint" className="tracking-[0.18em]">
+            or
+          </Eyebrow>
+          <span className="h-px flex-1 bg-rule" />
+        </div>
+
+        <Button variant="outline" onClick={() => void auth.signInWithGoogle()} disabled={busy}>
+          <GoogleMark />
+          Continue with Google
+        </Button>
+
         <Button variant="quiet" onClick={onSkip}>
           Use without an account
         </Button>
-        <p className="px-1 pt-1 text-center text-[11px] leading-relaxed text-faint text-pretty">
+        <p className="px-1 text-center text-[11px] leading-relaxed text-faint text-pretty">
           Without an account everything still works, but your logs live only on this device and go
           with it.
         </p>
