@@ -161,10 +161,17 @@ export function Progress() {
 
             <div className="pt-6">
               <BigNumber
-                // scrambles on every change, scrubbing included: Scramble
-                // restarts from the value itself, so dragging the curve reads
-                // as the figure spinning rather than snapping
-                value={<Scramble text={num(shown, 1)} delay={0} hold={110} perChar={40} />}
+                // Scrambles when the series changes under it, but not while a
+                // session is being read off the curve: mid-drag the figure has
+                // to keep up with the finger, and a value resolving out of
+                // noise cannot be read at the speed it is being changed.
+                value={
+                  at ? (
+                    num(shown, 1)
+                  ) : (
+                    <Scramble text={num(shown, 1)} delay={0} hold={110} perChar={40} />
+                  )
+                }
                 unit={unitLabel}
                 size={46}
               />
