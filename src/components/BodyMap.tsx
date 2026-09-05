@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { anatomy, groupForSlug, partPaths, type BodyView } from "../lib/anatomy";
 import type { MuscleGroup, MuscleScore } from "../lib/strength";
 import type { Gender } from "../types";
-import { Callout, FIG_FRAC, VB_H, VB_W, type Anchor, type CalloutLine } from "./Callout";
+import { Callout, FIG_FRAC, STAGE_ASPECT, type Anchor, type CalloutLine } from "./Callout";
 
 /**
  * Where each region's leader line lands, as a fraction of the figure's box.
@@ -241,7 +241,7 @@ export function BodyMap({
       <div
         style={
           showCallouts
-            ? { position: "relative", width: "100%", aspectRatio: `${VB_W} / ${VB_H}` }
+            ? { position: "relative", width: "100%", aspectRatio: `${STAGE_ASPECT}` }
             : undefined
         }
       >

@@ -25,9 +25,20 @@ export type CalloutLine = {
   scramble?: boolean;
 };
 
-/** Figure takes 40% of the callout container's width; the boxes flank it. */
-export const FIG_FRAC = 0.4;
-/** The callout frame the figure and its boxes are laid out inside. */
+/** Share of the stage width the figure takes; the boxes flank it. */
+export const FIG_FRAC = 0.47;
+
+/**
+ * Stage shape, as width / height.
+ *
+ * Deliberately taller than the 110x100 coordinate space below. The figure is
+ * drawn to fit its slice of the stage, so with a stage wider than it is tall
+ * the height was what bound its size and widening its slice alone bought
+ * nothing. A portrait stage lets the figure grow with the room it is given.
+ */
+export const STAGE_ASPECT = 0.92;
+
+/** The coordinate space the leader lines and boxes are positioned in. */
 export const VB_W = 110;
 export const VB_H = 100;
 
