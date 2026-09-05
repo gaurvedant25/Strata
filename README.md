@@ -108,6 +108,18 @@ unhelpful "could not sign in".
 Both values are public by design and safe in the bundle: row-level security
 means the anon key on its own can read nobody's data.
 
+### A caveat about email sign-up
+
+Supabase's built-in mailer is a testing convenience, not a mail service. It is
+capped at **two emails an hour** by default (Authentication → Rate Limits), and
+sign-up sends a confirmation email, so a couple of attempts exhausts it and
+every further one fails until the hour is out.
+
+Google sign-in is unaffected — it sends no email at all. If you want
+email and password to work for real users, connect your own SMTP under
+Authentication → Emails first; until then, treat email sign-up as a
+development path and Google as the real one.
+
 Leave `.env.local` out and none of the above applies — no sign-in screen, no
 network, exactly the local-only app described below.
 

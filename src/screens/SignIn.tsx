@@ -26,8 +26,12 @@ function explain(raw: string, mode: Mode) {
     return "Confirm your email first — check your inbox for the link.";
   if (m.includes("password") && m.includes("6"))
     return "Passwords need to be at least 6 characters.";
+  if (m.includes("invalid") && m.includes("email"))
+    return "The account service rejected that address. Use an inbox you can actually open, or continue with Google instead.";
+  if (m.includes("sending") || m.includes("smtp") || m.includes("confirmation email"))
+    return "The confirmation email could not be sent. Continue with Google instead — it needs no email.";
   if (m.includes("rate limit") || m.includes("too many"))
-    return "Too many attempts. Wait a minute and try again.";
+    return "Too many attempts. Signing up sends a confirmation email, and only a couple are allowed per hour — wait, or continue with Google, which sends none.";
   if (m.includes("fetch") || m.includes("network"))
     return `You appear to be offline. ${mode === "up" ? "Creating an account" : "Signing in"} needs a connection.`;
   return raw;
