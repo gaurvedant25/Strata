@@ -83,6 +83,17 @@ both are offline.
 6. Copy `.env.example` to `.env.local` and fill in the project URL and anon key
    from *Project Settings → Data API*.
 
+Then check it:
+
+```bash
+npm run check:cloud
+```
+
+That verifies the project is reachable, the key is the right one, the table
+exists, row-level security is actually on, and the Google provider is enabled —
+each of which fails silently in its own way and surfaces in the app as one
+unhelpful "could not sign in".
+
 Both values are public by design and safe in the bundle: row-level security
 means the anon key on its own can read nobody's data.
 
