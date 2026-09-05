@@ -208,9 +208,9 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                       <Scramble
                         key={active}
                         text={num(detail.best1rm)}
-                        delay={80}
-                        hold={260}
-                        perChar={90}
+                        delay={40}
+                        hold={130}
+                        perChar={45}
                       />
                     }
                     unit={`${unitLabel} est. 1RM`}
