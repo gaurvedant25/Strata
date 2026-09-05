@@ -110,7 +110,13 @@ export default function App() {
   }, [s.activeSessionId]);
 
   // each tab should open at its own top, not inherit the last tab's scroll
-  useEffect(() => window.scrollTo(0, 0), [tab, viewLogger, settingsOpen]);
+  // Block-bodied on purpose: an expression body returns whatever the call
+  // evaluates to, and React takes any non-function return as a cleanup and
+  // throws tearing it down. window.scrollTo returns undefined in a clean
+  // browser, but not necessarily in one where an extension has patched it.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [tab, viewLogger, settingsOpen]);
 
   if (!s.ready || !auth.ready) {
     return (

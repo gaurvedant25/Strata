@@ -199,7 +199,9 @@ export function BodyMap({
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }, [shown]);
 
-  useEffect(() => setP(0), [view]);
+  useEffect(() => {
+    setP(0);
+  }, [view]);
 
   const k = Math.min(1, Math.abs(p));
   const other: BodyView = view === "front" ? "back" : "front";
