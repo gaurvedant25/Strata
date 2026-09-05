@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Sparkline } from "../components/Sparkline";
-import { BigNumber, Empty, Eyebrow, StatBand } from "../components/ui";
+import { BigNumber, Empty, Eyebrow, Sheet, StatBand } from "../components/ui";
 import { exerciseHistory, personalRecords, sessionVolume } from "../lib/stats";
 import { num, parseKey } from "../lib/util";
 import { useStore } from "../store";
@@ -31,10 +31,11 @@ export function Progress() {
     [s.exercises, prs],
   );
 
-  // The exercise is stepped through rather than picked from a menu: a native
-  // select is a system-chrome box, which is exactly what this screen removed.
-  const [exIdx, setExIdx] = useState(0);
-  const current = tracked[exIdx % Math.max(1, tracked.length)];
+  // Held by id, not index, so the selection survives a new exercise being
+  // tracked or the list reordering as PRs land.
+  const [exId, setExId] = useState<string>("");
+  const [picker, setPicker] = useState(false);
+  const current = tracked.find((e) => e.id === exId) ?? tracked[0];
 
   const points = useMemo(
     () => (current ? exerciseHistory(done, current.id) : []),
@@ -90,9 +91,9 @@ export function Progress() {
         <>
           <div className="px-5 pt-6">
             <button
-              onClick={() => setExIdx((i) => (i + 1) % tracked.length)}
+              onClick={() => setPicker(true)}
               className="flex items-center gap-2.5 text-left"
-              aria-label="Next exercise"
+              aria-label="Choose exercise"
             >
               <span className="text-[23px] font-bold tracking-[-0.024em]">{current.name}</span>
               <svg
@@ -159,6 +160,45 @@ export function Progress() {
           )}
         </>
       )}
+
+      <Sheet open={picker} onClose={() => setPicker(false)} title="Exercise">
+        <div className="border-t border-rule">
+          {tracked.map((e) => {
+            const pr = prs.get(e.id);
+            const on = current?.id === e.id;
+            return (
+              <button
+                key={e.id}
+                onClick={() => {
+                  setExId(e.id);
+                  setPicker(false);
+                }}
+                className={`flex w-full items-center gap-3 border-b border-subrule py-3 text-left transition-colors ${
+                  on ? "text-fg" : "text-[#8b8b90]"
+                }`}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-medium">{e.name}</span>
+                  <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                    {e.muscle}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right font-mono text-[13px] text-muted">
+                  {pr ? `${num(pr.bestE1rm, 1)} ${unitLabel}` : ""}
+                </span>
+                <span
+                  className="size-2 shrink-0 rounded-full"
+                  style={{ background: on ? "#f5f5f5" : "transparent" }}
+                />
+              </button>
+            );
+          })}
+        </div>
+        <p className="pt-4 text-[12px] leading-relaxed text-muted">
+          Every exercise you have logged a working set for. The figure beside each is its best
+          estimated 1RM.
+        </p>
+      </Sheet>
 
       {bwValues.length > 1 && (
         <div className="px-5 pt-6">
