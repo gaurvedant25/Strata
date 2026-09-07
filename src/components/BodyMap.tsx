@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { anatomy, groupForSlug, partPaths, type BodyView } from "../lib/anatomy";
+import {
+  anatomy,
+  groupForSlug,
+  partPaths,
+  type BodyView,
+} from "../lib/anatomy";
 import type { MuscleGroup, MuscleScore } from "../lib/strength";
 import type { Gender } from "../types";
-import { Callout, FIG_FRAC, STAGE_ASPECT, type Anchor, type CalloutLine } from "./Callout";
+import {
+  Callout,
+  FIG_FRAC,
+  STAGE_ASPECT,
+  type Anchor,
+  type CalloutLine,
+} from "./Callout";
 
 /**
  * Where each region's leader line lands, as a fraction of the figure's box.
@@ -118,7 +129,7 @@ function Figure({
         opacity,
         transform: `translateZ(${DEPTH}px)`,
         pointerEvents: opacity > 0.5 ? "auto" : "none",
-        transition: "opacity 225ms ease",
+        transition: "opacity 225ms var(--ease-settle)",
       }}
     >
       <defs>
@@ -134,7 +145,11 @@ function Figure({
         const group = groupForSlug(part.slug);
         const sc = group ? scores[group] : undefined;
         const isSel = !!selected && group === selected;
-        const fill = sc ? `url(#${gradId(sc.color)})` : group ? SKIN : STRUCTURE;
+        const fill = sc
+          ? `url(#${gradId(sc.color)})`
+          : group
+            ? SKIN
+            : STRUCTURE;
         return (
           <g
             key={part.slug}
@@ -148,7 +163,7 @@ function Figure({
               filter: sc
                 ? `drop-shadow(0 0 ${3 + sc.score * 7}px ${sc.color}) drop-shadow(0 0 ${9 + sc.score * 20}px ${sc.color})`
                 : undefined,
-              transition: "filter 165ms ease",
+              transition: "filter 165ms var(--ease-settle)",
             }}
           >
             {partPaths(part).map((d, i) => (
@@ -159,7 +174,10 @@ function Figure({
                 fillOpacity={sc ? 0.8 + sc.score * 0.2 : 1}
                 stroke={isSel ? "#fff" : EDGE}
                 strokeWidth={isSel ? 4 : 1.5}
-                style={{ transition: "fill 165ms ease, fill-opacity 165ms ease" }}
+                style={{
+                  transition:
+                    "fill 165ms var(--ease-settle), fill-opacity 165ms var(--ease-settle)",
+                }}
               />
             ))}
           </g>
@@ -258,7 +276,9 @@ export function BodyMap({
     setP(0);
   }
 
-  const settle = dragging.current ? "none" : "transform 240ms cubic-bezier(.22,.61,.36,1)";
+  const settle = dragging.current
+    ? "none"
+    : "transform 240ms var(--ease-settle)";
 
   const anchor = (selected && ANCHOR[view][selected]) || ANCHOR[view].chest!;
   // Callouts need room either side, so the figure gives up the outer 60% of the
@@ -270,86 +290,105 @@ export function BodyMap({
       <div
         style={
           showCallouts
-            ? { position: "relative", width: "100%", aspectRatio: `${STAGE_ASPECT}` }
+            ? {
+                position: "relative",
+                width: "100%",
+                aspectRatio: `${STAGE_ASPECT}`,
+              }
             : undefined
         }
       >
-      <div
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        style={{
-          perspective: 900,
-          touchAction: "pan-y",
-          cursor: "grab",
-          position: showCallouts ? "absolute" : "relative",
-          ...(showCallouts
-            ? { left: `${(0.5 - FIG_FRAC / 2) * 100}%`, width: `${FIG_FRAC * 100}%`, top: 0, height: "100%" }
-            : { margin: "0 auto", maxWidth, aspectRatio: `${vbW} / ${vbH}` }),
-        }}
-      >
         <div
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={up}
+          onPointerCancel={up}
           style={{
-            position: "absolute",
-            inset: 0,
-            transformStyle: "preserve-3d",
-            transform: `rotateY(${p * MAX_TILT}deg)`,
-            transition: settle,
+            perspective: 900,
+            touchAction: "pan-y",
+            cursor: "grab",
+            position: showCallouts ? "absolute" : "relative",
+            ...(showCallouts
+              ? {
+                  left: `${(0.5 - FIG_FRAC / 2) * 100}%`,
+                  width: `${FIG_FRAC * 100}%`,
+                  top: 0,
+                  height: "100%",
+                }
+              : { margin: "0 auto", maxWidth, aspectRatio: `${vbW} / ${vbH}` }),
           }}
         >
-          {/* laminate: one cached silhouette bitmap repeated through the depth */}
-          {Array.from({ length: LAYERS }).map((_, i) => {
-            const t = i / (LAYERS - 1);
-            return (
-              <img
-                key={i}
-                src={silUrl}
-                alt=""
-                aria-hidden
-                draggable={false}
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  width: "100%",
-                  height: "100%",
-                  transform: `translateZ(${(-DEPTH + t * 2 * DEPTH) * 0.9}px)`,
-                  pointerEvents: "none",
-                }}
-              />
-            );
-          })}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              transformStyle: "preserve-3d",
+              transform: `rotateY(${p * MAX_TILT}deg)`,
+              transition: settle,
+            }}
+          >
+            {/* laminate: one cached silhouette bitmap repeated through the depth */}
+            {Array.from({ length: LAYERS }).map((_, i) => {
+              const t = i / (LAYERS - 1);
+              return (
+                <img
+                  key={i}
+                  src={silUrl}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    transform: `translateZ(${(-DEPTH + t * 2 * DEPTH) * 0.9}px)`,
+                    pointerEvents: "none",
+                  }}
+                />
+              );
+            })}
 
-          {/* both drawings sit at the same place and cross-fade as you turn */}
-          <Figure
-            gender={gender}
-            view="front"
-            scores={scores}
-            selected={selected}
-            onSelect={onSelect}
-            opacity={view === "front" ? outgoing : incoming}
-          />
-          <Figure
-            gender={gender}
-            view="back"
-            scores={scores}
-            selected={selected}
-            onSelect={onSelect}
-            opacity={view === "back" ? outgoing : incoming}
-          />
+            {/* both drawings sit at the same place and cross-fade as you turn */}
+            <Figure
+              gender={gender}
+              view="front"
+              scores={scores}
+              selected={selected}
+              onSelect={onSelect}
+              opacity={view === "front" ? outgoing : incoming}
+            />
+            <Figure
+              gender={gender}
+              view="back"
+              scores={scores}
+              selected={selected}
+              onSelect={onSelect}
+              opacity={view === "back" ? outgoing : incoming}
+            />
+          </div>
         </div>
-      </div>
 
-      {showCallouts && (
-        <>
-          {callouts!.left && (
-            <Callout key={`l-${view}-${selected}`} side="left" lines={callouts!.left} anchor={anchor} />
-          )}
-          {callouts!.right && (
-            <Callout key={`r-${view}-${selected}`} side="right" lines={callouts!.right} anchor={anchor} />
-          )}
-        </>
-      )}
+        {showCallouts && (
+          <>
+            {callouts!.left && (
+              <Callout
+                key={`l-${view}-${selected}`}
+                side="left"
+                lines={callouts!.left}
+                anchor={anchor}
+              />
+            )}
+            {callouts!.right && (
+              <Callout
+                key={`r-${view}-${selected}`}
+                side="right"
+                lines={callouts!.right}
+                anchor={anchor}
+              />
+            )}
+          </>
+        )}
       </div>
 
       {showToggle && (
@@ -358,7 +397,7 @@ export function BodyMap({
             <button
               key={v}
               onClick={() => onViewChange(v)}
-              className={`rounded-full px-3 py-1 text-[11px] font-medium capitalize transition-colors ${
+              className={`rounded-full px-3 py-1 text-[0.6875rem] font-medium capitalize transition-colors ${
                 view === v ? "bg-rule text-fg" : "text-muted"
               }`}
             >

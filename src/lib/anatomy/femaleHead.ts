@@ -80,14 +80,24 @@ export function femaleHead(view: BodyView): BodyPart {
           top: 100,
           h: 158,
           hw: 60,
-          s: { crown: 0.55, temple: 0.34, gonion: [0.78, 0.7], chin: 0.2 } as Half,
+          s: {
+            crown: 0.55,
+            temple: 0.34,
+            gonion: [0.78, 0.7],
+            chin: 0.2,
+          } as Half,
         }
       : {
           cx: 1143,
           top: 82,
           h: 164,
           hw: 63,
-          s: { crown: 0.6, temple: 0.33, gonion: [0.88, 0.74], chin: 0.34 } as Half,
+          s: {
+            crown: 0.6,
+            temple: 0.33,
+            gonion: [0.88, 0.74],
+            chin: 0.34,
+          } as Half,
         };
   return {
     slug: "head",

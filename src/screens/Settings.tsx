@@ -19,7 +19,9 @@ export function Settings({ onBack }: { onBack: () => void }) {
   async function doExport() {
     const data = await exportBackup();
     const json = JSON.stringify(data, null, 2);
-    const file = new File([json], `gym-log-${todayKey()}.json`, { type: "application/json" });
+    const file = new File([json], `gym-log-${todayKey()}.json`, {
+      type: "application/json",
+    });
 
     // iOS installed PWAs handle share sheets far better than <a download>
     if (navigator.canShare?.({ files: [file] })) {
@@ -54,7 +56,11 @@ export function Settings({ onBack }: { onBack: () => void }) {
     <div className="min-h-full pb-40">
       <div className="flex items-center justify-between px-5 pb-5 pt-[calc(env(safe-area-inset-top)+14px)]">
         <Eyebrow>Settings</Eyebrow>
-        <button onClick={onBack} className="flex items-center gap-1.5 text-muted active:text-fg">
+        <button
+          onClick={onBack}
+          aria-label="Back to Strength"
+          className="-my-3 -mr-2 flex h-11 items-center gap-1.5 pr-2 text-muted active:text-fg"
+        >
           <svg
             width="15"
             height="15"
@@ -67,7 +73,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           >
             <path d="M14 6l-6 6 6 6" />
           </svg>
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em]">
+          <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em]">
             Strength
           </span>
         </button>
@@ -80,8 +86,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
             <>
               <div className="flex items-center justify-between gap-4 border-b border-subrule px-5 py-3.5">
                 <div className="min-w-0">
-                  <p className="truncate text-[15px]">{auth.name ?? auth.email}</p>
-                  <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <p className="truncate text-[0.9375rem]">
+                    {auth.name ?? auth.email}
+                  </p>
+                  <p className="mt-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-muted">
                     {auth.sync === "syncing"
                       ? "Syncing…"
                       : auth.sync === "error"
@@ -93,7 +101,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
                 </div>
                 <button
                   onClick={() => void auth.push()}
-                  className="shrink-0 border-b border-fg pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em]"
+                  className="-my-2 -mr-2 flex h-11 shrink-0 items-center px-2 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] underline decoration-[1.5px] underline-offset-[5px]"
                 >
                   Sync now
                 </button>
@@ -116,14 +124,17 @@ export function Settings({ onBack }: { onBack: () => void }) {
                 }}
                 className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b] disabled:opacity-50"
               >
-                <span className="text-[15px]">{signingOut ? "Signing out…" : "Sign out"}</span>
+                <span className="text-[0.9375rem]">
+                  {signingOut ? "Signing out…" : "Sign out"}
+                </span>
                 <span className="text-muted">{signingOut ? "" : "→"}</span>
               </button>
             </>
           ) : (
             <div className="border-b border-rule px-5 py-4">
-              <p className="text-[13px] leading-relaxed text-muted text-pretty">
-                You are using Gym Log without an account, so these logs live only on this device.
+              <p className="text-[0.8125rem] leading-relaxed text-muted text-pretty">
+                You are using Gym Log without an account, so these logs live
+                only on this device.
               </p>
               <div className="pt-3.5">
                 <Button
@@ -205,21 +216,23 @@ export function Settings({ onBack }: { onBack: () => void }) {
         }}
         className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b]"
       >
-        <span className="text-[15px] text-danger">Erase all data</span>
-        <span className="text-[#4d1a16]">→</span>
+        <span className="text-[0.9375rem] text-danger">Erase all data</span>
+        {/* Was #4d1a16 — a dimmed danger red at 1.5:1, the least visible mark
+            in the app sitting on its most destructive row. */}
+        <span className="text-danger">→</span>
       </button>
 
-      <p className="px-5 pt-6 text-[12px] leading-[1.7] text-muted text-pretty">
+      <p className="px-5 pt-6 text-[0.75rem] leading-[1.7] text-muted text-pretty">
         {auth.session
           ? "Your workouts are stored on this device and in your account, and the two reconcile whenever you have a connection. Everything keeps working offline; clearing your browser data only clears this device."
           : "Everything lives on this device only — nothing is uploaded. Clearing your browser data or deleting the app also deletes your logs, so back up regularly."}
       </p>
 
       {msg && (
-        <div className="fixed inset-x-0 bottom-28 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 border-y border-rule bg-ink px-5 py-3.5 text-[14px]">
+        <div className="fixed inset-x-0 bottom-28 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 border-y border-rule bg-ink px-5 py-3.5 text-[0.875rem]">
           {msg}
           <button
-            className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-fg"
+            className="-my-2 -mr-2 flex h-11 shrink-0 items-center px-2 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg"
             onClick={() => setMsg(null)}
           >
             OK
@@ -258,8 +271,8 @@ function SettingRow({
       }`}
     >
       <div className="min-w-0">
-        <p className="text-[15px]">{label}</p>
-        {hint && <p className="mt-0.5 text-[12px] text-muted">{hint}</p>}
+        <p className="text-[0.9375rem]">{label}</p>
+        {hint && <p className="mt-0.5 text-[0.75rem] text-muted">{hint}</p>}
       </div>
       {children}
     </div>
@@ -284,21 +297,32 @@ function ActionRow({
         rule === "rule" ? "border-b border-rule" : "border-b border-subrule"
       }`}
     >
-      <span className="text-[15px]">{label}</span>
-      <span className="font-mono text-[12px] text-muted">{value}</span>
+      <span className="text-[0.9375rem]">{label}</span>
+      <span className="font-mono text-[0.75rem] text-muted">{value}</span>
     </button>
   );
 }
 
-function ExerciseManager({ open, onClose }: { open: boolean; onClose: () => void }) {
+function ExerciseManager({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const s = useStore();
   const ask = useConfirm();
   const [q, setQ] = useState("");
   const list = s.exercises
     .filter((e) => e.name.toLowerCase().includes(q.trim().toLowerCase()))
-    .sort((a, b) => a.muscle.localeCompare(b.muscle) || a.name.localeCompare(b.name));
+    .sort(
+      (a, b) =>
+        a.muscle.localeCompare(b.muscle) || a.name.localeCompare(b.name),
+    );
 
-  const used = new Set(s.sessions.flatMap((x) => x.entries.map((e) => e.exerciseId)));
+  const used = new Set(
+    s.sessions.flatMap((x) => x.entries.map((e) => e.exerciseId)),
+  );
 
   return (
     <Sheet open={open} onClose={onClose} title="Exercise library">
@@ -310,16 +334,19 @@ function ExerciseManager({ open, onClose }: { open: boolean; onClose: () => void
       />
       <div className="border-t border-rule">
         {list.map((e) => (
-          <div key={e.id} className="flex items-center gap-3 border-b border-subrule py-3">
+          <div
+            key={e.id}
+            className="flex items-center gap-3 border-b border-subrule py-3"
+          >
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[15px]">{e.name}</p>
-              <p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+              <p className="truncate text-[0.9375rem]">{e.name}</p>
+              <p className="mt-0.5 font-mono text-[0.6875rem] uppercase tracking-[0.1em] text-muted">
                 {e.muscle}
                 {e.bodyweight ? " · bodyweight" : ""}
               </p>
             </div>
             {used.has(e.id) ? (
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.14em] text-faint">
+              <span className="shrink-0 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-dim">
                 logged
               </span>
             ) : (
@@ -333,7 +360,7 @@ function ExerciseManager({ open, onClose }: { open: boolean; onClose: () => void
                   });
                   if (yes) void s.deleteExercise(e.id);
                 }}
-                className="shrink-0 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-danger"
+                className="-my-2 -mr-2 flex h-11 shrink-0 items-center px-2 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-danger"
               >
                 Delete
               </button>
@@ -341,9 +368,9 @@ function ExerciseManager({ open, onClose }: { open: boolean; onClose: () => void
           </div>
         ))}
       </div>
-      <p className="pt-4 text-[12px] leading-relaxed text-muted">
-        Exercises you have already logged can't be deleted — that would orphan your history. Add new
-        ones from the picker inside a workout.
+      <p className="pt-4 text-[0.75rem] leading-relaxed text-muted">
+        Exercises you have already logged can't be deleted — that would orphan
+        your history. Add new ones from the picker inside a workout.
       </p>
     </Sheet>
   );

@@ -1,5 +1,5 @@
 import type { Exercise, Gender, Session } from "../types";
-import { personalRecords } from "./stats";
+import { personalRecords, type PR } from "./stats";
 
 /**
  * Regions the body map scores.
@@ -78,8 +78,18 @@ export type RegionSection =
 export const REGION_SECTIONS: RegionSection[] = [
   { kind: "single", group: "chest" },
   { kind: "single", group: "shoulders" },
-  { kind: "group", id: "arms", label: "Arms", children: ["biceps", "triceps", "forearms"] },
-  { kind: "group", id: "back", label: "Back", children: ["traps", "lats", "lowerBack"] },
+  {
+    kind: "group",
+    id: "arms",
+    label: "Arms",
+    children: ["biceps", "triceps", "forearms"],
+  },
+  {
+    kind: "group",
+    id: "back",
+    label: "Back",
+    children: ["traps", "lats", "lowerBack"],
+  },
   { kind: "group", id: "core", label: "Core", children: ["abs", "obliques"] },
   {
     kind: "group",
@@ -117,7 +127,14 @@ export const CANONICAL_LIFT: Record<MuscleGroup, string> = {
 };
 
 /** Six rungs. Bronze is the floor - below the first threshold. */
-export const TIERS = ["Bronze", "Silver", "Gold", "Platinum", "Diamond", "Titan"] as const;
+export const TIERS = [
+  "Bronze",
+  "Silver",
+  "Gold",
+  "Platinum",
+  "Diamond",
+  "Titan",
+] as const;
 export type Tier = (typeof TIERS)[number];
 
 /**
@@ -125,19 +142,29 @@ export type Tier = (typeof TIERS)[number];
  * and each has to be tellable from the rung either side of it at a glance.
  *
  * Platinum and Diamond share a hue — 175 and 179 degrees, near enough the same
- * teal — and are told apart by brightness instead, Diamond being some three
- * times the luminance of Platinum. That is a deliberate pairing rather than the
- * accident it replaced: the earlier cyan and blue differed slightly in both
- * hue and brightness and so resolved in neither, where a dim teal against a
- * brilliant one separates cleanly and reads as the same metal, brighter.
+ * teal — and are told apart by brightness instead, Diamond carrying some two
+ * and a half times the luminance of Platinum. That is a deliberate pairing
+ * rather than the accident it replaced: the earlier cyan and blue differed
+ * slightly in both hue and brightness and so resolved in neither, where a dim
+ * teal against a brilliant one separates cleanly and reads as the same metal,
+ * brighter.
+ *
+ * Every rung is also set as small text — the tier name sits beside the muscle
+ * group in its own colour — so each has to clear 4.5:1 against the darkest
+ * ground it lands on, which is the selected card at #161616. Two did not:
+ * Platinum was a dim teal at 4.4:1 and Titan a deep violet at 3.2:1, the tier
+ * name effectively unreadable at the top of the ladder. Both have been lifted
+ * to the same hue at a brightness that clears the bar (Platinum 6.1:1, Titan
+ * 5.4:1) — Platinum keeps its place well below Diamond, and Titan is still
+ * unmistakably the violet rung.
  */
 export const TIER_COLOR: Record<Tier, string> = {
   Bronze: "#CD7F32",
   Silver: "#C0C0C0",
   Gold: "#FFD700",
-  Platinum: "#0E8C82",
+  Platinum: "#12A79B",
   Diamond: "#00FFF9",
-  Titan: "#8A2BE2",
+  Titan: "#AE6BF5",
 };
 
 /** What each rung says about the lifter, for anywhere a tier needs explaining. */
@@ -153,10 +180,10 @@ export const TIER_LEVEL: Record<Tier, string> = {
 /**
  * Text colour to put on a solid patch of a tier colour.
  *
- * Most of the palette is light enough to take near-black text, but Titan's
- * violet is dark — black on it lands at 3.5:1, under the 4.5:1 that small bold
- * text needs — so it takes white instead. Picked by luminance rather than
- * hardcoded, so a future palette change stays readable.
+ * Picked by luminance rather than hardcoded, which is what let the palette
+ * above be relit for contrast without touching anything here: every rung is
+ * now light enough to take near-black text, where the darker violet Titan used
+ * to be took white. A future palette change stays readable the same way.
  */
 export function tierInk(hex: string): string {
   const v = parseInt(hex.slice(1), 16);
@@ -184,36 +211,83 @@ export function tierInk(hex: string): string {
  */
 const STANDARDS: Record<MuscleGroup, Record<Gender, number[]>> = {
   // — approximated from published charts —
-  chest: { male: [0.5, 0.75, 1.0, 1.5, 2.0], female: [0.27, 0.4, 0.6, 0.9, 1.25] },
-  shoulders: { male: [0.35, 0.5, 0.7, 0.9, 1.2], female: [0.2, 0.3, 0.45, 0.6, 0.8] },
-  biceps: { male: [0.25, 0.35, 0.5, 0.7, 0.9], female: [0.15, 0.2, 0.3, 0.45, 0.6] },
-  quadriceps: { male: [0.75, 1.0, 1.5, 2.0, 2.5], female: [0.5, 0.75, 1.0, 1.5, 2.0] },
-  lowerBack: { male: [1.0, 1.5, 1.75, 2.25, 2.75], female: [0.6, 1.0, 1.25, 1.75, 2.25] },
-  glutes: { male: [1.0, 1.5, 2.0, 2.5, 3.0], female: [0.75, 1.25, 1.75, 2.25, 2.75] },
+  chest: {
+    male: [0.5, 0.75, 1.0, 1.5, 2.0],
+    female: [0.27, 0.4, 0.6, 0.9, 1.25],
+  },
+  shoulders: {
+    male: [0.35, 0.5, 0.7, 0.9, 1.2],
+    female: [0.2, 0.3, 0.45, 0.6, 0.8],
+  },
+  biceps: {
+    male: [0.25, 0.35, 0.5, 0.7, 0.9],
+    female: [0.15, 0.2, 0.3, 0.45, 0.6],
+  },
+  quadriceps: {
+    male: [0.75, 1.0, 1.5, 2.0, 2.5],
+    female: [0.5, 0.75, 1.0, 1.5, 2.0],
+  },
+  lowerBack: {
+    male: [1.0, 1.5, 1.75, 2.25, 2.75],
+    female: [0.6, 1.0, 1.25, 1.75, 2.25],
+  },
+  glutes: {
+    male: [1.0, 1.5, 2.0, 2.5, 3.0],
+    female: [0.75, 1.25, 1.75, 2.25, 2.75],
+  },
   // — estimated, with no chart behind them —
-  triceps: { male: [0.3, 0.45, 0.6, 0.8, 1.0], female: [0.18, 0.25, 0.35, 0.5, 0.65] },
-  forearms: { male: [0.2, 0.3, 0.4, 0.55, 0.75], female: [0.12, 0.18, 0.25, 0.35, 0.5] },
-  abs: { male: [0.3, 0.45, 0.6, 0.85, 1.1], female: [0.2, 0.3, 0.45, 0.6, 0.8] },
-  obliques: { male: [0.25, 0.35, 0.5, 0.7, 0.9], female: [0.15, 0.25, 0.35, 0.5, 0.65] },
-  hamstrings: { male: [0.75, 1.1, 1.4, 1.8, 2.25], female: [0.45, 0.7, 0.9, 1.25, 1.6] },
-  calves: { male: [0.75, 1.25, 1.75, 2.25, 3.0], female: [0.5, 0.85, 1.25, 1.75, 2.25] },
-  traps: { male: [0.75, 1.25, 1.75, 2.25, 3.0], female: [0.5, 0.8, 1.2, 1.6, 2.1] },
-  lats: { male: [0.5, 0.75, 1.0, 1.25, 1.6], female: [0.35, 0.5, 0.7, 0.9, 1.2] },
+  triceps: {
+    male: [0.3, 0.45, 0.6, 0.8, 1.0],
+    female: [0.18, 0.25, 0.35, 0.5, 0.65],
+  },
+  forearms: {
+    male: [0.2, 0.3, 0.4, 0.55, 0.75],
+    female: [0.12, 0.18, 0.25, 0.35, 0.5],
+  },
+  abs: {
+    male: [0.3, 0.45, 0.6, 0.85, 1.1],
+    female: [0.2, 0.3, 0.45, 0.6, 0.8],
+  },
+  obliques: {
+    male: [0.25, 0.35, 0.5, 0.7, 0.9],
+    female: [0.15, 0.25, 0.35, 0.5, 0.65],
+  },
+  hamstrings: {
+    male: [0.75, 1.1, 1.4, 1.8, 2.25],
+    female: [0.45, 0.7, 0.9, 1.25, 1.6],
+  },
+  calves: {
+    male: [0.75, 1.25, 1.75, 2.25, 3.0],
+    female: [0.5, 0.85, 1.25, 1.75, 2.25],
+  },
+  traps: {
+    male: [0.75, 1.25, 1.75, 2.25, 3.0],
+    female: [0.5, 0.8, 1.2, 1.6, 2.1],
+  },
+  lats: {
+    male: [0.5, 0.75, 1.0, 1.25, 1.6],
+    female: [0.35, 0.5, 0.7, 0.9, 1.2],
+  },
 };
 
 /** Score at each threshold; below the first one it ramps from 0. */
 const SCORE_AT_TIER = [0.2, 0.4, 0.6, 0.8, 1.0];
 
-function scoreFromRatio(ratio: number, points: number[]): { score: number; tier: Tier } {
+function scoreFromRatio(
+  ratio: number,
+  points: number[],
+): { score: number; tier: Tier } {
   const xs = [0, ...points];
   const ys = [0, ...SCORE_AT_TIER];
   let tier: Tier = TIERS[0];
-  for (let i = 0; i < points.length; i++) if (ratio >= points[i]) tier = TIERS[i + 1];
+  for (let i = 0; i < points.length; i++)
+    if (ratio >= points[i]) tier = TIERS[i + 1];
 
   for (let i = 1; i < xs.length; i++) {
     if (ratio <= xs[i] || i === xs.length - 1) {
       const span = xs[i] - xs[i - 1];
-      const t = span === 0 ? 1 : Math.min(1, Math.max(0, (ratio - xs[i - 1]) / span));
+      const t =
+        span === 0 ? 1 : Math.min(1, Math.max(0, (ratio - xs[i - 1]) / span));
       const score = ys[i - 1] + t * (ys[i] - ys[i - 1]);
       return { score: Math.min(1, Math.max(0, score)), tier };
     }
@@ -230,6 +304,30 @@ export type MuscleScore = {
   lift: string;
 };
 
+/**
+ * The best record held under a given exercise name, across every exercise that
+ * carries it.
+ *
+ * A library can hold the same name more than once — an import, a restore or a
+ * re-seed leaves duplicates behind, and all but one of them have no history
+ * against them. Resolving the name with `find` picks whichever copy happens to
+ * come back first, so a region would blank out at random depending on which
+ * one that was, even with years of the lift logged under its twin.
+ */
+export function bestNamed(
+  exercises: Exercise[],
+  prs: Map<string, PR>,
+  name: string,
+): PR | undefined {
+  let best: PR | undefined;
+  for (const e of exercises) {
+    if (e.name !== name) continue;
+    const pr = prs.get(e.id);
+    if (pr && (!best || pr.bestE1rm > best.bestE1rm)) best = pr;
+  }
+  return best;
+}
+
 /** No bodyweight means nothing can be normalized, so every region stays unscored. */
 export function computeMuscleScores(
   sessions: Session[],
@@ -243,12 +341,18 @@ export function computeMuscleScores(
   const prs = personalRecords(sessions.filter((s) => s.endedAt));
   for (const muscle of Object.keys(CANONICAL_LIFT) as MuscleGroup[]) {
     const lift = CANONICAL_LIFT[muscle];
-    const exercise = exercises.find((e) => e.name === lift);
-    const pr = exercise ? prs.get(exercise.id) : undefined;
+    const pr = bestNamed(exercises, prs, lift);
     if (!pr || pr.bestE1rm <= 0) continue;
     const ratio = pr.bestE1rm / bodyweight;
     const { score, tier } = scoreFromRatio(ratio, STANDARDS[muscle][gender]);
-    out[muscle] = { ratio, score, tier, color: TIER_COLOR[tier], best1rm: pr.bestE1rm, lift };
+    out[muscle] = {
+      ratio,
+      score,
+      tier,
+      color: TIER_COLOR[tier],
+      best1rm: pr.bestE1rm,
+      lift,
+    };
   }
   return out;
 }

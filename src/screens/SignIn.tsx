@@ -19,7 +19,8 @@ type Mode = "in" | "up";
 /** Supabase's messages are terse and occasionally cryptic; these are not. */
 function explain(raw: string, mode: Mode) {
   const m = raw.toLowerCase();
-  if (m.includes("invalid login")) return "That email and password don't match an account.";
+  if (m.includes("invalid login"))
+    return "That email and password don't match an account.";
   if (m.includes("already registered") || m.includes("already been registered"))
     return "There's already an account with that email. Try signing in instead.";
   if (m.includes("email not confirmed"))
@@ -28,7 +29,11 @@ function explain(raw: string, mode: Mode) {
     return "Passwords need to be at least 6 characters.";
   if (m.includes("invalid") && m.includes("email"))
     return "The account service rejected that address. Use an inbox you can actually open, or continue with Google instead.";
-  if (m.includes("sending") || m.includes("smtp") || m.includes("confirmation email"))
+  if (
+    m.includes("sending") ||
+    m.includes("smtp") ||
+    m.includes("confirmation email")
+  )
     return "The confirmation email could not be sent. Continue with Google instead — it needs no email.";
   if (m.includes("rate limit") || m.includes("too many"))
     return "Too many attempts. Signing up sends a confirmation email, and only a couple are allowed per hour — wait, or continue with Google, which sends none.";
@@ -89,12 +94,12 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
       <div className="flex-1">
         <div className="pt-[10vh]">
           <Eyebrow>Gym Log</Eyebrow>
-          <h1 className="mt-4 text-[29px] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
+          <h1 className="mt-4 text-[1.8125rem] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
             {mode === "up"
               ? "Create an account and your training is never only on this phone."
               : "Welcome back."}
           </h1>
-          <p className="mt-3 text-[14px] leading-relaxed text-muted text-pretty">
+          <p className="mt-3 text-[0.875rem] leading-relaxed text-muted text-pretty">
             {mode === "up"
               ? "Every workout is saved to your account and to this device. After this you never need signal again."
               : "Sign in and this device catches up with everything you have logged elsewhere."}
@@ -133,12 +138,16 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
           </label>
 
           <label className="mt-5 block">
-            <Eyebrow className="mb-1.5 block tracking-[0.18em]">Password</Eyebrow>
+            <Eyebrow className="mb-1.5 block tracking-[0.18em]">
+              Password
+            </Eyebrow>
             <input
               type="password"
               autoComplete={mode === "up" ? "new-password" : "current-password"}
               className={inputCls}
-              placeholder={mode === "up" ? "At least 6 characters" : "Your password"}
+              placeholder={
+                mode === "up" ? "At least 6 characters" : "Your password"
+              }
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => {
@@ -150,15 +159,23 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
           {mode === "in" && (
             <button
               onClick={() => void forgot()}
-              className="mt-3.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted active:text-fg"
+              className="mt-3.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted active:text-fg"
             >
               Forgot password
             </button>
           )}
         </div>
 
-        {err && <p className="mt-5 text-[13px] leading-relaxed text-danger text-pretty">{err}</p>}
-        {note && <p className="mt-5 text-[13px] leading-relaxed text-fg text-pretty">{note}</p>}
+        {err && (
+          <p className="mt-5 text-[0.8125rem] leading-relaxed text-danger text-pretty">
+            {err}
+          </p>
+        )}
+        {note && (
+          <p className="mt-5 text-[0.8125rem] leading-relaxed text-fg text-pretty">
+            {note}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 pt-7">
@@ -168,13 +185,17 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
 
         <div className="flex items-center gap-3 py-1">
           <span className="h-px flex-1 bg-rule" />
-          <Eyebrow tone="faint" className="tracking-[0.18em]">
+          <Eyebrow tone="dim" className="tracking-[0.18em]">
             or
           </Eyebrow>
           <span className="h-px flex-1 bg-rule" />
         </div>
 
-        <Button variant="outline" onClick={() => void auth.signInWithGoogle()} disabled={busy}>
+        <Button
+          variant="outline"
+          onClick={() => void auth.signInWithGoogle()}
+          disabled={busy}
+        >
           <GoogleMark />
           Continue with Google
         </Button>
@@ -182,9 +203,9 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
         <Button variant="quiet" onClick={onSkip}>
           Use without an account
         </Button>
-        <p className="px-1 text-center text-[11px] leading-relaxed text-faint text-pretty">
-          Without an account everything still works, but your logs live only on this device and go
-          with it.
+        <p className="px-1 text-center text-[0.6875rem] leading-relaxed text-dim text-pretty">
+          Without an account everything still works, but your logs live only on
+          this device and go with it.
         </p>
       </div>
     </div>

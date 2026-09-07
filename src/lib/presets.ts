@@ -23,7 +23,8 @@ export const PRESETS: Preset[] = [
   {
     key: "full-body",
     name: "Full Body",
-    blurb: "3 days · every muscle each session. The most forgiving if you miss a day.",
+    blurb:
+      "3 days · every muscle each session. The most forgiving if you miss a day.",
     days: [
       [
         "Full Body A",
@@ -203,7 +204,8 @@ export const PRESETS: Preset[] = [
   {
     key: "arnold",
     name: "Arnold Split",
-    blurb: "3 days run twice a week · chest+back, shoulders+arms, legs. Very high volume.",
+    blurb:
+      "3 days run twice a week · chest+back, shoulders+arms, legs. Very high volume.",
     days: [
       [
         "Chest & Back",

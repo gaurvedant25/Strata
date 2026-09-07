@@ -1,5 +1,6 @@
 export const uid = () =>
-  (crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36));
+  crypto.randomUUID?.() ??
+  Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 export function todayKey(d = new Date()) {
   const p = (n: number) => String(n).padStart(2, "0");
@@ -17,7 +18,11 @@ export function fmtDate(key: string) {
   if (key === today) return "Today";
   const yest = todayKey(new Date(Date.now() - 864e5));
   if (key === yest) return "Yesterday";
-  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 
 export function fmtDuration(ms: number) {
@@ -43,7 +48,15 @@ export function cls(...v: (string | false | null | undefined)[]) {
   return v.filter(Boolean).join(" ");
 }
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 
 /** "Fridays" style plural label for the weekday most sessions of a routine land on. */
 export function mostCommonWeekdayLabel(dates: string[]) {

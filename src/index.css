@@ -14,13 +14,64 @@
   /* The only two greys that draw anything: a section rule and a row rule. */
   --color-rule: #1a1a1a;
   --color-subrule: #111111;
-  /* Hierarchy is three text tones, never a lighter box. */
+  /* Hierarchy is three text tones, never a lighter box.
+     Every one of them clears 4.5:1 against the darkest ground it is ever set
+     on (#161616, the selected card), so the ladder is built out of tones that
+     can all actually be read rather than out of one legible tone and two
+     suggestions of one. `faint` is deliberately NOT in that ladder — it is
+     below the text threshold and is only ever allowed to draw a mark, never a
+     word. See the note on it below. */
   --color-fg: #f5f5f5;
-  --color-muted: #666666;
-  --color-faint: #3a3a3a;
+  /* Secondary. 7.5:1 on black, 6.4:1 on a selected card. */
+  --color-muted: #9a9a9a;
+  /* Tertiary, and the resting state of anything interactive that is currently
+     off — an unselected tab, a placeholder. These are still words a person has
+     to read to navigate, so this tone clears the text minimum too (5.3:1 on
+     black, 4.6:1 on a card) rather than fading toward the background. */
+  --color-dim: #808080;
+  /* Not a text tone. The only things drawn in it are marks that carry no
+     words — an unfilled pip, an empty set dot — which WCAG holds to 3:1 as
+     non-text graphics rather than to 4.5:1. Setting type in this is a bug. */
+  --color-faint: #646464;
   --color-danger: #ff453a;
 
-  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /*
+   * The type scale, in rem rather than px.
+   *
+   * Every size in the app used to be a hard pixel value, which meant the whole
+   * interface ignored the reader's text-size setting outright: someone who had
+   * asked their phone for larger type got the same 9px uppercase labels as
+   * everyone else, with no way to change it. In rem, one setting moves the
+   * entire scale and the layout follows.
+   *
+   * The floor is `--text-label` at 11px, the smallest size the platform
+   * guidance treats as legible. Nothing in the app sets type below it. The
+   * sizes underneath it — 9px and 10px labels, tracked wide and set in caps,
+   * which is the hardest combination there is to read small — have all been
+   * lifted onto this rung. They lose a pixel of distinction from each other
+   * and gain the ability to be read at all; tracking, weight and tone were
+   * always doing that separating work anyway.
+   */
+  --text-label: 0.6875rem; /* 11px — the micro-label floor */
+  /*
+   * For chrome that names itself rather than carrying content: the tab bar's
+   * titles, the caption under a figure in a stat band. It scales, but stops.
+   *
+   * Turning the text size up is a request to make the thing you came to read
+   * bigger, not to make the furniture bigger — and at 175% four tab titles
+   * side by side are wider than the phone, so the bar either overflows or
+   * every title truncates to nothing. Grows with the reader to a 13px ceiling
+   * and holds there.
+   */
+  --text-chrome: min(0.6875rem, 13px);
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.8125rem; /* 13px */
+  --text-base: 0.875rem; /* 14px */
+  --text-md: 0.9375rem; /* 15px */
+  --text-lg: 1rem; /* 16px */
+
+  --font-sans:
+    "DM Sans Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* Everything that animates does so a quarter faster than the defaults it was
@@ -28,6 +79,14 @@
      utilities, which would otherwise still run at Tailwind's own 150ms and be
      left out of step with the timings set explicitly elsewhere. */
   --default-transition-duration: 112ms;
+
+  /* The one curve everything settles on.
+     Motion here always decelerates into its end: it leaves briskly and arrives
+     gently, so a value that changes comes to rest rather than stopping dead.
+     Defined in Tailwind's easing namespace, so `ease-settle` is also available
+     as a utility, and made the default for every bare transition utility. */
+  --ease-settle: cubic-bezier(0.22, 0.9, 0.3, 1);
+  --default-transition-timing-function: var(--ease-settle);
 }
 
 :root {
@@ -53,12 +112,16 @@ body {
 
 /* iOS auto-zooms any *form field* rendered under 16px. Buttons are exempt from
    that behaviour, so they must not be pinned here — and this has to sit in a
-   layer, or it would outrank every Tailwind text-size utility. */
+   layer, or it would outrank every Tailwind text-size utility.
+
+   `max()` rather than a flat 16px so the floor stops fields shrinking under
+   the zoom threshold without also capping them there: a reader who has turned
+   their text size up gets fields that grow with everything else. */
 @layer base {
   input,
   select,
   textarea {
-    font-size: 16px;
+    font-size: max(1rem, 16px);
   }
 
   input,
@@ -82,20 +145,6 @@ input[type="number"]::-webkit-inner-spin-button {
   scrollbar-width: none;
 }
 
-@keyframes pop {
-  from {
-    transform: scale(0.85);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-.animate-pop {
-  animation: pop 0.105s ease-out;
-}
-
 @keyframes rise {
   from {
     transform: translateY(14px);
@@ -107,5 +156,150 @@ input[type="number"]::-webkit-inner-spin-button {
   }
 }
 .animate-rise {
-  animation: rise 0.135s ease-out;
+  animation: rise 0.135s var(--ease-settle);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-fade {
+  animation: fade 0.14s var(--ease-settle);
+}
+
+/* One column of an odometer: a strip of every character the wheel turns past,
+   inside a window one line tall. The travel is the whole strip less the one
+   line on show, so a column spinning 2 through 9 covers seven places and one
+   stepping 8 to 9 covers a single place, from the same pair of keyframes.
+   Upward when the figure rose, downward when it fell. */
+@keyframes roll-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% + 1em));
+  }
+}
+@keyframes roll-down {
+  from {
+    transform: translateY(calc(-100% + 1em));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Leaving.
+ *
+ * The mirror of `rise` and of the scrim's fade, run as transitions rather than
+ * keyframes so an overlay reopened mid-exit retargets from where it actually
+ * is instead of restarting from the bottom of the screen.
+ *
+ * Shorter than the arrival, and the panel travels a shorter distance than it
+ * came: on the way out you only need enough movement to read as "gone", and
+ * anything more is time spent waiting for the app to give you back the screen.
+ */
+[data-closing] {
+  pointer-events: none;
+}
+
+/*
+ * The transition belongs on the resting state, not on the closing one. Declared
+ * only under `[data-closing]`, the property and its new value arrive in the
+ * same style change and the panel jumps straight to the end — the exit was
+ * there in the markup and invisible on screen.
+ *
+ * The resting values are written out for the same reason: the transition needs
+ * something to start from. They match where `rise` leaves the panel, so the
+ * entry animation ending changes nothing and cannot itself trigger a
+ * transition.
+ */
+.leave-panel {
+  transform: translateY(0);
+  opacity: 1;
+  transition:
+    transform 110ms var(--ease-settle),
+    opacity 110ms var(--ease-settle);
+}
+
+.leave-panel[data-closing] {
+  transform: translateY(8px);
+  opacity: 0;
+}
+
+.leave-scrim {
+  opacity: 1;
+  transition: opacity 110ms var(--ease-settle);
+}
+
+.leave-scrim[data-closing] {
+  opacity: 0;
+}
+
+/*
+ * Press feedback.
+ *
+ * The app had none. Every control changed colour on `:active` and nothing
+ * moved, so a screen you hammer — Log Set, the two dials, the number pad —
+ * never physically acknowledged the press. A control that dips under the
+ * finger is the cheapest way to make an interface feel like it is listening,
+ * and it matters most exactly here, mid-set, when you are not looking closely.
+ *
+ * Unlayered on purpose: it sits after Tailwind's utility layer so the
+ * transition-property below wins over a `transition-colors` on the same
+ * element, and both the colour change and the dip run from one declaration.
+ *
+ * `--press` lets a wide element opt into a shallower dip — scaling a
+ * full-bleed row by 3% reads as the row lurching, where 1% reads as a press.
+ */
+.press {
+  --press: 0.97;
+  transition-property:
+    transform, color, background-color, border-color, opacity;
+  transition-duration: 112ms;
+  transition-timing-function: var(--ease-settle);
+}
+
+.press:active {
+  transform: scale(var(--press));
+}
+
+/* Wide rows and cards: the same gesture, a tenth of the travel. */
+.press-row {
+  --press: 0.99;
+}
+
+/*
+ * Motion the viewer has asked not to see.
+ *
+ * The scramble, the odometer and the chart's draw check this query in script
+ * and skip themselves outright. This covers everything declared in CSS instead
+ * — the arrival animations above and the colour and opacity transitions on the
+ * body map and its callouts — which would otherwise still run in full.
+ *
+ * Reduced to a moment rather than removed, so anything waiting on an animation
+ * or transition to finish still hears that it did.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Reduced motion means gentler, not none: the press keeps its colour
+     response and gives up only the movement. */
+  .press:active {
+    transform: none;
+  }
 }

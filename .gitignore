@@ -31,3 +31,6 @@ ds-bundle/
 .design-sync/node_modules
 
 .env.local
+
+# built APK, refreshed on every `npm run apk`
+/gym-log.apk

@@ -121,5 +121,9 @@ export function anatomy(gender: Gender, view: BodyView) {
 
 /** Every path of a part, flattened — left/right/common are just draw sides. */
 export function partPaths(p: BodyPart): string[] {
-  return [...(p.path.left ?? []), ...(p.path.right ?? []), ...(p.path.common ?? [])];
+  return [
+    ...(p.path.left ?? []),
+    ...(p.path.right ?? []),
+    ...(p.path.common ?? []),
+  ];
 }

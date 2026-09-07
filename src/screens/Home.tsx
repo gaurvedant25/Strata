@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { BodyMap, type BodyView, type Callouts } from "../components/BodyMap";
-import { Scramble } from "../components/Callout";
+import { Numeral, resetNumerals } from "../components/Numeral";
 import { Tune } from "../components/icons";
 import {
   BigNumber,
@@ -20,13 +20,14 @@ import {
   TIER_COLOR,
   TIER_LEVEL,
   REGION_SECTIONS,
+  bestNamed,
   computeMuscleScores,
   type MuscleGroup,
   type MuscleScore,
   type Tier,
 } from "../lib/strength";
 import { personalRecords } from "../lib/stats";
-import { fmtRelative, num, parseKey, todayKey } from "../lib/util";
+import { num, parseKey, todayKey } from "../lib/util";
 import { useStore } from "../store";
 
 const ALL_GROUPS: MuscleGroup[] = [...FRONT_GROUPS, ...BACK_GROUPS];
@@ -60,15 +61,24 @@ function percentile(score: number) {
   return 50;
 }
 
-/** The tier dot. The only colour on the screen besides the figure itself. */
+/**
+ * The tier dot. The only colour on the screen besides the figure itself.
+ *
+ * Colour is all it has, so on its own it says nothing to anyone who cannot
+ * separate these hues or cannot see it at all. It carries its tier as text for
+ * assistive technology; sighted readers get the same word spelled out in the
+ * eyebrow beside it.
+ */
 function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
   return (
     <span
+      role="img"
+      aria-label={score ? `${score.tier} tier` : "Not yet scored"}
       className="inline-block shrink-0 rounded-full"
       style={{
         width: size,
         height: size,
-        background: score ? score.color : "#3a3a41",
+        background: score ? score.color : "var(--color-faint)",
         boxShadow: score ? `0 0 ${size + 3}px ${score.color}` : undefined,
       }}
     />
@@ -76,7 +86,7 @@ function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
 }
 
 /** The bar colour for a region with nothing logged against it yet. */
-const UNSCORED = "#3a3a41";
+const UNSCORED = "var(--color-faint)";
 
 /**
  * A section's own tier: the average of the regions inside it.
@@ -95,7 +105,9 @@ function averageTier(
   groups: MuscleGroup[],
   scores: Partial<Record<MuscleGroup, MuscleScore>>,
 ): Tier | null {
-  const ranks = groups.map((g) => scores[g]?.tier).filter((t): t is Tier => !!t);
+  const ranks = groups
+    .map((g) => scores[g]?.tier)
+    .filter((t): t is Tier => !!t);
   if (!ranks.length) return null;
   const mean = ranks.reduce((t, r) => t + TIERS.indexOf(r), 0) / ranks.length;
   return TIERS[Math.round(mean)];
@@ -139,31 +151,38 @@ function Row({
     <button
       onClick={onClick}
       style={{ minHeight, marginLeft: indent ? 22 : 0, background }}
-      className="relative grid w-full grid-cols-[minmax(0,1fr)_auto_16px] items-center gap-2.5 overflow-hidden rounded-[9px] pl-4 pr-3 text-left"
+      aria-expanded={chevron ? chevron === "open" : undefined}
+      className="press press-row relative grid w-full grid-cols-[minmax(0,1fr)_auto_16px] items-center gap-2.5 overflow-hidden rounded-[9px] pl-4 pr-3 text-left"
     >
-      <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: tierColor }} />
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-[3px]"
+        style={{ background: tierColor }}
+      />
       <span className="flex min-w-0 flex-col gap-[5px] py-[11px]">
         <span
           className="truncate leading-[1.15]"
-          style={{ fontSize: nameSize, color: nameColor }}
+          style={{ fontSize: `${nameSize / 16}rem`, color: nameColor }}
         >
           {name}
         </span>
         {sub && (
-          <span className="font-mono text-[10.5px] uppercase leading-none tracking-[0.16em] text-[#969696]">
+          <span className="font-mono text-[0.6875rem] uppercase leading-none tracking-[0.16em] text-muted">
             {sub}
           </span>
         )}
       </span>
       <span
-        className="whitespace-nowrap font-mono text-[9.5px] font-medium uppercase leading-none tracking-[0.16em]"
+        className="whitespace-nowrap font-mono text-[0.6875rem] font-medium uppercase leading-none tracking-[0.16em]"
         style={{ color: tierColor }}
       >
         {tierText}
       </span>
       <span
-        className="inline-block text-right font-mono text-[14px] leading-none text-[#8d8d8d] transition-transform duration-[180ms]"
-        style={{ transform: chevron === "open" ? "rotate(90deg)" : "rotate(0deg)" }}
+        className="inline-block text-right font-mono text-[0.875rem] leading-none text-muted transition-transform duration-[180ms]"
+        style={{
+          transform: chevron === "open" ? "rotate(90deg)" : "rotate(0deg)",
+        }}
       >
         {chevron ? "›" : ""}
       </span>
@@ -182,9 +201,19 @@ export function Home({ onSettings }: { onSettings: () => void }) {
   const latestBw = s.bodyweight[s.bodyweight.length - 1];
 
   const scores = useMemo(
-    () => computeMuscleScores(s.sessions, s.exercises, latestBw?.weight ?? null, s.settings.gender),
+    () =>
+      computeMuscleScores(
+        s.sessions,
+        s.exercises,
+        latestBw?.weight ?? null,
+        s.settings.gender,
+      ),
     [s.sessions, s.exercises, latestBw?.weight, s.settings.gender],
   );
+
+  // Leaving the tab unmounts this screen; forgetting its figures means coming
+  // back scrambles rather than rolling from the region shown last time.
+  useEffect(() => () => resetNumerals("home:"), []);
 
   const active = selected ?? ALL_GROUPS.find((m) => scores[m]) ?? "chest";
   const detail = scores[active];
@@ -193,8 +222,8 @@ export function Home({ onSettings }: { onSettings: () => void }) {
   // was, and roughly where that sits. Absent until the region has been scored.
   const callouts: Callouts | null = useMemo(() => {
     if (!detail) return null;
-    const lift = s.exercises.find((e) => e.name === CANONICAL_LIFT[active]);
-    const pr = lift ? personalRecords(s.sessions.filter((x) => x.endedAt)).get(lift.id) : undefined;
+    const prs = personalRecords(s.sessions.filter((x) => x.endedAt));
+    const pr = bestNamed(s.exercises, prs, CANONICAL_LIFT[active]);
     if (!pr) return null;
     return {
       left: [
@@ -204,10 +233,13 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           size: 14,
           weight: 500,
           tight: true,
-          scramble: true,
+          numeralId: "home:lift",
         },
         {
-          text: parseKey(pr.date).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+          text: parseKey(pr.date).toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+          }),
           size: 8,
           weight: 600,
           dim: true,
@@ -219,7 +251,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           size: 14,
           weight: 600,
           tight: true,
-          scramble: true,
+          numeralId: "home:percentile",
         },
         { text: "estimated", size: 8, weight: 600, dim: true },
       ],
@@ -234,9 +266,11 @@ export function Home({ onSettings }: { onSettings: () => void }) {
   const [openIds, setOpenIds] = useState<string[]>(() =>
     activeSection && activeSection.kind === "group" ? [activeSection.id] : [],
   );
-  const activeId = activeSection && activeSection.kind === "group" ? activeSection.id : null;
+  const activeId =
+    activeSection && activeSection.kind === "group" ? activeSection.id : null;
   useEffect(() => {
-    if (activeId) setOpenIds((o) => (o.includes(activeId) ? o : [...o, activeId]));
+    if (activeId)
+      setOpenIds((o) => (o.includes(activeId) ? o : [...o, activeId]));
   }, [activeId]);
 
   /** Selecting a region also spins the figure to the side that region is on. */
@@ -257,7 +291,11 @@ export function Home({ onSettings }: { onSettings: () => void }) {
     <div className="min-h-full px-5 pb-40 pt-[calc(env(safe-area-inset-top)+14px)]">
       <div className="flex items-center justify-between pb-3.5">
         <Eyebrow>Strength</Eyebrow>
-        <button onClick={onSettings} aria-label="Settings" className="text-muted active:text-fg">
+        <button
+          onClick={onSettings}
+          aria-label="Settings"
+          className="-my-3 -mr-3 grid size-11 place-items-center text-muted active:text-fg"
+        >
           <Tune />
         </button>
       </div>
@@ -267,24 +305,12 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           eyebrow="Nothing scored yet"
           title="Every score here is a lift measured against your bodyweight."
           body="Nothing shows up until we know what you weigh."
-          action={<Button onClick={() => setBwOpen(true)}>Log body weight</Button>}
+          action={
+            <Button onClick={() => setBwOpen(true)}>Log body weight</Button>
+          }
         />
       ) : (
         <>
-          <div className="flex items-baseline justify-between gap-3 border-t border-rule pt-3">
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono text-[26px] font-medium leading-none tracking-[-0.01em]">
-                {num(latestBw.weight)}
-              </span>
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
-                {unitLabel} · {fmtRelative(latestBw.at, s.now)}
-              </span>
-            </div>
-            <Button variant="link" onClick={() => setBwOpen(true)}>
-              Update
-            </Button>
-          </div>
-
           <div className="mt-0.5">
             <BodyMap
               gender={s.settings.gender}
@@ -297,6 +323,28 @@ export function Home({ onSettings }: { onSettings: () => void }) {
               maxWidth={268}
               callouts={callouts}
             />
+          </div>
+
+          {/*
+            Bodyweight sits under the figure rather than above it, in the same
+            boxed style as the callouts on either side of the body: everything
+            on this screen is a lift measured against this number, so it reads
+            as one more annotation on the figure instead of a headline of its
+            own. Tapping it is still how you update it.
+          */}
+          <div className="-mt-2 flex justify-end">
+            <button
+              onClick={() => setBwOpen(true)}
+              aria-label={`Body weight ${num(latestBw.weight)} ${unitLabel}, tap to update`}
+              className="press rounded-[3px] border border-faint px-3.5 py-2.5 text-right active:border-muted"
+            >
+              <span className="block font-mono text-[1.375rem] font-medium leading-none tracking-[-0.02em]">
+                <Numeral id="home:bw" text={num(latestBw.weight)} />
+              </span>
+              <span className="mt-1.5 block font-mono text-[0.6875rem] font-semibold uppercase leading-none tracking-[0.16em] text-muted">
+                {unitLabel}
+              </span>
+            </button>
           </div>
 
           <TextTabs
@@ -313,7 +361,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           <div className="border-t border-rule pt-[18px]">
             <div className="flex items-center gap-2.5">
               <Dot score={detail} size={9} />
-              <h2 className="text-[27px] leading-none tracking-[-0.015em]">
+              <h2 className="text-[1.6875rem] leading-none tracking-[-0.015em]">
                 {MUSCLE_LABEL[active]}
               </h2>
               {detail && (
@@ -331,8 +379,8 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                     // keyed on the region so switching regions replays the reveal,
                     // in step with the callouts settling on the figure above
                     value={
-                      <Scramble
-                        key={active}
+                      <Numeral
+                        id="home:best"
                         text={num(detail.best1rm)}
                         delay={30}
                         hold={98}
@@ -342,13 +390,16 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                     unit={`${unitLabel} est. 1RM`}
                   />
                 </div>
-                <p className="mt-2.5 text-[13px] text-muted">
+                <p className="mt-2.5 text-[0.8125rem] text-muted">
                   {CANONICAL_LIFT[active]} ·{" "}
-                  <span className="font-mono text-fg">{num(detail.ratio, 2)}×</span> bodyweight
+                  <span className="font-mono text-fg">
+                    <Numeral id="home:ratio" text={num(detail.ratio, 2)} />×
+                  </span>{" "}
+                  bodyweight
                 </p>
               </>
             ) : (
-              <p className="mt-3 text-[13px] leading-relaxed text-muted">
+              <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted">
                 Log a {CANONICAL_LIFT[active]} set to score this region.
               </p>
             )}
@@ -356,7 +407,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
 
           {/* Inset less than the header, so the cards read as the wider band */}
           <div className="-mx-1.5 mt-6 flex flex-col gap-1.5">
-            <span className="px-2 pb-1.5 font-mono text-[10.5px] uppercase leading-none tracking-[0.18em] text-[#9a9a9a]">
+            <span className="px-2 pb-1.5 font-mono text-[0.6875rem] uppercase leading-none tracking-[0.18em] text-muted">
               Muscle groups
             </span>
 
@@ -442,7 +493,9 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           value={bw}
           onChange={(e) => setBw(e.target.value)}
         />
-        <p className="mt-2.5 text-[12px] text-muted">Saved against today. One entry per day.</p>
+        <p className="mt-2.5 text-[0.75rem] text-muted">
+          Saved against today. One entry per day.
+        </p>
       </Sheet>
     </div>
   );

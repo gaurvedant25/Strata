@@ -34,7 +34,13 @@ const Ctx = createContext<Auth | null>(null);
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function AuthProvider({ children, onSynced }: { children: ReactNode; onSynced: () => void }) {
+export function AuthProvider({
+  children,
+  onSynced,
+}: {
+  children: ReactNode;
+  onSynced: () => void;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(!cloudConfigured);
   const [sync, setSync] = useState<SyncState>(cloudConfigured ? "idle" : "off");
@@ -80,7 +86,8 @@ export function AuthProvider({ children, onSynced }: { children: ReactNode; onSy
     if (!session) return;
     void run();
     const onOnline = () => void run();
-    const onVisible = () => document.visibilityState === "visible" && void run();
+    const onVisible = () =>
+      document.visibilityState === "visible" && void run();
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -118,12 +125,16 @@ export function AuthProvider({ children, onSynced }: { children: ReactNode; onSy
       // With email confirmation switched on, Supabase returns a user but no
       // session until the link is clicked; the caller has to say so rather than
       // silently appearing to have done nothing.
-      if (!data.session) return "Check your email to confirm the address, then sign in.";
+      if (!data.session)
+        return "Check your email to confirm the address, then sign in.";
       return null;
     },
     async signIn(email, password) {
       if (!supabase) throw new Error("No account service is configured.");
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (error) throw error;
     },
     async resetPassword(email) {

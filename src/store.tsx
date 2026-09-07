@@ -72,7 +72,9 @@ async function adoptLooseRoutines(data: Loaded): Promise<Loaded> {
     createdAt: loose[0].createdAt,
   };
   await store.put.split(split);
-  await Promise.all(loose.map((r) => store.put.routine({ ...r, splitId: split.id })));
+  await Promise.all(
+    loose.map((r) => store.put.routine({ ...r, splitId: split.id })),
+  );
   // an existing user lands back where they were, rather than on the chooser
   if (!data.activeSplitId) await store.put.activeSplitId(split.id);
   return store.loadAll();
@@ -156,7 +158,10 @@ function useProvideStore() {
 
   /** The days of the active split, in order. Empty when no split is chosen. */
   const splitRoutines = useMemo(
-    () => (s.activeSplitId ? s.routines.filter((r) => r.splitId === s.activeSplitId) : []),
+    () =>
+      s.activeSplitId
+        ? s.routines.filter((r) => r.splitId === s.activeSplitId)
+        : [],
     [s.routines, s.activeSplitId],
   );
 
@@ -182,7 +187,10 @@ function useProvideStore() {
       if (!cur) return p;
       const next = fn(structuredClone(cur));
       void store.put.session(next);
-      return { ...p, sessions: p.sessions.map((x) => (x.id === next.id ? next : x)) };
+      return {
+        ...p,
+        sessions: p.sessions.map((x) => (x.id === next.id ? next : x)),
+      };
     });
   }, []);
 
@@ -217,7 +225,11 @@ function useProvideStore() {
       };
       await store.put.session(session);
       await store.put.activeSessionId(id);
-      setS((p) => ({ ...p, sessions: [session, ...p.sessions], activeSessionId: id }));
+      setS((p) => ({
+        ...p,
+        sessions: [session, ...p.sessions],
+        activeSessionId: id,
+      }));
       return id;
     },
 
@@ -269,7 +281,10 @@ function useProvideStore() {
       });
     },
     removeEntry(entryId: string) {
-      patchActive((d) => ({ ...d, entries: d.entries.filter((e) => e.id !== entryId) }));
+      patchActive((d) => ({
+        ...d,
+        entries: d.entries.filter((e) => e.id !== entryId),
+      }));
     },
     moveEntry(entryId: string, dir: -1 | 1) {
       patchActive((d) => {
@@ -290,7 +305,6 @@ function useProvideStore() {
           reps: last?.reps ?? 8,
           weight: last?.weight ?? 0,
           done: false,
-          warmup: false,
         });
         return d;
       });
@@ -330,7 +344,10 @@ function useProvideStore() {
     },
     async deleteExercise(id: string) {
       await store.del.exercise(id);
-      setS((p) => ({ ...p, exercises: p.exercises.filter((x) => x.id !== id) }));
+      setS((p) => ({
+        ...p,
+        exercises: p.exercises.filter((x) => x.id !== id),
+      }));
     },
 
     /**
@@ -366,7 +383,11 @@ function useProvideStore() {
       };
       await store.put.split(split);
       await store.put.activeSplitId(split.id);
-      setS((p) => ({ ...p, splits: [...p.splits, split], activeSplitId: split.id }));
+      setS((p) => ({
+        ...p,
+        splits: [...p.splits, split],
+        activeSplitId: split.id,
+      }));
     },
 
     async setActiveSplit(id: string | null) {
@@ -376,7 +397,10 @@ function useProvideStore() {
 
     async saveSplit(next: Split) {
       await store.put.split(next);
-      setS((p) => ({ ...p, splits: p.splits.map((x) => (x.id === next.id ? next : x)) }));
+      setS((p) => ({
+        ...p,
+        splits: p.splits.map((x) => (x.id === next.id ? next : x)),
+      }));
     },
 
     /** Removes a split and its days. Logged workouts are untouched. */
@@ -412,14 +436,17 @@ function useProvideStore() {
       await store.put.bodyweight(rec);
       setS((p) => ({
         ...p,
-        bodyweight: [...p.bodyweight.filter((x) => x.date !== date), rec].sort((a, b) =>
-          a.date.localeCompare(b.date),
+        bodyweight: [...p.bodyweight.filter((x) => x.date !== date), rec].sort(
+          (a, b) => a.date.localeCompare(b.date),
         ),
       }));
     },
     async deleteBodyWeight(date: string) {
       await store.del.bodyweight(date);
-      setS((p) => ({ ...p, bodyweight: p.bodyweight.filter((x) => x.date !== date) }));
+      setS((p) => ({
+        ...p,
+        bodyweight: p.bodyweight.filter((x) => x.date !== date),
+      }));
     },
 
     async saveSettings(patch: Partial<Settings>) {

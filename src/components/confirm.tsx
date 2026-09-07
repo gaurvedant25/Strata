@@ -1,5 +1,13 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
-import { Button, Eyebrow } from "./ui";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useDialog, usePresence } from "../lib/useDialog";
+import { Button, Eyebrow, Scrim } from "./ui";
 
 /**
  * In-app confirmation, replacing window.confirm.
@@ -33,6 +41,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<ConfirmOptions | null>(null);
   // Held in a ref rather than state: settling the promise is not a render.
   const settle = useRef<(v: boolean) => void>(() => {});
+  const [last, setLast] = useState<ConfirmOptions | null>(null);
 
   const ask = useCallback<Ask>((o) => {
     setOpen(o);
@@ -46,38 +55,63 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     settle.current(v);
   };
 
+  // Escape and a tap outside both mean "no", which is the safe answer: every
+  // caller of this is guarding something destructive.
+  const panel = useDialog(!!open, () => close(false));
+  const { present, closing } = usePresence(!!open);
+  // The dialog's text lives in `open`, which is cleared the moment it closes.
+  // The last options are kept so the box still has something to say while it
+  // animates out, rather than emptying a frame before it goes.
+  if (open && open !== last) setLast(open);
+  const shown = open ?? last;
+
   return (
     <Ctx.Provider value={ask}>
       {children}
-      {open && (
+      {present && shown && (
         <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-          <button
-            aria-label="Cancel"
-            onClick={() => close(false)}
-            className="absolute inset-0 bg-black/80 backdrop-blur-[2px]"
-          />
-          <div className="animate-rise relative mx-auto w-full max-w-lg border-t border-rule bg-ink px-5 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-5">
-            <Eyebrow tone={open.danger ? "fg" : "muted"}>
-              {open.danger ? "Confirm" : "Are you sure"}
+          <Scrim onClose={() => close(false)} closing={closing} />
+          <div
+            ref={panel}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-title"
+            aria-describedby={shown.body ? "confirm-body" : undefined}
+            tabIndex={-1}
+            data-closing={closing || undefined}
+            className="animate-rise leave-panel relative mx-auto w-full max-w-lg border-t border-rule bg-ink px-5 pb-[calc(env(safe-area-inset-bottom)+18px)] pt-5 outline-none"
+          >
+            <Eyebrow tone={shown.danger ? "fg" : "muted"}>
+              {shown.danger ? "Confirm" : "Are you sure"}
             </Eyebrow>
-            <h2 className="mt-3 text-[21px] font-bold leading-tight tracking-[-0.02em] text-pretty">
-              {open.title}
+            <h2
+              id="confirm-title"
+              className="mt-3 text-[1.3125rem] font-bold leading-tight tracking-[-0.02em] text-pretty"
+            >
+              {shown.title}
             </h2>
-            {open.body && (
-              <p className="mt-2.5 text-[13px] leading-relaxed text-muted text-pretty">
-                {open.body}
+            {shown.body && (
+              <p
+                id="confirm-body"
+                className="mt-2.5 text-[0.8125rem] leading-relaxed text-muted text-pretty"
+              >
+                {shown.body}
               </p>
             )}
             <div className="mt-6 flex flex-col gap-2.5">
               <Button
-                variant={open.danger ? "danger" : "solid"}
+                variant={shown.danger ? "danger" : "solid"}
                 onClick={() => close(true)}
-                className={open.danger ? "h-13 rounded-full border border-danger/40" : undefined}
+                className={
+                  shown.danger
+                    ? "h-13 rounded-full border border-danger/40"
+                    : undefined
+                }
               >
-                {open.confirmLabel ?? "Confirm"}
+                {shown.confirmLabel ?? "Confirm"}
               </Button>
               <Button variant="quiet" onClick={() => close(false)}>
-                {open.cancelLabel ?? "Cancel"}
+                {shown.cancelLabel ?? "Cancel"}
               </Button>
             </div>
           </div>

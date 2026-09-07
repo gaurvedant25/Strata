@@ -19,7 +19,13 @@ import type { Settings } from "../types";
  */
 
 /** The stores that travel. `meta` holds device-local state and does not. */
-const KINDS = ["exercises", "routines", "splits", "sessions", "bodyweight"] as const;
+const KINDS = [
+  "exercises",
+  "routines",
+  "splits",
+  "sessions",
+  "bodyweight",
+] as const;
 type Kind = (typeof KINDS)[number];
 
 /** Which field is the primary key in each store. */
@@ -58,7 +64,10 @@ async function localChanges(since: number) {
       if (!stamped) {
         // Give it the timestamp it is being pushed with, so the next pass sees
         // a normal row rather than rediscovering this one every time.
-        await (d.put as (s: string, v: unknown) => Promise<unknown>)(kind, { ...r, updatedAt });
+        await (d.put as (s: string, v: unknown) => Promise<unknown>)(kind, {
+          ...r,
+          updatedAt,
+        });
       }
       out.push({
         kind,
@@ -70,7 +79,8 @@ async function localChanges(since: number) {
     }
   }
   // Settings is a single row rather than a store, so it is carried by hand.
-  const settings = (await d.get("meta", "settings")) as (Settings & { updatedAt?: number }) | undefined;
+  const settings = (await d.get("meta", "settings")) as
+    (Settings & { updatedAt?: number }) | undefined;
   if (settings && Number(settings.updatedAt ?? 0) > since) {
     out.push({
       kind: "settings",
@@ -88,21 +98,31 @@ async function applyRemote(rows: Row[]) {
   const d = await db();
   for (const row of rows) {
     if (row.kind === "settings") {
-      const cur = (await d.get("meta", "settings")) as { updatedAt?: number } | undefined;
+      const cur = (await d.get("meta", "settings")) as
+        { updatedAt?: number } | undefined;
       if (Number(cur?.updatedAt ?? 0) < row.updated_at) {
-        await d.put("meta", { ...row.data, updatedAt: row.updated_at }, "settings");
+        await d.put(
+          "meta",
+          { ...row.data, updatedAt: row.updated_at },
+          "settings",
+        );
       }
       continue;
     }
     const kind = row.kind as Kind;
     if (!KINDS.includes(kind)) continue;
-    const cur = (await d.get(kind, row.id)) as { updatedAt?: number } | undefined;
+    const cur = (await d.get(kind, row.id)) as
+      { updatedAt?: number } | undefined;
     // A tie goes to what is already here, so a re-pull of unchanged rows is a
     // no-op rather than a churn of identical writes.
     if (Number(cur?.updatedAt ?? 0) >= row.updated_at) continue;
     // The server round-trips whole records, so the shape is whatever this app
     // wrote; the store is keyed by the same field it was pushed under.
-    const value = { ...row.data, updatedAt: row.updated_at, deleted: row.deleted };
+    const value = {
+      ...row.data,
+      updatedAt: row.updated_at,
+      deleted: row.deleted,
+    };
     await (d.put as (s: string, v: unknown) => Promise<unknown>)(kind, value);
   }
 }
@@ -141,7 +161,9 @@ export async function clearLocalForAccountSwitch() {
  * Pull runs first so that a local row which lost a conflict is overwritten
  * before it can be pushed back out.
  */
-export async function syncNow(userId: string): Promise<{ pulled: number; pushed: number }> {
+export async function syncNow(
+  userId: string,
+): Promise<{ pulled: number; pushed: number }> {
   if (!supabase) return { pulled: 0, pushed: 0 };
 
   const owner = await meta<string>("accountId");
@@ -150,7 +172,8 @@ export async function syncNow(userId: string): Promise<{ pulled: number; pushed:
   }
   await setMeta("accountId", userId);
 
-  const since = owner === userId ? (await meta<number>("lastSyncedAt")) ?? 0 : 0;
+  const since =
+    owner === userId ? ((await meta<number>("lastSyncedAt")) ?? 0) : 0;
 
   const { data: remote, error: pullErr } = await supabase
     .from("gym_records")
@@ -162,12 +185,10 @@ export async function syncNow(userId: string): Promise<{ pulled: number; pushed:
 
   const mine = await localChanges(since);
   if (mine.length) {
-    const { error: pushErr } = await supabase
-      .from("gym_records")
-      .upsert(
-        mine.map((r) => ({ ...r, user_id: userId })),
-        { onConflict: "user_id,kind,id" },
-      );
+    const { error: pushErr } = await supabase.from("gym_records").upsert(
+      mine.map((r) => ({ ...r, user_id: userId })),
+      { onConflict: "user_id,kind,id" },
+    );
     if (pushErr) throw pushErr;
   }
 

@@ -31,7 +31,13 @@ const TABS: { id: Tab; label: string; Icon: IconT }[] = [
   { id: "progress", label: "Progress", Icon: ChartIcon },
 ];
 
-function BodyIcon({ className, size = 20 }: { className?: string; size?: number }) {
+function BodyIcon({
+  className,
+  size = 20,
+}: {
+  className?: string;
+  size?: number;
+}) {
   return (
     <svg
       width={size}
@@ -50,7 +56,13 @@ function BodyIcon({ className, size = 20 }: { className?: string; size?: number 
   );
 }
 
-function ListIcon({ className, size = 20 }: { className?: string; size?: number }) {
+function ListIcon({
+  className,
+  size = 20,
+}: {
+  className?: string;
+  size?: number;
+}) {
   return (
     <svg
       width={size}
@@ -104,9 +116,16 @@ export default function App() {
   const [onboarding, setOnboarding] = useState<boolean | null>(null);
   useEffect(() => {
     if (!s.ready || onboarding !== null) return;
-    const fresh = !s.bodyweight.length && !s.splits.length && !s.sessions.length;
+    const fresh =
+      !s.bodyweight.length && !s.splits.length && !s.sessions.length;
     setOnboarding(fresh && localStorage.getItem("gymlog.onboarded") !== "1");
-  }, [s.ready, s.bodyweight.length, s.splits.length, s.sessions.length, onboarding]);
+  }, [
+    s.ready,
+    s.bodyweight.length,
+    s.splits.length,
+    s.sessions.length,
+    onboarding,
+  ]);
 
   const inWorkout = !!s.active;
 
@@ -131,7 +150,7 @@ export default function App() {
   if (!s.ready || !auth.ready) {
     return (
       <div className="grid h-full place-items-center">
-        <div className="animate-pulse font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">
+        <div className="animate-pulse font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-muted">
           Loading
         </div>
       </div>
@@ -197,41 +216,60 @@ export default function App() {
         </>
       )}
 
-      {inWorkout && (
-        <button
-          onClick={() => setViewLogger(true)}
-          className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+69px)] z-40 mx-auto flex max-w-lg items-center justify-between border-y border-rule bg-ink/95 px-5 py-3 backdrop-blur-xl"
-        >
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-fg">
-            Workout in progress
-          </span>
-          <span className="font-mono text-[13px] text-muted">
-            {fmtDuration(s.now - s.active!.startedAt)} →
-          </span>
-        </button>
-      )}
+      {/*
+        The pill and the tab bar are one stack pinned to the bottom, rather than
+        two things each pinned separately. The pill used to sit at a hardcoded
+        69px off the bottom — the tab bar's height, measured once and written
+        down — so the moment the reader's text size moved the bar grew and the
+        pill sat on top of it. Stacked, the pill is above the bar because it is
+        above it in the document, at any size.
+      */}
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg flex-col">
+        {inWorkout && (
+          <button
+            onClick={() => setViewLogger(true)}
+            aria-label="Return to the workout in progress"
+            className="flex items-center justify-between border-t border-rule bg-ink/95 px-5 py-3 backdrop-blur-xl"
+          >
+            <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg">
+              Workout in progress
+            </span>
+            <span className="font-mono text-[0.8125rem] text-muted">
+              {fmtDuration(s.now - s.active!.startedAt)} →
+            </span>
+          </button>
+        )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-rule bg-ink/96 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
-        <div className="mx-auto flex max-w-lg">
-          {TABS.map(({ id, label, Icon }) => {
-            const active = !settingsOpen && tab === id;
-            return (
-              <button
-                key={id}
-                onClick={() => goTab(id)}
-                className={`flex flex-1 flex-col items-center gap-1.5 pb-[15px] pt-[13px] transition-colors ${
-                  active ? "text-fg" : "text-faint"
-                }`}
-              >
-                <Icon size={20} />
-                <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em]">
-                  {label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+        <nav
+          aria-label="Sections"
+          className="border-t border-rule bg-ink/96 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+        >
+          <div className="flex">
+            {TABS.map(({ id, label, Icon }) => {
+              const active = !settingsOpen && tab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => goTab(id)}
+                  // Which tab you are on was communicated by tone alone. A screen
+                  // reader now hears it too, and the tone it is communicated in
+                  // is one that can be read: the resting state used to be #3a3a3a
+                  // at 1.9:1, which is under even the 3:1 held to non-text marks.
+                  aria-current={active ? "page" : undefined}
+                  className={`flex flex-1 flex-col items-center gap-1.5 pb-[15px] pt-[13px] transition-colors ${
+                    active ? "text-fg" : "text-dim"
+                  }`}
+                >
+                  <Icon size={20} />
+                  <span className="font-mono text-chrome font-semibold uppercase tracking-[0.14em]">
+                    {label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
     </div>
   );
 }

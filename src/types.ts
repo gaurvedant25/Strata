@@ -62,7 +62,8 @@ export type SetLog = {
   weight: number;
   rpe?: number;
   done: boolean;
-  warmup?: boolean;
+  /** Deliberately passed over rather than logged. Counts as settled, not as work. */
+  skipped?: boolean;
 };
 
 export type SessionEntry = {

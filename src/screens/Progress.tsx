@@ -1,7 +1,14 @@
-import { useMemo, useState } from "react";
-import { Scramble } from "../components/Callout";
+import { useEffect, useMemo, useState } from "react";
+import { Numeral, resetNumerals } from "../components/Numeral";
 import { Sparkline } from "../components/Sparkline";
-import { BigNumber, Empty, Eyebrow, Sheet, StatBand, TextTabs } from "../components/ui";
+import {
+  BigNumber,
+  Empty,
+  Eyebrow,
+  Sheet,
+  StatBand,
+  TextTabs,
+} from "../components/ui";
 import { exerciseHistory, personalRecords, sessionVolume } from "../lib/stats";
 import { num, parseKey } from "../lib/util";
 import { useStore } from "../store";
@@ -14,10 +21,17 @@ const METRICS: { id: Metric; label: string }[] = [
 ];
 
 const shortDate = (key: string) =>
-  parseKey(key).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  parseKey(key).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
 
 const longDate = (key: string) =>
-  parseKey(key).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  parseKey(key).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 
 /** How far back the curve reaches. Matches the windows History offers. */
 type Range = "all" | "30d" | "90d" | "year";
@@ -52,11 +66,20 @@ export function Progress() {
   // Which session the finger is on. Cleared whenever the series underneath it
   // changes, so an index can never point at a different lift's history.
   const [scrub, setScrub] = useState<number | null>(null);
-  // A tap replays the scramble; a drag suppresses it until the next tap or
-  // series change, since the figure has to keep up with the finger.
+  // A drag writes the figures straight, since they have to keep up with the
+  // finger; a tap lets them roll to whatever it landed on.
   const [sweeping, setSweeping] = useState(false);
-  const [tapSeq, setTapSeq] = useState(0);
+  // The body weight curve reads the same way as the one above it, and keeps its
+  // own place on it: the two are separate series and a finger is only ever on
+  // one of them.
+  const [bwScrub, setBwScrub] = useState<number | null>(null);
+  const [bwSweeping, setBwSweeping] = useState(false);
   const current = tracked.find((e) => e.id === exId) ?? tracked[0];
+
+  // Leaving the tab unmounts the screen; forgetting the figures means coming
+  // back reads as an arrival and scrambles, rather than rolling from whatever
+  // was on screen last time.
+  useEffect(() => () => resetNumerals("progress:"), []);
 
   const points = useMemo(() => {
     if (!current) return [];
@@ -95,6 +118,9 @@ export function Progress() {
   const at = scrub != null && points[scrub] ? points[scrub] : null;
   const shown = at ? at[metric] : last;
   const bwValues = s.bodyweight.map((b) => b.weight);
+  // Whichever reading the finger is on, else the most recent one.
+  const bwAt = bwScrub != null ? (s.bodyweight[bwScrub] ?? null) : null;
+  const bwShown = bwAt ? bwAt.weight : bwValues[bwValues.length - 1];
 
   return (
     <div className="min-h-full pb-40">
@@ -117,16 +143,18 @@ export function Progress() {
           <div className="px-5 pt-6">
             <button
               onClick={() => setPicker(true)}
-              className="flex items-center gap-2.5 text-left"
+              className="-my-1 flex min-h-11 items-center gap-2.5 py-1 text-left"
               aria-label="Choose exercise"
             >
-              <span className="text-[23px] font-bold tracking-[-0.024em]">{current.name}</span>
+              <span className="text-[1.4375rem] font-bold tracking-[-0.024em]">
+                {current.name}
+              </span>
               <svg
                 width="16"
                 height="16"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#666"
+                stroke="var(--color-muted)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -135,26 +163,25 @@ export function Progress() {
               </svg>
             </button>
 
-            <div className="flex items-baseline justify-between gap-4 pt-4.5">
-              <div className="flex gap-5">
-              {METRICS.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => {
-                    setMetric(m.id);
-                    setScrub(null);
-                    setSweeping(false);
-                  }}
-                  className={`border-b pb-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] transition-colors ${
-                    metric === m.id ? "border-fg text-fg" : "border-transparent text-faint"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-              </div>
+            {/* Wraps rather than overflows: at a large text size the metric
+                names and the range names together are wider than the screen,
+                and the range row drops beneath instead of pushing the page
+                sideways. */}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pt-4.5">
+              {/* Was a hand-rolled copy of TextTabs, which meant the shared
+                  one could be given a workable hit area and this one silently
+                  kept the old 17px-tall word. */}
               <TextTabs
-                gap="gap-3.5"
+                options={METRICS}
+                value={metric}
+                onChange={(m) => {
+                  setMetric(m);
+                  setScrub(null);
+                  setSweeping(false);
+                }}
+              />
+              <TextTabs
+                gap="gap-4"
                 options={RANGES.map((r) => ({ id: r.id, label: r.label }))}
                 value={range}
                 onChange={(r) => {
@@ -172,31 +199,24 @@ export function Progress() {
                 // to keep up with the finger, and a value resolving out of
                 // noise cannot be read at the speed it is being changed.
                 value={
-                  sweeping ? (
-                    num(shown, 1)
-                  ) : (
-                    // keyed on the tap so landing on a session replays the
-                    // reveal even when the figure happens to be unchanged
-                    <Scramble
-                      key={tapSeq}
-                      text={num(shown, 1)}
-                      delay={0}
-                      hold={83}
-                      perChar={30}
-                    />
-                  )
+                  <Numeral
+                    id="progress:big"
+                    text={num(shown, 1)}
+                    animate={!sweeping}
+                  />
                 }
                 unit={unitLabel}
                 size={46}
               />
             </div>
-            <p className="mt-2.5 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+            <p className="mt-2.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted">
               {at ? (
                 <span className="text-fg">{longDate(at.date)}</span>
               ) : points.length > 1 ? (
                 <>
                   {change >= 0 ? "+" : ""}
-                  {num(change, 1)}% since {shortDate(points[0].date)}
+                  <Numeral id="progress:change" text={num(change, 1)} />% since{" "}
+                  {shortDate(points[0].date)}
                 </>
               ) : (
                 `${points.length} session${points.length === 1 ? "" : "s"} in range`
@@ -211,16 +231,20 @@ export function Progress() {
               onSelect={(i, via) => {
                 setScrub(i);
                 setSweeping(via === "drag");
-                if (via === "tap") setTapSeq((n) => n + 1);
               }}
               labels={
                 points.length > 1
-                  ? [shortDate(points[0].date), shortDate(points[points.length - 1].date)]
+                  ? [
+                      shortDate(points[0].date),
+                      shortDate(points[points.length - 1].date),
+                    ]
                   : undefined
               }
             />
-            <p className="pt-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-faint">
-              {at ? "Tap a point to read it · drag to sweep" : "Tap or drag the curve to read a session"}
+            <p className="pt-1 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-dim">
+              {at
+                ? "Tap a point to read it · drag to sweep"
+                : "Tap or drag the curve to read a session"}
             </p>
           </div>
 
@@ -229,9 +253,30 @@ export function Progress() {
               <StatBand
                 size="sm"
                 stats={[
-                  { label: "Best est. 1RM", value: `${num(pr.bestE1rm, 1)}` },
-                  { label: "Heaviest set", value: `${num(pr.heaviest)}×${pr.heaviestReps}` },
-                  { label: "Best session", value: `${num(pr.bestVolume, 0)}` },
+                  {
+                    label: "Best est. 1RM",
+                    value: (
+                      <Numeral id="progress:best" text={num(pr.bestE1rm, 1)} />
+                    ),
+                  },
+                  {
+                    label: "Heaviest set",
+                    value: (
+                      <Numeral
+                        id="progress:heaviest"
+                        text={`${num(pr.heaviest)}×${pr.heaviestReps}`}
+                      />
+                    ),
+                  },
+                  {
+                    label: "Best session",
+                    value: (
+                      <Numeral
+                        id="progress:volume"
+                        text={num(pr.bestVolume, 0)}
+                      />
+                    ),
+                  },
                 ]}
               />
             </div>
@@ -257,12 +302,14 @@ export function Progress() {
                 }`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-medium">{e.name}</span>
-                  <span className="mt-0.5 block font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+                  <span className="block truncate text-[0.9375rem] font-medium">
+                    {e.name}
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-muted">
                     {e.muscle}
                   </span>
                 </span>
-                <span className="shrink-0 text-right font-mono text-[13px] text-muted">
+                <span className="shrink-0 text-right font-mono text-[0.8125rem] text-muted">
                   {pr ? `${num(pr.bestE1rm, 1)} ${unitLabel}` : ""}
                 </span>
                 <span
@@ -273,9 +320,9 @@ export function Progress() {
             );
           })}
         </div>
-        <p className="pt-4 text-[12px] leading-relaxed text-muted">
-          Every exercise you have logged a working set for. The figure beside each is its best
-          estimated 1RM.
+        <p className="pt-4 text-[0.75rem] leading-relaxed text-muted">
+          Every exercise you have logged a working set for. The figure beside
+          each is its best estimated 1RM.
         </p>
       </Sheet>
 
@@ -283,22 +330,50 @@ export function Progress() {
         <div className="px-5 pt-6">
           <div className="flex items-baseline justify-between">
             <Eyebrow className="tracking-[0.18em]">Body weight</Eyebrow>
-            <span className="font-mono text-[15px] font-medium">
-              {num(bwValues[bwValues.length - 1])}{" "}
-              <span className="text-[9px] uppercase tracking-[0.16em] text-muted">{unitLabel}</span>
+            <span className="font-mono text-[0.9375rem] font-medium">
+              {/* Held steady mid-drag for the same reason as the figure above:
+                  a value resolving out of noise cannot be read at the speed a
+                  finger changes it. */}
+              <Numeral
+                id="progress:bw"
+                text={num(bwShown)}
+                animate={!bwSweeping}
+              />{" "}
+              <span className="text-[0.6875rem] uppercase tracking-[0.16em] text-muted">
+                {unitLabel}
+              </span>
             </span>
           </div>
           <div className="mt-3">
             <Sparkline
               values={bwValues}
+              selected={bwScrub}
+              onSelect={(i, via) => {
+                setBwScrub(i);
+                setBwSweeping(via === "drag");
+              }}
+              labels={[
+                shortDate(s.bodyweight[0].date),
+                shortDate(s.bodyweight[s.bodyweight.length - 1].date),
+              ]}
               width={348}
-              height={84}
+              // taller than it was: the captions now take a band at the foot of
+              // it, and the curve keeps the height it had before them
+              height={98}
               padT={6}
-              padB={8}
-              stroke="#666"
+              padB={22}
+              stroke="var(--color-muted)"
               strokeWidth={1.4}
               showBaseline={false}
+              // Follows the curve above rather than racing it, so the page
+              // settles top to bottom.
+              enterDelay={240}
             />
+            <p className="pt-1 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-dim">
+              {bwAt
+                ? longDate(bwAt.date)
+                : "Tap or drag the curve to read a weigh-in"}
+            </p>
           </div>
         </div>
       )}

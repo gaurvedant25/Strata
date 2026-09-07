@@ -146,3 +146,20 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 `;
 writeFileSync(join(OUT, "icon.svg"), svg);
 console.log("wrote public/icon.svg");
+
+/*
+ * The Android launcher icon, for `npx @capacitor/assets generate`. It wants a
+ * single 1024px source and slices the density buckets itself, so this is the
+ * only extra size the native build needs — drawn by the same routine as the
+ * rest rather than resampled up from the 512.
+ */
+const NATIVE = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
+mkdirSync(NATIVE, { recursive: true });
+for (const [name, buf] of [
+  ["icon.png", render(1024, { maskable: true })],
+  // the adaptive foreground is the same mark; the layer behind it is flat ink
+  ["icon-foreground.png", render(1024, { maskable: true })],
+]) {
+  writeFileSync(join(NATIVE, name), buf);
+  console.log("wrote assets/" + name, buf.length + "b");
+}

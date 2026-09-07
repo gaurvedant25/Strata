@@ -1,4 +1,5 @@
-import { useEffect, type MouseEvent, type ReactNode } from "react";
+import { type MouseEvent, type ReactNode } from "react";
+import { useDialog, usePresence } from "../lib/useDialog";
 import { cls } from "../lib/util";
 
 /**
@@ -17,14 +18,14 @@ export function Eyebrow({
   className,
 }: {
   children: ReactNode;
-  tone?: "muted" | "faint" | "fg";
+  tone?: "muted" | "dim" | "fg";
   className?: string;
 }) {
   return (
     <span
       className={cls(
-        "font-mono text-[10px] font-semibold uppercase tracking-[0.2em]",
-        tone === "fg" ? "text-fg" : tone === "faint" ? "text-faint" : "text-muted",
+        "font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.2em]",
+        tone === "fg" ? "text-fg" : tone === "dim" ? "text-dim" : "text-muted",
         className,
       )}
     >
@@ -55,14 +56,17 @@ export function Button({
 }) {
   const variants = {
     solid:
-      "h-13 w-full rounded-full bg-fg px-5 font-mono text-[12px] font-semibold uppercase tracking-[0.14em] text-black active:bg-white",
+      "h-13 w-full rounded-full bg-fg px-5 font-mono text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-black active:bg-white",
     quiet:
-      "h-11 w-full bg-transparent font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted active:text-fg",
+      "h-11 w-full bg-transparent font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted active:text-fg",
     outline:
-      "h-13 w-full rounded-full border border-rule bg-transparent px-5 font-mono text-[12px] font-semibold uppercase tracking-[0.14em] text-fg active:border-faint",
-    link: "border-b border-fg pb-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-fg",
+      "h-13 w-full rounded-full border border-rule bg-transparent px-5 font-mono text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-fg active:border-faint",
+    /* Underlined with `text-decoration` rather than a bottom border: the hit
+       area is now 44px tall, and a border would draw the rule at the bottom of
+       that box instead of under the word. */
+    link: "h-11 px-1 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg underline decoration-[1.5px] underline-offset-[5px]",
     danger:
-      "h-11 w-full bg-transparent font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-danger active:opacity-70",
+      "h-11 w-full bg-transparent font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-danger active:opacity-70",
   };
   return (
     <button
@@ -70,7 +74,7 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       className={cls(
-        "inline-flex select-none items-center justify-center gap-2 transition-colors disabled:opacity-40",
+        "press inline-flex select-none items-center justify-center gap-2 disabled:opacity-40",
         variants[variant],
         className,
       )}
@@ -126,11 +130,15 @@ export function Empty({
 }) {
   return (
     <div className="pt-[70px]">
-      <Eyebrow tone="faint">{eyebrow}</Eyebrow>
-      <h2 className="mt-4 text-[27px] font-bold leading-[1.15] tracking-[-0.025em] text-pretty">
+      <Eyebrow tone="dim">{eyebrow}</Eyebrow>
+      <h2 className="mt-4 text-[1.6875rem] font-bold leading-[1.15] tracking-[-0.025em] text-pretty">
         {title}
       </h2>
-      {body && <p className="mt-3.5 text-[14px] leading-relaxed text-muted text-pretty">{body}</p>}
+      {body && (
+        <p className="mt-3.5 text-[0.875rem] leading-relaxed text-muted text-pretty">
+          {body}
+        </p>
+      )}
       {action && <div className="mt-8">{action}</div>}
     </div>
   );
@@ -163,12 +171,12 @@ export function StatBand({
           <span
             className={cls(
               "font-mono font-medium tracking-[-0.015em]",
-              size === "sm" ? "text-[15px]" : "text-[21px]",
+              size === "sm" ? "text-[0.9375rem]" : "text-[1.3125rem]",
             )}
           >
             {s.value}
           </span>
-          <span className="font-mono text-[9px] font-semibold uppercase leading-snug tracking-[0.18em] text-muted">
+          <span className="break-words font-mono text-chrome font-semibold uppercase leading-snug tracking-[0.18em] text-muted">
             {s.label}
           </span>
         </div>
@@ -185,17 +193,18 @@ export function BigNumber({
 }: {
   value: ReactNode;
   unit: string;
+  /** In px, at the reader's default text size. Emitted as rem so it scales. */
   size?: number;
 }) {
   return (
     <div className="flex items-end gap-2.5">
       <span
         className="font-mono font-medium leading-[0.9] tracking-[-0.035em]"
-        style={{ fontSize: size }}
+        style={{ fontSize: `${size / 16}rem` }}
       >
         {value}
       </span>
-      <span className="pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted">
+      <span className="pb-1.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted">
         {unit}
       </span>
     </div>
@@ -217,14 +226,20 @@ export function TextTabs<T extends string>({
   gap?: string;
 }) {
   return (
-    <div className={cls("flex", gap, className)}>
+    <div className={cls("flex flex-wrap", gap, className)}>
       {options.map((o) => (
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
           className={cls(
-            "border-b pb-[3px] font-mono text-[10px] font-semibold uppercase tracking-[0.16em] transition-colors",
-            value === o.id ? "border-fg text-fg" : "border-transparent text-faint",
+            // The hit area is widened past the word with a pseudo-element
+            // rather than with padding, because the bottom border is the
+            // selected state and padding would stretch that rule out either
+            // side of the label it is meant to underline.
+            "press relative flex h-11 items-end border-b pb-[3px] font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] before:absolute before:inset-y-0 before:left-1/2 before:w-[max(2.75rem,calc(100%+1rem))] before:-translate-x-1/2 before:content-['']",
+            value === o.id
+              ? "border-fg text-fg"
+              : "border-transparent text-dim",
           )}
         >
           {o.label}
@@ -251,7 +266,7 @@ export function Segmented<T extends string>({
           key={o.id}
           onClick={() => onChange(o.id)}
           className={cls(
-            "min-w-[52px] rounded-full px-3.5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors",
+            "press flex h-11 min-w-[52px] items-center justify-center rounded-full px-3.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em]",
             value === o.id ? "bg-fg text-black" : "text-muted",
           )}
         >
@@ -278,7 +293,7 @@ export function Row({
     "w-full px-5 text-left",
     rule === "rule" && "border-b border-rule",
     rule === "subrule" && "border-b border-subrule",
-    onClick && "active:bg-[#0b0b0b]",
+    onClick && "press press-row active:bg-[#0b0b0b]",
     className,
   );
   return onClick ? (
@@ -287,6 +302,36 @@ export function Row({
     </button>
   ) : (
     <div className={cn}>{children}</div>
+  );
+}
+
+/**
+ * The scrim behind a dialog.
+ *
+ * Deliberately not a button. It used to be one, which put a control the size of
+ * the whole screen labelled "Close" into the tab order ahead of everything in
+ * the dialog it was meant to be behind. Tapping it still dismisses; people not
+ * using a pointer get Escape and the dialog's own close control instead.
+ */
+export function Scrim({
+  onClose,
+  className,
+  closing,
+}: {
+  onClose: () => void;
+  className?: string;
+  closing?: boolean;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      data-closing={closing || undefined}
+      onClick={onClose}
+      className={cls(
+        "leave-scrim absolute inset-0 bg-black/80 backdrop-blur-[2px]",
+        className,
+      )}
+    />
   );
 }
 
@@ -303,31 +348,35 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+  const panel = useDialog(open, onClose);
+  const { present, closing } = usePresence(open);
 
-  if (!open) return null;
+  if (!present) return null;
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <button
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/80 backdrop-blur-[2px]"
-      />
-      <div className="animate-rise relative mx-auto flex max-h-[88vh] w-full max-w-lg flex-col border-t border-rule bg-ink">
+      <Scrim onClose={onClose} closing={closing} />
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        data-closing={closing || undefined}
+        className="animate-rise leave-panel relative mx-auto flex max-h-[88vh] w-full max-w-lg flex-col border-t border-rule bg-ink outline-none"
+      >
         <div className="flex items-center justify-between border-b border-rule px-5 py-3.5">
           <Eyebrow>{title}</Eyebrow>
-          <button onClick={onClose} className="font-mono text-[15px] text-muted active:text-fg">
+          <button
+            onClick={onClose}
+            aria-label={`Close ${title}`}
+            className="-my-3 -mr-3 grid size-11 place-items-center font-mono text-[0.9375rem] text-muted active:text-fg"
+          >
             ✕
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {children}
+        </div>
         {footer && (
           <div className="border-t border-rule px-5 pb-[calc(env(safe-area-inset-bottom)+14px)] pt-3.5">
             {footer}
@@ -351,14 +400,16 @@ export function Field({
     <label className="block">
       <Eyebrow className="mb-2 block">{label}</Eyebrow>
       {children}
-      {hint && <span className="mt-1.5 block text-[12px] text-muted">{hint}</span>}
+      {hint && (
+        <span className="mt-1.5 block text-[0.75rem] text-muted">{hint}</span>
+      )}
     </label>
   );
 }
 
 /** Inputs are a hairline underline, not a filled box. */
 export const inputCls =
-  "w-full border-b border-rule bg-transparent px-0 py-2.5 text-fg outline-none placeholder:text-faint focus:border-fg";
+  "w-full border-b border-rule bg-transparent px-0 py-2.5 text-fg outline-none placeholder:text-dim focus:border-fg";
 
 /** Same, for a value the user types as a numeral. */
 export const numInputCls = `${inputCls} font-mono`;
@@ -367,7 +418,7 @@ export const numInputCls = `${inputCls} font-mono`;
 export function IconButton({
   children,
   onClick,
-  size = 34,
+  size = 44,
   className,
   label,
 }: {
@@ -386,7 +437,7 @@ export function IconButton({
       }}
       style={{ width: size, height: size }}
       className={cls(
-        "grid shrink-0 place-items-center rounded-full text-muted transition-colors active:text-fg",
+        "press grid shrink-0 place-items-center rounded-full text-muted active:text-fg",
         className,
       )}
     >

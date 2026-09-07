@@ -18,7 +18,13 @@ import type { Gender, Unit } from "../types";
  * gathers defaults rather than blocking entry.
  */
 
-type Step = { eyebrow: string; title: string; body: string; cta: string; back: string };
+type Step = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  cta: string;
+  back: string;
+};
 
 const STEPS: Step[] = [
   {
@@ -87,10 +93,12 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       </div>
 
       <Eyebrow>{step.eyebrow}</Eyebrow>
-      <h1 className="mt-3.5 text-[30px] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
+      <h1 className="mt-3.5 text-[1.875rem] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
         {step.title}
       </h1>
-      <p className="mt-3 text-[14px] leading-relaxed text-muted text-pretty">{step.body}</p>
+      <p className="mt-3 text-[0.875rem] leading-relaxed text-muted text-pretty">
+        {step.body}
+      </p>
 
       <div className="min-h-0 flex-1 pt-8">
         {i === 0 && (
@@ -103,7 +111,11 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
                 title: "Kilograms",
                 sub: "Plates in 2.5 kg steps. The default outside the US.",
               },
-              { key: "lb" as Unit, title: "Pounds", sub: "Plates in 5 lb steps." },
+              {
+                key: "lb" as Unit,
+                title: "Pounds",
+                sub: "Plates in 5 lb steps.",
+              },
             ]}
           />
         )}
@@ -111,10 +123,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {i === 1 && (
           <div>
             <div className="flex items-end gap-3 border-b border-fg pb-3.5">
-              <span className="font-mono text-[56px] font-medium leading-[0.9] tracking-[-0.04em]">
+              <span className="font-mono text-[3.5rem] font-medium leading-[0.9] tracking-[-0.04em]">
                 {num(bw, 1)}
               </span>
-              <span className="pb-[7px] font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+              <span className="pb-[7px] font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted">
                 {unit === "lb" ? "lbs" : "kg"}
               </span>
             </div>
@@ -122,16 +134,19 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
               {[-1, -0.1, 0.1, 1].map((d) => (
                 <button
                   key={d}
-                  onClick={() => setBw((v) => Math.max(30, +(v + d).toFixed(1)))}
-                  className="h-11 flex-1 rounded-full border border-rule font-mono text-[12px] font-medium active:border-faint"
+                  onClick={() =>
+                    setBw((v) => Math.max(30, +(v + d).toFixed(1)))
+                  }
+                  className="h-11 flex-1 rounded-full border border-rule font-mono text-[0.75rem] font-medium active:border-faint"
                 >
                   {d > 0 ? "+" : ""}
                   {d}
                 </button>
               ))}
             </div>
-            <p className="mt-5 text-[13px] leading-relaxed text-muted">
-              Saved against today. You can log it again any time from the Strength screen.
+            <p className="mt-5 text-[0.8125rem] leading-relaxed text-muted">
+              Saved against today. You can log it again any time from the
+              Strength screen.
             </p>
           </div>
         )}
@@ -159,14 +174,21 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <Choices
             value={splitKey}
             onChange={setSplitKey}
-            options={PRESETS.map((p) => ({ key: p.key, title: p.name, sub: p.blurb }))}
+            options={PRESETS.map((p) => ({
+              key: p.key,
+              title: p.name,
+              sub: p.blurb,
+            }))}
           />
         )}
       </div>
 
       <div className="flex flex-col gap-3 pt-6">
         <Button onClick={next}>{step.cta}</Button>
-        <Button variant="quiet" onClick={() => (i === 0 ? onDone() : setI(i - 1))}>
+        <Button
+          variant="quiet"
+          onClick={() => (i === 0 ? onDone() : setI(i - 1))}
+        >
           {step.back}
         </Button>
       </div>
@@ -197,18 +219,21 @@ function Choices<T extends string>({
           >
             <span className="flex-1">
               <span
-                className={`block text-[16px] font-medium ${on ? "text-fg" : "text-[#8b8b90]"}`}
+                className={`block text-[1rem] font-medium ${on ? "text-fg" : "text-[#8b8b90]"}`}
               >
                 {o.title}
               </span>
-              <span className="mt-1.5 block text-[12px] leading-relaxed text-muted text-pretty">
+              <span className="mt-1.5 block text-[0.75rem] leading-relaxed text-muted text-pretty">
                 {o.sub}
               </span>
             </span>
             <span
-              className="mt-1.5 size-4 shrink-0 rounded-full border transition-all"
+              // `transition-all` animated every property this element has,
+              // including ones that are not on the GPU. Only the three that
+              // actually change are named.
+              className="mt-1.5 size-4 shrink-0 rounded-full border transition-[border-color,background-color,box-shadow]"
               style={{
-                borderColor: on ? "#f5f5f5" : "#1f1f1f",
+                borderColor: on ? "var(--color-fg)" : "var(--color-faint)",
                 background: on ? "#f5f5f5" : "transparent",
                 boxShadow: on ? "inset 0 0 0 4px #000" : "none",
               }}

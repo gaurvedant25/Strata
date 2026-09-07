@@ -4,7 +4,17 @@ import { useStore } from "../store";
 import type { Exercise } from "../types";
 import { Button, Sheet, inputCls } from "./ui";
 
-const MUSCLES = ["Chest", "Back", "Shoulders", "Arms", "Legs", "Glutes", "Core", "Cardio", "Other"];
+const MUSCLES = [
+  "Chest",
+  "Back",
+  "Shoulders",
+  "Arms",
+  "Legs",
+  "Glutes",
+  "Core",
+  "Cardio",
+  "Other",
+];
 
 export function ExercisePicker({
   open,
@@ -28,7 +38,12 @@ export function ExercisePicker({
     const needle = q.trim().toLowerCase();
     const list = s.exercises
       .filter((e) => !e.archived)
-      .filter((e) => !needle || e.name.toLowerCase().includes(needle) || e.muscle.toLowerCase().includes(needle))
+      .filter(
+        (e) =>
+          !needle ||
+          e.name.toLowerCase().includes(needle) ||
+          e.muscle.toLowerCase().includes(needle),
+      )
       .sort((a, b) => a.name.localeCompare(b.name));
     const m = new Map<string, Exercise[]>();
     for (const e of list) m.set(e.muscle, [...(m.get(e.muscle) ?? []), e]);
@@ -60,15 +75,27 @@ export function ExercisePicker({
       footer={
         creating ? (
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setCreating(false)}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setCreating(false)}
+            >
               Cancel
             </Button>
-            <Button className="flex-1" onClick={() => void create()} disabled={!name.trim()}>
+            <Button
+              className="flex-1"
+              onClick={() => void create()}
+              disabled={!name.trim()}
+            >
               Create & add
             </Button>
           </div>
         ) : (
-          <Button variant="outline" className="w-full" onClick={() => setCreating(true)}>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setCreating(true)}
+          >
             + Create new exercise
           </Button>
         )
@@ -84,7 +111,7 @@ export function ExercisePicker({
             onChange={(e) => setName(e.target.value)}
           />
           <div>
-            <p className="mb-2.5 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-muted">
+            <p className="mb-2.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-muted">
               Muscle group
             </p>
             <div className="flex flex-wrap gap-2">
@@ -92,7 +119,7 @@ export function ExercisePicker({
                 <button
                   key={m}
                   onClick={() => setMuscle(m)}
-                  className={`rounded-full border px-3.5 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.1em] transition-colors ${
+                  className={`rounded-full border px-3.5 py-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] transition-colors ${
                     muscle === m
                       ? "border-fg bg-fg text-black"
                       : "border-rule text-muted"
@@ -104,10 +131,10 @@ export function ExercisePicker({
             </div>
           </div>
           <label className="flex items-center justify-between border-y border-rule py-3">
-            <span className="text-[15px]">Bodyweight exercise</span>
+            <span className="text-[0.9375rem]">Bodyweight exercise</span>
             <input
               type="checkbox"
-              className="size-5 accent-white"
+              className="size-6 accent-white"
               checked={bodyweight}
               onChange={(e) => setBodyweight(e.target.checked)}
             />
@@ -122,12 +149,14 @@ export function ExercisePicker({
             onChange={(e) => setQ(e.target.value)}
           />
           {groups.length === 0 && (
-            <p className="py-6 text-[13px] text-muted">No match. Create it with the button below.</p>
+            <p className="py-6 text-[0.8125rem] text-muted">
+              No match. Create it with the button below.
+            </p>
           )}
           <div className="space-y-5">
             {groups.map(([m, list]) => (
               <div key={m}>
-                <p className="mb-1 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-muted">
+                <p className="mb-1 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-muted">
                   {m}
                 </p>
                 <div className="border-t border-rule">
@@ -137,9 +166,9 @@ export function ExercisePicker({
                       onClick={() => onPick(e)}
                       className="flex w-full items-center justify-between border-b border-subrule py-3 text-left active:bg-[#0b0b0b]"
                     >
-                      <span className="text-[15px]">{e.name}</span>
+                      <span className="text-[0.9375rem]">{e.name}</span>
                       {e.bodyweight && (
-                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">
+                        <span className="font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-dim">
                           bodyweight
                         </span>
                       )}

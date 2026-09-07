@@ -9,9 +9,12 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "icons": "node scripts/icons.mjs",
-    "check:cloud": "node scripts/check-cloud.mjs"
+    "check:cloud": "node scripts/check-cloud.mjs",
+    "apk": "node scripts/build-apk.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@supabase/supabase-js": "^2.115.0",
@@ -20,6 +23,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",

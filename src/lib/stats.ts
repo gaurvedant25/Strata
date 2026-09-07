@@ -7,7 +7,8 @@ export function e1rm(weight: number, reps: number) {
   return weight * (1 + reps / 30);
 }
 
-export const working = (sets: SetLog[]) => sets.filter((s) => s.done && !s.warmup && s.reps > 0);
+export const working = (sets: SetLog[]) =>
+  sets.filter((s) => s.done && s.reps > 0);
 
 export function setVolume(s: SetLog) {
   return s.weight * s.reps;
@@ -34,7 +35,10 @@ export type ExercisePoint = {
 };
 
 /** One point per session in which the exercise was actually worked, oldest first. */
-export function exerciseHistory(sessions: Session[], exerciseId: string): ExercisePoint[] {
+export function exerciseHistory(
+  sessions: Session[],
+  exerciseId: string,
+): ExercisePoint[] {
   const out: ExercisePoint[] = [];
   for (const s of sessions) {
     for (const e of s.entries) {
@@ -51,7 +55,14 @@ export function exerciseHistory(sessions: Session[], exerciseId: string): Exerci
         volume += setVolume(set);
         reps += set.reps;
       }
-      out.push({ date: s.date, at: s.startedAt, topWeight, e1rm: best, volume, reps });
+      out.push({
+        date: s.date,
+        at: s.startedAt,
+        topWeight,
+        e1rm: best,
+        volume,
+        reps,
+      });
     }
   }
   return out.sort((a, b) => a.at - b.at);
@@ -108,7 +119,11 @@ export function personalRecords(sessions: Session[]): Map<string, PR> {
 }
 
 /** Most recent completed sets for an exercise, excluding a session id. Powers "last time". */
-export function lastPerformance(sessions: Session[], exerciseId: string, excludeSessionId?: string) {
+export function lastPerformance(
+  sessions: Session[],
+  exerciseId: string,
+  excludeSessionId?: string,
+) {
   const ordered = [...sessions].sort((a, b) => b.startedAt - a.startedAt);
   for (const s of ordered) {
     if (s.id === excludeSessionId) continue;

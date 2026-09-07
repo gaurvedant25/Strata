@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Numeral } from "./Numeral";
 
 /**
  * The annotation that draws itself onto the figure: a leader line snaps out
@@ -10,6 +11,15 @@ import { useEffect, useRef, useState } from "react";
  * timestamps fresh. Driving the animation from render would restart it on each
  * tick; reading elapsed time means a re-render resumes where it left off.
  */
+
+/**
+ * The smallest a callout line is allowed to be drawn.
+ *
+ * These boxes carried the app's smallest type — labels were being passed in at
+ * 8px, set in caps and tracked wide, which is the least readable combination
+ * there is. They are lifted to the same 11px floor the rest of the app uses.
+ */
+const LABEL_FLOOR_PX = 11;
 
 /** Where a leader line lands, as a fraction of the figure's own box. */
 export type Anchor = [x: number, y: number, bilateral?: boolean];
@@ -28,10 +38,30 @@ export type CalloutLine = {
    * attention to the one thing that had actually changed.
    */
   scramble?: boolean;
+  /**
+   * Animate this line as a figure instead: scrambling the first time the screen
+   * shows it, then rolling to each later value. Takes precedence over
+   * `scramble`, and the id is what lets it survive the box being remounted when
+   * the region changes.
+   */
+  numeralId?: string;
 };
 
-/** Share of the stage width the figure takes; the boxes flank it. */
-export const FIG_FRAC = 0.47;
+/**
+ * Share of the stage width the figure takes; the boxes flank it.
+ *
+ * Trimmed from 0.47 to give the boxes the room the 11px label floor needs.
+ * Their labels are mono, uppercase and tracked wide, which is the widest way
+ * there is to set a word, and at the old 8px they only just fit — lifted to a
+ * legible size, "ESTIMATED" broke across two lines. The figure gives up about
+ * four percent of its slice, which it can afford; the labels could not afford
+ * to stay unreadable.
+ */
+export const FIG_FRAC = 0.45;
+
+/** Share of the stage width one flanking box takes. Two of them plus the
+ *  figure come to just under the full stage. */
+const BOX_FRAC = 0.27;
 
 /**
  * Stage shape, as width / height.
@@ -53,10 +83,10 @@ const LINE_MS = 300;
 const BOX_MS = 180;
 
 const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789×@#%";
-const dots = (s: string) => s.replace(/[^ ]/g, "·");
 
 const reduced = () =>
-  typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  typeof matchMedia === "function" &&
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
  * Resolves text out of noise, one character at a time.
@@ -87,19 +117,31 @@ export function Scramble({
   hold?: number;
 }) {
   const full = String(text);
-  const [out, setOut] = useState(() => (reduced() ? full : dots(full)));
+  /*
+   * Held invisible until the churn actually starts.
+   *
+   * The value is rendered in full from the first paint so the line reserves its
+   * real width and nothing reflows when the noise arrives — it is simply not
+   * drawn yet. It used to sit as a row of dots instead, which for anything with
+   * a delay meant half a second of visible placeholder before the effect began:
+   * you saw the dashes, not the value resolving.
+   */
+  const [out, setOut] = useState(full);
+  const [churning, setChurning] = useState(() => reduced());
   const start = useRef(0);
   if (!start.current) start.current = performance.now();
 
   // Restarting on a changed value rather than on a remount matters when the
   // value changes rapidly — dragging a chart, say. Remounting would reset the
-  // output to dots on every frame and the effect would never get far enough to
-  // show noise, so a fast series of changes would read as a stutter rather
-  // than as the value spinning.
+  // output on every frame and the effect would never get far enough to show
+  // noise, so a fast series of changes would read as a stutter rather than as
+  // the value spinning.
   const shown = useRef(full);
   if (shown.current !== full) {
     shown.current = full;
     start.current = performance.now();
+    // A delayed replay hides again rather than showing the new value early.
+    if (delay > 0 && !reduced()) setChurning(false);
   }
 
   useEffect(() => {
@@ -108,16 +150,20 @@ export function Scramble({
       return;
     }
     const chars = full.split("");
-    const noise = () => SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
+    const noise = () =>
+      SCRAMBLE_CHARS[Math.floor(Math.random() * SCRAMBLE_CHARS.length)];
     const tick = () => {
       const t = performance.now() - start.current - delay;
       if (t < 0) return false;
+      setChurning(true);
       const revealed = Math.floor((t - hold) / perChar);
       if (revealed >= chars.length) {
         setOut(full);
         return true;
       }
-      setOut(chars.map((c, i) => (i < revealed || c === " " ? c : noise())).join(""));
+      setOut(
+        chars.map((c, i) => (i < revealed || c === " " ? c : noise())).join(""),
+      );
       return false;
     };
     if (tick()) return;
@@ -127,7 +173,9 @@ export function Scramble({
     return () => clearInterval(id);
   }, [full, delay, perChar, hold]);
 
-  return <>{out}</>;
+  return (
+    <span style={{ visibility: churning ? undefined : "hidden" }}>{out}</span>
+  );
 }
 
 export function Callout({
@@ -161,7 +209,10 @@ export function Callout({
   // anchor and hides the whole line, and it opens out to the box's corner.
   const axPct = (ax / VB_W) * 100;
   const cornerPct = (corner / VB_W) * 100;
-  const edgePct = (p: number) => (isLeft ? `inset(0 0 0 ${p.toFixed(2)}%)` : `inset(0 ${(100 - p).toFixed(2)}% 0 0)`);
+  const edgePct = (p: number) =>
+    isLeft
+      ? `inset(0 0 0 ${p.toFixed(2)}%)`
+      : `inset(0 ${(100 - p).toFixed(2)}% 0 0)`;
 
   // 0 = nothing, 1 = line drawn, 2 = box in.
   const start = useRef(0);
@@ -214,7 +265,7 @@ export function Callout({
            * stroke — invisible against black, obvious across a lit muscle.
            */
           clipPath: reveal,
-          transition: `clip-path ${LINE_MS}ms cubic-bezier(.3,.7,.3,1)`,
+          transition: `clip-path ${LINE_MS}ms var(--ease-settle)`,
         }}
       >
         {/* a black casing under the hairline, so it stays legible over a lit muscle */}
@@ -240,12 +291,12 @@ export function Callout({
           position: "absolute",
           top: `${boxY}%`,
           [isLeft ? "left" : "right"]: 0,
-          width: "24.5%",
-          maxWidth: 104,
+          width: `${BOX_FRAC * 100}%`,
+          maxWidth: 116,
           textAlign: isLeft ? "left" : "right",
           padding: "7px 8px",
           boxSizing: "border-box",
-          border: "1px solid #1f1f1f",
+          border: "1px solid var(--color-faint)",
           borderRadius: 3,
           background: "transparent",
           pointerEvents: "none",
@@ -254,7 +305,7 @@ export function Callout({
           transformOrigin: isLeft ? "top right" : "top left",
           transform: phase > 1 ? "scale(1)" : "scale(.18)",
           opacity: phase > 1 ? 1 : 0,
-          transition: `transform ${BOX_MS}ms cubic-bezier(.22,.61,.36,1), opacity ${Math.round(BOX_MS * 0.75)}ms ease-out`,
+          transition: `transform ${BOX_MS}ms var(--ease-settle), opacity ${Math.round(BOX_MS * 0.75)}ms var(--ease-settle)`,
           zIndex: 4,
         }}
       >
@@ -263,18 +314,24 @@ export function Callout({
             key={i}
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: l.size ?? 10,
+              fontSize: `${Math.max(l.size ?? 11, LABEL_FLOOR_PX) / 16}rem`,
               fontWeight: l.weight ?? 500,
               letterSpacing: l.tight ? "0" : ".1em",
               textTransform: l.tight ? "none" : "uppercase",
               lineHeight: 1.35,
-              color: l.dim ? "#666" : "#f5f5f5",
+              color: l.dim ? "var(--color-dim)" : "var(--color-fg)",
               marginTop: i ? 3 : 0,
               whiteSpace: l.tight ? "nowrap" : "normal",
               overflowWrap: "break-word",
             }}
           >
-            {l.scramble ? <Scramble text={l.text} delay={480 + i * 53} /> : l.text}
+            {l.numeralId ? (
+              <Numeral id={l.numeralId} text={l.text} delay={480 + i * 53} />
+            ) : l.scramble ? (
+              <Scramble text={l.text} delay={480 + i * 53} />
+            ) : (
+              l.text
+            )}
           </div>
         ))}
       </div>

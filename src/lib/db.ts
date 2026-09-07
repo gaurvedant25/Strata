@@ -1,5 +1,12 @@
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { BodyWeight, Exercise, Routine, Session, Settings, Split } from "../types";
+import type {
+  BodyWeight,
+  Exercise,
+  Routine,
+  Session,
+  Settings,
+  Split,
+} from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 
 interface GymDB extends DBSchema {
@@ -39,7 +46,13 @@ export function db() {
           // be judged "not newer than nothing" and silently never upload.
           // Backfilling from whatever timestamp each record already has keeps
           // their relative order rather than flattening them all to now.
-          for (const name of ["exercises", "routines", "splits", "sessions", "bodyweight"] as const) {
+          for (const name of [
+            "exercises",
+            "routines",
+            "splits",
+            "sessions",
+            "bodyweight",
+          ] as const) {
             const store = tx.objectStore(name) as unknown as {
               openCursor(): Promise<{
                 value: Record<string, unknown>;
@@ -54,7 +67,9 @@ export function db() {
                 const born = v.startedAt ?? v.createdAt ?? v.at ?? Date.now();
                 void cursor.update({ ...v, updatedAt: Number(born) });
               }
-              return (cursor.continue() as Promise<unknown>).then(walk as never);
+              return (cursor.continue() as Promise<unknown>).then(
+                walk as never,
+              );
             });
           }
         }
@@ -66,17 +81,25 @@ export function db() {
 
 export async function loadAll() {
   const d = await db();
-  const [exercises, routines, splits, sessions, bodyweight, settings, activeId, splitId] =
-    await Promise.all([
-      d.getAll("exercises"),
-      d.getAll("routines"),
-      d.getAll("splits"),
-      d.getAll("sessions"),
-      d.getAll("bodyweight"),
-      d.get("meta", "settings") as Promise<Settings | undefined>,
-      d.get("meta", "activeSessionId") as Promise<string | undefined>,
-      d.get("meta", "activeSplitId") as Promise<string | undefined>,
-    ]);
+  const [
+    exercises,
+    routines,
+    splits,
+    sessions,
+    bodyweight,
+    settings,
+    activeId,
+    splitId,
+  ] = await Promise.all([
+    d.getAll("exercises"),
+    d.getAll("routines"),
+    d.getAll("splits"),
+    d.getAll("sessions"),
+    d.getAll("bodyweight"),
+    d.get("meta", "settings") as Promise<Settings | undefined>,
+    d.get("meta", "activeSessionId") as Promise<string | undefined>,
+    d.get("meta", "activeSplitId") as Promise<string | undefined>,
+  ]);
   return {
     exercises: live(exercises),
     // days keep the order they were created in, which is the order of the split
@@ -106,9 +129,12 @@ export const put = {
   split: async (v: Split) => (await db()).put("splits", stamp(v)),
   session: async (v: Session) => (await db()).put("sessions", stamp(v)),
   bodyweight: async (v: BodyWeight) => (await db()).put("bodyweight", stamp(v)),
-  settings: async (v: Settings) => (await db()).put("meta", stamp(v), "settings"),
-  activeSessionId: async (v: string | null) => (await db()).put("meta", v, "activeSessionId"),
-  activeSplitId: async (v: string | null) => (await db()).put("meta", v, "activeSplitId"),
+  settings: async (v: Settings) =>
+    (await db()).put("meta", stamp(v), "settings"),
+  activeSessionId: async (v: string | null) =>
+    (await db()).put("meta", v, "activeSessionId"),
+  activeSplitId: async (v: string | null) =>
+    (await db()).put("meta", v, "activeSplitId"),
 };
 
 /**
@@ -138,12 +164,17 @@ export const del = {
     const d = await db();
     const prev = await d.get("bodyweight", date);
     if (!prev) return;
-    await d.put("bodyweight", { ...prev, deleted: true, updatedAt: Date.now() });
+    await d.put("bodyweight", {
+      ...prev,
+      deleted: true,
+      updatedAt: Date.now(),
+    });
   },
 };
 
 /** Rows the app should act as if it never had. */
-const live = <T extends { deleted?: boolean }>(rows: T[]) => rows.filter((r) => !r.deleted);
+const live = <T extends { deleted?: boolean }>(rows: T[]) =>
+  rows.filter((r) => !r.deleted);
 
 export type Backup = {
   format: "gymlog";
@@ -175,7 +206,8 @@ export async function exportBackup(): Promise<Backup> {
 /** Merge-import: existing ids are overwritten, unknown ids added. Nothing is deleted. */
 export async function importBackup(raw: unknown) {
   const b = raw as Partial<Backup>;
-  if (!b || b.format !== "gymlog") throw new Error("Not a Gym Log backup file.");
+  if (!b || b.format !== "gymlog")
+    throw new Error("Not a Gym Log backup file.");
   const d = await db();
   const tx = d.transaction(
     ["exercises", "routines", "splits", "sessions", "bodyweight", "meta"],
