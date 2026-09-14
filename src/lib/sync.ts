@@ -148,6 +148,7 @@ export async function clearLocalForAccountSwitch() {
     ...KINDS.map((k) => tx.objectStore(k).clear()),
     tx.objectStore("meta").delete("settings"),
     tx.objectStore("meta").delete("activeSessionId"),
+    tx.objectStore("meta").delete("pendingCompletionId"),
     tx.objectStore("meta").delete("activeSplitId"),
     tx.objectStore("meta").delete("lastSyncedAt"),
     tx.done,

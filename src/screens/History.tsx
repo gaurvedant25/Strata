@@ -1,14 +1,19 @@
 import { useMemo, useState } from "react";
 import { useConfirm } from "../components/confirm";
+import { StreakDetails } from "../components/StreakDetails";
+import { StreakIcon } from "../components/icons";
 import { Button, Empty, Eyebrow, StatBand, TextTabs } from "../components/ui";
 import {
   e1rm,
   personalRecords,
   sessionSetCount,
   sessionVolume,
+  streakSummary,
   working,
 } from "../lib/stats";
-import { fmtDuration, num, parseKey } from "../lib/util";
+import { fmtClock, fmtDuration, num, parseKey } from "../lib/util";
+import { prBests, workoutCard } from "../lib/card/select";
+import { useShareCard } from "../lib/card/useShareCard";
 import { useStore } from "../store";
 import type { Session } from "../types";
 
@@ -25,9 +30,17 @@ export function History() {
   const s = useStore();
   const [open, setOpen] = useState<Session | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
+  const [streakOpen, setStreakOpen] = useState(false);
   const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
 
   const done = useMemo(() => s.sessions.filter((x) => x.endedAt), [s.sessions]);
+  const streak = useMemo(
+    () => streakSummary(s.sessions, s.now),
+    [s.sessions, s.now],
+  );
+  const latestStreakWorkout = streak.latestSessionId
+    ? (s.sessions.find((x) => x.id === streak.latestSessionId)?.name ?? null)
+    : null;
 
   const months = useMemo(() => {
     const cutoff = FILTERS.find((f) => f.id === filter)!.days;
@@ -54,13 +67,23 @@ export function History() {
   const shown = months.reduce((t, [, l]) => t + l.length, 0);
 
   return (
-    <div className="min-h-full pb-40">
+    <div className="min-h-full pb-stack">
       <div className="sticky top-0 z-20 border-b border-rule bg-ink/95 px-5 pt-[calc(env(safe-area-inset-top)+14px)] backdrop-blur-xl">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-center justify-between">
           <Eyebrow>History</Eyebrow>
-          <Eyebrow className="tracking-[0.16em]">
-            {shown} workout{shown === 1 ? "" : "s"}
-          </Eyebrow>
+          <div className="-my-3 -mr-3 flex items-center gap-1">
+            <Eyebrow className="tracking-[0.16em]">
+              {shown} workout{shown === 1 ? "" : "s"}
+            </Eyebrow>
+            <button
+              onClick={() => setStreakOpen(true)}
+              aria-label={`View streak, ${streak.current} day${streak.current === 1 ? "" : "s"}`}
+              className={`press flex size-11 items-center justify-center gap-1 font-mono text-label font-semibold ${streak.current ? "text-ember" : "text-muted"}`}
+            >
+              <StreakIcon size={18} />
+              <span>{streak.current}</span>
+            </button>
+          </div>
         </div>
         <TextTabs
           className="py-4"
@@ -86,51 +109,67 @@ export function History() {
         </div>
       ) : (
         months.map(([label, list]) => (
-          <div key={label}>
-            <div className="flex items-baseline justify-between border-b border-rule px-5 pb-2 pt-[22px]">
+          <div key={label} className="px-5">
+            <div className="flex items-baseline justify-between px-1.5 pb-2.5 pt-[22px]">
               <Eyebrow className="tracking-[0.18em]">{label}</Eyebrow>
               <span className="font-mono text-[0.6875rem] font-medium text-dim">
                 {list.length}
               </span>
             </div>
-            {list.map((x) => {
-              const d = parseKey(x.date);
-              return (
-                <button
-                  key={x.id}
-                  onClick={() => setOpen(x)}
-                  className="grid w-full grid-cols-[52px_1fr_auto] items-center gap-x-3.5 border-b border-subrule px-5 py-3.5 text-left active:bg-[#0b0b0b]"
-                >
-                  <span className="font-mono text-[0.6875rem] font-medium uppercase leading-[1.35] tracking-[0.06em] text-muted">
-                    {d.toLocaleDateString(undefined, { day: "2-digit" })}
-                    <br />
-                    {d.toLocaleDateString(undefined, { month: "short" })}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[0.9375rem] font-medium">
-                      {x.name}
+            <div className="flex flex-col gap-2">
+              {list.map((x) => {
+                const d = parseKey(x.date);
+                return (
+                  <button
+                    key={x.id}
+                    onClick={() => setOpen(x)}
+                    className="press press-row grid w-full grid-cols-[46px_1fr_auto] items-center gap-x-3.5 rounded-[18px] border border-rule bg-[#101010] px-[18px] py-4 text-left"
+                  >
+                    <span className="font-mono text-[0.6875rem] font-medium uppercase leading-[1.35] tracking-[0.06em] text-muted">
+                      {d.toLocaleDateString(undefined, { day: "2-digit" })}
+                      <br />
+                      {d.toLocaleDateString(undefined, { month: "short" })}
                     </span>
-                    <span className="mt-0.5 block font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted">
-                      {x.entries.length} ex · {sessionSetCount(x)} sets
-                    </span>
-                  </span>
-                  <span className="text-right">
-                    <span className="block font-mono text-[0.875rem] font-medium">
-                      {num(sessionVolume(x), 0)}{" "}
-                      <span className="text-[0.6875rem] uppercase tracking-[0.1em] text-muted">
-                        {unitLabel}
+                    <span className="min-w-0">
+                      {/*
+                      The one thing at full brightness in the row. What you come
+                      to this screen for is which session a line was, and the
+                      name was competing on level terms with the volume — two
+                      numerals of the same weight, one of them holding the
+                      right-hand edge, so the eye went to the tonnage first and
+                      had to come back for the answer.
+                    */}
+                      <span className="block truncate text-[1.0625rem] font-medium tracking-[-0.01em]">
+                        {x.name}
+                      </span>
+                      <span className="mt-0.5 block font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-dim">
+                        {x.entries.length} ex · {sessionSetCount(x)} sets
                       </span>
                     </span>
-                    <span className="block font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-muted">
-                      {x.endedAt ? fmtDuration(x.endedAt - x.startedAt) : ""}
+                    <span className="text-right">
+                      <span className="block font-mono text-[0.875rem] font-medium text-muted">
+                        {num(sessionVolume(x), 0)}{" "}
+                        <span className="text-[0.6875rem] uppercase tracking-[0.1em] text-dim">
+                          {unitLabel}
+                        </span>
+                      </span>
+                      <span className="block font-mono text-[0.6875rem] font-medium uppercase tracking-[0.1em] text-dim">
+                        {x.endedAt ? fmtDuration(x.endedAt - x.startedAt) : ""}
+                      </span>
                     </span>
-                  </span>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ))
       )}
+      <StreakDetails
+        open={streakOpen}
+        onClose={() => setStreakOpen(false)}
+        summary={streak}
+        latestWorkout={latestStreakWorkout}
+      />
     </div>
   );
 }
@@ -149,8 +188,30 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
     [s.sessions],
   );
 
+  /*
+   * The session as a picture. Built from the same records this page flags its
+   * PRs against, so a card never claims one the page below it does not.
+   */
+  const shareData = useMemo(
+    () =>
+      workoutCard(
+        session,
+        s.exerciseById,
+        // A workout in the history has ended, so nothing here reads the clock.
+        session.endedAt ?? session.startedAt,
+        unitLabel,
+        prBests(s.sessions),
+      ),
+    [session, s.exerciseById, s.sessions, unitLabel],
+  );
+  const shareCard = useShareCard(
+    "workout",
+    shareData,
+    `gym-log-workout-${session.date}.png`,
+  );
+
   return (
-    <div className="min-h-full pb-40">
+    <div className="min-h-full pb-stack">
       <div className="px-5 pt-[calc(env(safe-area-inset-top)+12px)]">
         <button
           onClick={onBack}
@@ -212,17 +273,21 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
                 {ex?.name ?? "Exercise"}
               </p>
               <span className="shrink-0 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted">
-                {num(
-                  sets.reduce((t, x) => t + x.weight * x.reps, 0),
-                  0,
-                )}{" "}
-                {unitLabel}
+                {ex?.tracks === "time"
+                  ? fmtClock(sets.reduce((t, x) => t + (x.seconds ?? 0), 0))
+                  : `${num(
+                      sets.reduce((t, x) => t + x.weight * x.reps, 0),
+                      0,
+                    )} ${unitLabel}`}
               </span>
             </div>
             <div className="mt-3">
               {sets.map((set, i) => {
+                // A held set has no estimated 1RM to beat, so it is never a PR.
                 const isPr =
-                  best > 0 && e1rm(set.weight, set.reps) >= best - 0.01;
+                  ex?.tracks !== "time" &&
+                  best > 0 &&
+                  e1rm(set.weight, set.reps) >= best - 0.01;
                 return (
                   <div
                     key={set.id}
@@ -232,8 +297,22 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
                       {i + 1}
                     </span>
                     <span className="font-mono text-[0.875rem]">
-                      {num(set.weight)} <span className="text-dim">×</span>{" "}
-                      {set.reps}
+                      {ex?.tracks === "time" ? (
+                        set.weight ? (
+                          <>
+                            +{num(set.weight)}{" "}
+                            <span className="text-dim">·</span>{" "}
+                            {fmtClock(set.seconds ?? 0)}
+                          </>
+                        ) : (
+                          fmtClock(set.seconds ?? 0)
+                        )
+                      ) : (
+                        <>
+                          {num(set.weight)} <span className="text-dim">×</span>{" "}
+                          {set.reps}
+                        </>
+                      )}
                     </span>
                     <span className="text-center font-mono text-[0.6875rem] text-muted">
                       {set.rpe ? `@${set.rpe}` : ""}
@@ -259,6 +338,13 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
       )}
 
       <div className="flex flex-col gap-3.5 px-5 pt-6">
+        <Button
+          variant="quiet"
+          disabled={!shareCard.ready}
+          onClick={shareCard.share}
+        >
+          Share workout
+        </Button>
         <Button
           onClick={() => {
             void s.resumeSession(session.id);

@@ -32,5 +32,9 @@ ds-bundle/
 
 .env.local
 
-# built APK, refreshed on every `npm run apk`
+# built APK and release bundle, refreshed on every `npm run apk` / `npm run aab`
 /gym-log.apk
+/gym-log.aab
+
+# Supabase CLI scratch: the linked-project pointer and a version check.
+supabase/.temp/

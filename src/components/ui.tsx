@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { useDialog, usePresence } from "../lib/useDialog";
 import { cls } from "../lib/util";
 
@@ -108,7 +108,7 @@ export function Screen({
           {right}
         </div>
       </header>
-      <div className={cls("pb-40", pad && "px-5")}>{children}</div>
+      <div className={cls("pb-stack", pad && "px-5")}>{children}</div>
     </div>
   );
 }
@@ -151,20 +151,44 @@ export function Empty({
 export function StatBand({
   stats,
   size = "md",
+  frame = "bleed",
 }: {
   stats: { label: string; value: ReactNode }[];
   size?: "sm" | "md";
+  /**
+   * `bleed` runs edge to edge across a black screen, ruled top and bottom.
+   * `card` sits inside a panel that already has an edge: it keeps only the
+   * rule that separates it from what is above, and drops its outer padding so
+   * the first figure lines up with the card's own gutter.
+   */
+  frame?: "bleed" | "card";
 }) {
+  const card = frame === "card";
   return (
     <div
-      className="grid border-y border-rule"
+      className={cls(
+        "grid",
+        card ? "border-t border-rule" : "border-y border-rule",
+      )}
       style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0,1fr))` }}
     >
       {stats.map((s, i) => (
         <div
           key={s.label}
           className={cls(
-            "flex flex-col items-start gap-1.5 px-5 py-3.5",
+            "flex flex-col items-start gap-1.5",
+            // Inside a panel the band is the last thing on it and the card's
+            // own bottom gutter finishes the column, so it does not need the
+            // breathing room a band ruled top and bottom across a black
+            // screen does.
+            card ? "py-3" : "py-3.5",
+            card
+              ? i === 0
+                ? "pr-3.5"
+                : i === stats.length - 1
+                  ? "pl-3.5"
+                  : "px-3.5"
+              : "px-5",
             i < stats.length - 1 && "border-r border-rule",
           )}
         >
@@ -211,6 +235,110 @@ export function BigNumber({
   );
 }
 
+/**
+ * A `BigNumber` you can also type into.
+ *
+ * The steppers under these figures are the right tool for a nudge and the wrong
+ * one for an answer: reaching 82.5 from 80 is two taps, reaching it from 60 is
+ * twenty-five, and there was no other way in. Tapping the figure now opens the
+ * number for editing with the numeric keyboard, and the steppers stay for the
+ * adjustment they were always good at.
+ *
+ * The figure still animates through `display` while idle — editing swaps in a
+ * plain input, because a field whose digits roll as you type them is unreadable.
+ */
+export function EditableNumber({
+  value,
+  display,
+  unit,
+  size = 46,
+  min = 0,
+  max = 9999,
+  decimals = 1,
+  label,
+  onChange,
+}: {
+  value: number;
+  /** What the figure looks like at rest — usually an animated numeral. */
+  display: ReactNode;
+  unit: string;
+  size?: number;
+  min?: number;
+  max?: number;
+  /** 0 for a count, 1 for a weight. */
+  decimals?: number;
+  /** Names the figure for anyone not reading the eyebrow above it. */
+  label: string;
+  onChange: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [buf, setBuf] = useState("");
+
+  function commit() {
+    const parsed = parseFloat(buf);
+    if (isFinite(parsed)) {
+      const clamped = Math.min(max, Math.max(min, parsed));
+      onChange(+clamped.toFixed(decimals));
+    }
+    setEditing(false);
+  }
+
+  const fontSize = `${size / 16}rem`;
+
+  if (editing) {
+    return (
+      <div className="flex items-end gap-2.5">
+        <input
+          autoFocus
+          // `decimal` rather than `numeric` so the keypad carries a separator
+          // for a bodyweight like 82.5; a rep count sets decimals to 0 and the
+          // extra key simply goes unused.
+          inputMode={decimals ? "decimal" : "numeric"}
+          enterKeyHint="done"
+          aria-label={label}
+          value={buf}
+          onChange={(e) => setBuf(e.target.value.replace(/[^0-9.]/g, ""))}
+          onFocus={(e) => e.target.select()}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          className="border-b border-fg bg-transparent p-0 font-mono font-medium leading-[0.9] tracking-[-0.035em] text-fg outline-none"
+          // Sized to its content so the unit stays beside the figure rather
+          // than being pushed out by a full-width field. Safe in ch units
+          // because the face is monospaced.
+          style={{ fontSize, width: `${Math.max(buf.length, 2) + 0.5}ch` }}
+        />
+        <span className="pb-1.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted">
+          {unit}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => {
+        setBuf(decimals ? String(value) : String(Math.round(value)));
+        setEditing(true);
+      }}
+      aria-label={`${label}: ${value} ${unit}. Tap to type a new one.`}
+      className="flex items-end gap-2.5 text-left"
+    >
+      <span
+        className="font-mono font-medium leading-[0.9] tracking-[-0.035em]"
+        style={{ fontSize }}
+      >
+        {display}
+      </span>
+      <span className="pb-1.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted">
+        {unit}
+      </span>
+    </button>
+  );
+}
+
 /** Underlined mono tabs. Used for view, metric and filter switches alike. */
 export function TextTabs<T extends string>({
   options,
@@ -218,12 +346,21 @@ export function TextTabs<T extends string>({
   onChange,
   className,
   gap = "gap-5",
+  dense = false,
 }: {
   options: { id: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   className?: string;
   gap?: string;
+  /**
+   * Lays the row out at the height of the word and hangs the touch target off
+   * it, rather than reserving the whole 44px in the flow. The target is the
+   * same size either way — this only decides whether the page pays for it in
+   * layout. For a row that wraps, keep at least `gap-y-6` between the lines,
+   * which is where two rows' hit areas meet rather than overlap.
+   */
+  dense?: boolean;
 }) {
   return (
     <div className={cls("flex flex-wrap", gap, className)}>
@@ -236,7 +373,11 @@ export function TextTabs<T extends string>({
             // rather than with padding, because the bottom border is the
             // selected state and padding would stretch that rule out either
             // side of the label it is meant to underline.
-            "press relative flex h-11 items-end border-b pb-[3px] font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] before:absolute before:inset-y-0 before:left-1/2 before:w-[max(2.75rem,calc(100%+1rem))] before:-translate-x-1/2 before:content-['']",
+            "press relative flex items-end border-b pb-[3px] font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] before:absolute before:left-1/2 before:w-[max(2.75rem,calc(100%+1rem))] before:-translate-x-1/2 before:content-['']",
+            // Dense reaches the same 44px by growing the pseudo-element up and
+            // down instead of the button, so the word keeps its baseline and
+            // the row keeps only the word's height.
+            dense ? "before:-inset-y-3" : "h-11 before:inset-y-0",
             value === o.id
               ? "border-fg text-fg"
               : "border-transparent text-dim",
@@ -421,16 +562,20 @@ export function IconButton({
   size = 44,
   className,
   label,
+  pressed,
 }: {
   children: ReactNode;
   onClick?: (e: MouseEvent<HTMLButtonElement>) => void;
   size?: number;
   className?: string;
   label?: string;
+  /** Set when the button is a toggle, so its state is announced as well as drawn. */
+  pressed?: boolean;
 }) {
   return (
     <button
       aria-label={label}
+      aria-pressed={pressed}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.(e);

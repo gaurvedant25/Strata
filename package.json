@@ -10,15 +10,21 @@
     "preview": "vite preview",
     "icons": "node scripts/icons.mjs",
     "check:cloud": "node scripts/check-cloud.mjs",
-    "apk": "node scripts/build-apk.mjs"
+    "check:streaks": "node scripts/check-streaks.cjs",
+    "apk": "node scripts/build-android.mjs",
+    "aab": "node scripts/build-android.mjs --release",
+    "deploy": "npm run build && npx vercel link --yes --project gym-log --cwd dist && npx vercel deploy --prod --yes --cwd dist"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
     "@capacitor/core": "^8.5.1",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.1",
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@supabase/supabase-js": "^2.115.0",
     "idb": "^8.0.3",
+    "motion": "^13.2.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },

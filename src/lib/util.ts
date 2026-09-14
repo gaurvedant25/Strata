@@ -33,9 +33,19 @@ export function fmtDuration(ms: number) {
   return `${m}m`;
 }
 
-export function mmss(sec: number) {
-  const s = Math.max(0, Math.round(sec));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+/**
+ * A held set, as a clock: 45 -> "0:45", 90 -> "1:30", 3700 -> "1:01:40".
+ *
+ * Minutes are never padded and seconds always are, so the figure reads the way
+ * a stopwatch does rather than as a decimal that happens to have a colon in it.
+ */
+export function fmtClock(seconds: number) {
+  const t = Math.max(0, Math.round(seconds));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const s = t % 60;
+  const ss = String(s).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
 /** Trim trailing zeros: 22.50 -> 22.5, 20.0 -> 20 */

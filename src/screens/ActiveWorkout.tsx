@@ -1,21 +1,26 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
 import { ExercisePicker } from "../components/ExercisePicker";
+import { Check, ChevronRight, Minus, Plus, Share } from "../components/icons";
 import { Button, Empty, Eyebrow, Scrim, Sheet } from "../components/ui";
 import { useDialog, usePresence } from "../lib/useDialog";
+import { streakCard } from "../lib/card/select";
+import { useShareCard } from "../lib/card/useShareCard";
 import {
   e1rm,
   lastPerformance,
   personalRecords,
+  sessionElapsed,
   sessionSetCount,
   sessionVolume,
+  streakSummary,
+  qualifiesForStreak,
 } from "../lib/stats";
-import { fmtDuration, mmss, num } from "../lib/util";
+import { fmtClock, fmtDuration, num } from "../lib/util";
 import { useStore } from "../store";
-import type { SetLog } from "../types";
+import type { Session, SetLog } from "../types";
 
-/** How long the rest clock runs after a set is logged. */
-const REST_SECONDS = 120;
 /**
  * The tone a value settles to once its set is logged: still readable, but no
  * longer the live figure the dials are pointed at.
@@ -31,14 +36,61 @@ const DIM = "#a5a5aa";
  */
 const DIMMED = "var(--color-dim)";
 
+/**
+ * The set row the dials are pointed at.
+ *
+ * Lifted off the card rather than tinted or ruled: on a raised surface a wash
+ * of light is the quietest way to say "this one", and it leaves the tone of the
+ * text alone so the row you are working on is not also the hardest to read.
+ */
+const ROW_ON = "#242424";
+
+/**
+ * Sessions whose finish card has already been waved away.
+ *
+ * Module-level rather than component state because leaving the logger unmounts
+ * this screen. Held in the component, a workout you had already dismissed the
+ * card for would produce it again every time you came back to the tab.
+ */
+const celebrated = new Set<string>();
+
+/**
+ * The streak this workout leaves you on, and whether it is the workout that
+ * moved it.
+ *
+ * Scored from the persisted completion time. By the time the card appears the
+ * workout is already durable locally, even though it stays open behind the
+ * celebration until the athlete chooses Finish or Keep going.
+ *
+ * `grew` is the difference the session made: the second workout of a day lands
+ * on a day already counted, so the run is the same length as it was an hour
+ * ago and the card should not claim otherwise.
+ */
+function streakFor(sessions: Session[], session: Session, now: number) {
+  const others = sessions.filter((x) => x.id !== session.id);
+  const ended: Session = { ...session, endedAt: session.endedAt ?? now };
+  const all = [...others, ended];
+  const current = streakSummary(all, now);
+  const before = streakSummary(others, now);
+  return {
+    days: current.current,
+    grew: current.current > before.current,
+    best: current.best,
+    qualified: qualifiesForStreak(ended),
+  };
+}
+
 /** Which number the pad and the steppers are editing. */
-type Field = "weight" | "reps";
+type Field = "weight" | "reps" | "seconds";
 type Pad = { entryId: string; setId: string; field: Field; buf: string | null };
 
 /** A dial reads "—" rather than "0": an untouched number is not a logged zero. */
 const dial = (v: number) => (v ? num(v) : "—");
-const pad2 = (n: number) => String(n).padStart(2, "0");
+/** The same rule for a held set: a clock, or a dash until it has been set. */
+const clock = (v: number | undefined) => (v ? fmtClock(v) : "—");
 const settled = (x: SetLog) => !!(x.done || x.skipped);
+/** How much a press of the time stepper moves, in seconds. */
+const HOLD_STEP = 5;
 
 /**
  * The logger, rebuilt around one set at a time.
@@ -53,6 +105,7 @@ const settled = (x: SetLog) => !!(x.done || x.skipped);
  */
 export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   const s = useStore();
+  const auth = useAuth();
   const session = s.active!;
   const ask = useConfirm();
   const askDiscard = () =>
@@ -72,7 +125,6 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   );
   // An explicitly tapped set. Null means "whichever one is up next".
   const [cursor, setCursor] = useState<string | null>(null);
-  const [restEnds, setRestEnds] = useState<number | null>(null);
   const [pad, setPad] = useState<Pad | null>(null);
   // The pad's title and value are read out of `pad`, which is cleared the
   // instant it closes. Holding the last one keeps the panel populated while it
@@ -83,12 +135,89 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
 
   const unit = s.settings.unit === "lb" ? "lbs" : "kg";
   const step = s.settings.unit === "lb" ? 5 : 2.5;
-  const elapsed = s.now - session.startedAt;
+  const elapsed = sessionElapsed(session, s.now);
   const volume = sessionVolume(session);
   const setsDone = sessionSetCount(session);
-  const restLeft = restEnds
-    ? Math.max(0, Math.round((restEnds - s.now) / 1000))
-    : 0;
+  // Every set accounted for, logged or skipped, is the end of the workout.
+  const allSets = session.entries.flatMap((e) => e.sets);
+  const workoutDone = allSets.length > 0 && allSets.every(settled);
+  const [celebrationOff, setCelebrationOff] = useState(() =>
+    celebrated.has(session.id),
+  );
+  function dismissCelebration() {
+    celebrated.add(session.id);
+    setCelebrationOff(true);
+  }
+  const pendingCompletion =
+    s.pendingCompletionId === session.id && !!session.endedAt;
+  const completionAttempted = useRef(false);
+  const [completionRetry, setCompletionRetry] = useState(0);
+  const [completionSaving, setCompletionSaving] = useState(false);
+  const [completionError, setCompletionError] = useState<string | null>(null);
+
+  // Crossing into the all-settled state is the completion event. Persist it
+  // before presenting the celebration, so closing the app on that card cannot
+  // lose the workout or its streak.
+  useEffect(() => {
+    if (!workoutDone) {
+      completionAttempted.current = false;
+      celebrated.delete(session.id);
+      if (celebrationOff) setCelebrationOff(false);
+      return;
+    }
+    if (
+      session.endedAt ||
+      pendingCompletion ||
+      celebrationOff ||
+      completionAttempted.current
+    )
+      return;
+    completionAttempted.current = true;
+    setCompletionSaving(true);
+    setCompletionError(null);
+    void s
+      .markSessionComplete()
+      .then((completed) => {
+        if (completed) void auth.push();
+      })
+      .catch(() => {
+        completionAttempted.current = false;
+        setCompletionError("Couldn't save this workout. Your sets are still here.");
+      })
+      .finally(() => setCompletionSaving(false));
+  }, [
+    auth,
+    celebrationOff,
+    completionRetry,
+    pendingCompletion,
+    s,
+    session.endedAt,
+    session.id,
+    workoutDone,
+  ]);
+
+  // Only worth counting when the persisted celebration is up.
+  const streak =
+    workoutDone && pendingCompletion && !celebrationOff
+      ? streakFor(s.sessions, session, s.now)
+      : null;
+
+  /*
+   * The picture the share button hands over.
+   *
+   * Built here rather than inside the card so it is drawn the moment the card
+   * appears — seconds before anyone reaches the button — because the share
+   * sheet has to open on the tap itself and a PNG takes long enough to encode
+   * to lose the gesture. Null while there is no card, and the hook idles.
+   */
+  const shareData = streak
+    ? streakCard(s.sessions, session, s.now, unit)
+    : null;
+  const shareCard = useShareCard(
+    shareData && 'streak',
+    shareData,
+    'gym-log-streak-' + session.date + '.png',
+  );
 
   const entry =
     session.entries.find((e) => e.id === openId) ??
@@ -99,7 +228,15 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
 
   /** Writes one dial. Kept explicit so the patch stays a typed `Partial<SetLog>`. */
   const write = (entryId: string, setId: string, field: Field, v: number) =>
-    s.updateSet(entryId, setId, field === "reps" ? { reps: v } : { weight: v });
+    s.updateSet(
+      entryId,
+      setId,
+      field === "reps"
+        ? { reps: v }
+        : field === "seconds"
+          ? { seconds: v }
+          : { weight: v },
+    );
 
   function bump(entryId: string, setId: string, field: Field, d: number) {
     const st = session.entries
@@ -138,7 +275,7 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
       pad.entryId,
       pad.setId,
       pad.field,
-      ok ? (pad.field === "reps" ? Math.round(v) : v) : 0,
+      ok ? (pad.field === "weight" ? v : Math.round(v)) : 0,
     );
   }
 
@@ -149,11 +286,6 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
       onRename={(v) => s.renameSession(v)}
       elapsed={fmtDuration(elapsed)}
       onFinish={() => setConfirmFinish(true)}
-      pips={session.entries.flatMap((e) =>
-        e.sets.map((x) =>
-          x.done ? "bg-fg" : x.skipped ? "bg-faint" : "bg-rule",
-        ),
-      )}
     />
   );
 
@@ -162,9 +294,23 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
       open={confirmFinish}
       onClose={() => setConfirmFinish(false)}
       line={summary}
+      saving={completionSaving}
+      error={completionError}
       onSave={() => {
-        void s.finishSession();
-        setConfirmFinish(false);
+        setCompletionSaving(true);
+        setCompletionError(null);
+        void s
+          .finishSession()
+          .then((completed) => {
+            if (completed) void auth.push();
+            setConfirmFinish(false);
+          })
+          .catch(() =>
+            setCompletionError(
+              "Couldn't save this workout. Your sets are still here.",
+            ),
+          )
+          .finally(() => setCompletionSaving(false));
       }}
       onDiscard={async () => {
         if (await askDiscard()) {
@@ -216,6 +362,8 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   }
 
   const ex = s.exerciseById.get(entry.exerciseId);
+  /** Held for a duration rather than counted out — a plank, a treadmill run. */
+  const timed = ex?.tracks === "time";
   const last = lastPerformance(
     s.sessions,
     entry.exerciseId,
@@ -239,7 +387,6 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
     if (!cur) return;
     s.updateSet(entry.id, cur.id, { done: true, skipped: false });
     setCursor(null);
-    setRestEnds(REST_SECONDS > 0 ? Date.now() + REST_SECONDS * 1000 : null);
     // Last one of this exercise: move on rather than leaving a finished block up.
     if (entry.sets.every((x) => x.id === cur.id || settled(x))) {
       const next = session.entries.find(
@@ -253,253 +400,377 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   const isPR = (x: SetLog) =>
     x.done && x.reps > 0 && priorBest > 0 && e1rm(x.weight, x.reps) > priorBest;
 
+  // Which of the other exercises still has work in it decides what the second
+  // card calls itself: a queue, or a list of what else is here.
+  const upNext = session.entries.some(
+    (e) => e.id !== entry.id && e.sets.some((x) => !settled(x)),
+  );
+
   return (
     <div className="flex min-h-full flex-col bg-ink">
       {header}
 
-      <section
-        key={entry.id}
-        className="animate-fade border-t border-rule px-5 pb-5 pt-6"
-      >
-        <div className="flex justify-between font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-muted">
-          <span>
-            Exercise {session.entries.indexOf(entry) + 1} of{" "}
-            {session.entries.length}
-          </span>
-          <span className="flex items-center gap-3">
-            {idx >= 0 && `Set ${idx + 1} of ${entry.sets.length}`}
-            <button
-              onClick={() => setMenu(entry.id)}
-              aria-label={`Options for ${ex?.name ?? "exercise"}`}
-              /* Hit area padded to 44px and pulled back out with negative
-                 margins, so the target grows without the header row moving. */
-              className="-my-3 -mr-3 grid size-11 place-items-center text-[0.75rem] leading-none tracking-normal text-dim active:text-fg"
-            >
-              ⋯
-            </button>
-          </span>
-        </div>
-
-        <p className="mt-3 text-pretty text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em]">
-          {ex?.name ?? "Exercise"}
-        </p>
-        <p className="mt-2 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.12em] text-muted">
-          {prev
-            ? `Last time · ${dial(prev.weight)} × ${prev.reps}`
-            : "First time logging this"}
-        </p>
-
-        {cur && (
-          <>
-            <div className="mt-[26px]">
-              <Dial
-                label={weightLabel}
-                value={dial(cur.weight)}
-                dim={settled(cur)}
-                onLess={() => bump(entry.id, cur.id, "weight", -step)}
-                onMore={() => bump(entry.id, cur.id, "weight", step)}
-                onEdit={() =>
-                  setPad({
-                    entryId: entry.id,
-                    setId: cur.id,
-                    field: "weight",
-                    buf: null,
-                  })
-                }
-              />
-              <Dial
-                label="Reps"
-                value={dial(cur.reps)}
-                dim={settled(cur)}
-                bottomRule
-                onLess={() => bump(entry.id, cur.id, "reps", -1)}
-                onMore={() => bump(entry.id, cur.id, "reps", 1)}
-                onEdit={() =>
-                  setPad({
-                    entryId: entry.id,
-                    setId: cur.id,
-                    field: "reps",
-                    buf: null,
-                  })
-                }
-              />
-            </div>
-
-            <div className="mt-5 flex gap-3">
-              <button
-                onClick={() => {
-                  if (!cur.done) logSet();
-                }}
-                className="press h-14 flex-1 rounded-full bg-fg font-mono text-[0.8125rem] font-semibold uppercase tracking-[0.14em] text-black"
-              >
-                {cur.done ? "Logged" : "Log set"}
-              </button>
-              <button
-                onClick={() =>
-                  settled(cur)
-                    ? s.updateSet(entry.id, cur.id, {
-                        done: false,
-                        skipped: false,
-                      })
-                    : s.updateSet(entry.id, cur.id, { skipped: true })
-                }
-                className="press h-14 w-26 rounded-full border border-faint font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-muted active:text-fg"
-              >
-                {settled(cur) ? "Undo" : "Skip"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {restLeft > 0 && (
-          <div className="animate-fade mt-4 flex items-center justify-between rounded-full border border-faint px-[18px] py-[11px] font-mono">
-            <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-muted">
-              Rest
-            </span>
-            <span className="text-[0.9375rem] font-medium tracking-[-0.02em]">
-              {mmss(restLeft)}
-            </span>
-            <button
-              onClick={() => setRestEnds(null)}
-              className="-my-3 -mr-2 flex h-11 items-center px-2 text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-muted active:text-fg"
-            >
-              Skip
-            </button>
-          </div>
-        )}
-      </section>
-
-      <div className="px-5 pt-1">
-        {entry.sets.map((x, i) => (
-          <button
-            key={x.id}
-            onClick={() => setCursor(x.id)}
-            className="press press-row flex w-full items-center gap-3.5 border-b border-subrule py-3 text-left"
-          >
-            <span
-              className="w-5 font-mono text-[0.6875rem] font-medium"
-              style={{ color: i === idx ? undefined : DIMMED }}
-            >
-              {i + 1}
-            </span>
-            <span
-              className="flex-1 font-mono text-[0.9375rem] font-medium"
-              style={{
-                color: x.skipped
-                  ? DIMMED
-                  : x.done || i !== idx
-                    ? DIM
-                    : undefined,
-                textDecoration: settled(x) ? "line-through" : undefined,
-              }}
-            >
-              {dial(x.weight)} × {dial(x.reps)}
-            </span>
-            <span
-              className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: settled(x) && !isPR(x) ? DIMMED : undefined }}
-            >
-              {x.skipped
-                ? "Skipped"
-                : x.done
-                  ? isPR(x)
-                    ? "PR"
-                    : "Done"
-                  : i === idx
-                    ? "Now"
-                    : ""}
-            </span>
-          </button>
-        ))}
-
-        <div className="flex items-center gap-5 pb-1 pt-4">
-          <button
-            onClick={() => s.addSet(entry.id)}
-            className="-mx-2 flex h-11 items-center px-2 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg underline decoration-[1.5px] underline-offset-[5px]"
-          >
-            + Set
-          </button>
-          <button
-            onClick={() => {
-              const lastSet = entry.sets[entry.sets.length - 1];
-              if (lastSet && entry.sets.length > 1)
-                s.removeSet(entry.id, lastSet.id);
-            }}
-            disabled={entry.sets.length < 2}
-            className="-mx-2 flex h-11 items-center px-2 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted disabled:opacity-40"
-          >
-            − Set
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-auto pt-5">
-        {session.entries
-          .filter((e) => e.id !== entry.id)
-          .map((e) => {
-            const done = e.sets.filter((x) => x.done).length;
-            const complete = e.sets.every((x) => settled(x));
-            return (
-              <button
-                key={e.id}
-                onClick={() => {
-                  setOpenId(e.id);
-                  setCursor(null);
-                }}
-                className="press press-row flex w-full items-center gap-3.5 border-t border-rule px-5 py-[17px] text-left"
-              >
-                <span className="w-5 font-mono text-[0.6875rem] text-dim">
-                  {pad2(session.entries.indexOf(e) + 1)}
-                </span>
-                <span
-                  className="min-w-0 flex-1 truncate text-[1rem] font-medium tracking-[-0.015em]"
-                  style={{
-                    color: complete ? DIMMED : undefined,
-                    textDecoration: complete ? "line-through" : undefined,
-                  }}
-                >
-                  {s.exerciseById.get(e.exerciseId)?.name ?? "Exercise"}
-                </span>
-                <span className="flex items-center gap-[5px]">
-                  {e.sets.map((x) => (
-                    <span
-                      key={x.id}
-                      className={`size-1.5 rounded-full border ${
-                        x.done ? "border-fg bg-fg" : "border-faint"
-                      }`}
-                    />
-                  ))}
-                </span>
-                <span className="min-w-10 text-right font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-muted">
-                  {complete ? "Done" : `${done}/${e.sets.length}`}
-                </span>
-              </button>
-            );
-          })}
-
-        <button
-          onClick={() => setPicker(true)}
-          className="group flex w-full items-center gap-3 border-t border-rule p-5 text-left"
+      {/*
+        Two cards on the black ground, in a gutter narrower than the rest of the
+        app's. This is the one screen read at arm's length with a bar in your
+        hands, so the panel carrying the numbers takes all the width it can and
+        the ground is left showing as a seam rather than as a margin.
+      */}
+      <div className="flex flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+        <section
+          key={entry.id}
+          className="animate-exswap rounded-2xl border border-cardrule bg-card px-5 pb-2 pt-[22px]"
         >
-          <span className="grid size-7 place-items-center rounded-full border border-muted font-mono text-[0.9375rem] leading-none text-fg transition-colors group-active:border-fg">
-            +
-          </span>
-          <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg">
-            Add exercise
-          </span>
-        </button>
+          <div className="flex justify-between font-mono text-label font-semibold uppercase tracking-[0.2em] text-muted">
+            <span>
+              Exercise {session.entries.indexOf(entry) + 1} of{" "}
+              {session.entries.length}
+            </span>
+            <span className="flex items-center gap-3">
+              {idx >= 0 && `Set ${idx + 1} of ${entry.sets.length}`}
+              <button
+                onClick={() => setMenu(entry.id)}
+                aria-label={`Options for ${ex?.name ?? "exercise"}`}
+                /* Hit area padded to 44px and pulled back out with negative
+                   margins, so the target grows without the header row moving. */
+                className="-my-3 -mr-3 grid size-11 place-items-center text-[0.75rem] leading-none tracking-normal text-dim active:text-fg"
+              >
+                ⋯
+              </button>
+            </span>
+          </div>
 
-        <div className="border-t border-rule px-5 pb-8 pt-5">
-          <Eyebrow className="tracking-[0.18em]">Workout notes</Eyebrow>
-          <textarea
-            className="mt-2 w-full resize-none bg-transparent text-[0.9375rem] leading-relaxed outline-none placeholder:text-dim"
-            rows={2}
-            placeholder="How the session felt, what to change next time…"
-            value={session.note ?? ""}
-            onChange={(e) => s.setSessionNote(e.target.value)}
-          />
-        </div>
+          <p className="mt-3 text-pretty text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em]">
+            {ex?.name ?? "Exercise"}
+          </p>
+          <p className="mt-2 font-mono text-label font-medium uppercase tracking-[0.12em] text-muted">
+            {prev
+              ? timed
+                ? `Last time · ${clock(prev.seconds)}`
+                : `Last time · ${dial(prev.weight)} × ${prev.reps}`
+              : "First time logging this"}
+          </p>
+
+          {cur && (
+            <>
+              {/*
+                The two dials side by side rather than stacked. Weight and reps
+                are read as one figure — "forty by six" — and a set is logged by
+                adjusting one of them and hitting the button, so they belong on
+                one line with the button under both.
+              */}
+              <div className="mt-5 grid grid-cols-2 items-center gap-2.5">
+                <Dial
+                  label={weightLabel}
+                  value={dial(cur.weight)}
+                  dim={settled(cur)}
+                  onLess={() => bump(entry.id, cur.id, "weight", -step)}
+                  onMore={() => bump(entry.id, cur.id, "weight", step)}
+                  onEdit={() =>
+                    setPad({
+                      entryId: entry.id,
+                      setId: cur.id,
+                      field: "weight",
+                      buf: null,
+                    })
+                  }
+                />
+                {timed ? (
+                  <Dial
+                    label="Time"
+                    value={clock(cur.seconds)}
+                    dim={settled(cur)}
+                    onLess={() =>
+                      bump(entry.id, cur.id, "seconds", -HOLD_STEP)
+                    }
+                    onMore={() => bump(entry.id, cur.id, "seconds", HOLD_STEP)}
+                    onEdit={() =>
+                      setPad({
+                        entryId: entry.id,
+                        setId: cur.id,
+                        field: "seconds",
+                        buf: null,
+                      })
+                    }
+                  />
+                ) : (
+                  <Dial
+                    label="Reps"
+                    value={dial(cur.reps)}
+                    dim={settled(cur)}
+                    onLess={() => bump(entry.id, cur.id, "reps", -1)}
+                    onMore={() => bump(entry.id, cur.id, "reps", 1)}
+                    onEdit={() =>
+                      setPad({
+                        entryId: entry.id,
+                        setId: cur.id,
+                        field: "reps",
+                        buf: null,
+                      })
+                    }
+                  />
+                )}
+              </div>
+
+              {/*
+                Logging the set is the whole point of the screen, so it gets the
+                full width and the only filled button on it. Skip and undo sit
+                under it as words: they are the exception, and setting them side
+                by side made them look like the same kind of choice.
+              */}
+              <div className="mt-4 flex flex-col items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (!cur.done) logSet();
+                  }}
+                  className="press h-13 w-full rounded-full bg-fg font-mono text-[0.8125rem] font-semibold uppercase tracking-[0.14em] text-black"
+                >
+                  {cur.done ? "Logged" : "Log set"}
+                </button>
+                <button
+                  onClick={() =>
+                    settled(cur)
+                      ? s.updateSet(entry.id, cur.id, {
+                          done: false,
+                          skipped: false,
+                        })
+                      : s.updateSet(entry.id, cur.id, { skipped: true })
+                  }
+                  className="press flex h-11 items-center px-5 font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted active:text-fg"
+                >
+                  {settled(cur) ? "Undo" : "Skip"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/*
+            The record of the exercise, inside the card that is working on it.
+            The rule runs the full width of the card, so the list reads as the
+            underside of the panel rather than as a separate thing below it.
+          */}
+          <div className="-mx-5 mt-3.5 border-t border-cardrule px-5 pb-4 pt-2">
+            {entry.sets.map((x, i) => {
+              const now = i === idx;
+              const pr = isPR(x);
+              return (
+                <button
+                  key={x.id}
+                  onClick={() => setCursor(x.id)}
+                  style={{ background: now ? ROW_ON : undefined }}
+                  className="press press-row flex w-full items-center gap-3.5 rounded-[10px] p-3 text-left"
+                >
+                  {/*
+                    The mark carries the state, which is what lets every row
+                    keep the same tone: a check for a set that happened, its own
+                    number for one that has not.
+                  */}
+                  <span
+                    className="grid size-5 shrink-0 place-items-center rounded-full border font-mono text-label font-medium leading-none"
+                    style={{
+                      borderColor:
+                        x.done || now ? "var(--color-fg)" : "var(--color-rule)",
+                      background: x.done ? "var(--color-fg)" : undefined,
+                      color: x.done ? "#000" : now ? undefined : DIM,
+                    }}
+                  >
+                    {x.done ? <Check size={11} /> : i + 1}
+                  </span>
+                  <span
+                    className="min-w-0 flex-1 font-mono text-[1rem] font-medium tracking-[-0.01em]"
+                    style={{
+                      color: x.skipped ? DIMMED : undefined,
+                      textDecoration: x.skipped ? "line-through" : undefined,
+                    }}
+                  >
+                    {timed
+                      ? x.weight
+                        ? `+${dial(x.weight)} ${unit} · ${clock(x.seconds)}`
+                        : clock(x.seconds)
+                      : `${dial(x.weight)} ${unit} × ${dial(x.reps)}`}
+                  </span>
+                  {(pr || (now && !x.done)) && (
+                    <span className="font-mono text-label font-semibold uppercase tracking-[0.18em] text-fg">
+                      {pr ? "PR" : "Now"}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            <div className="flex items-center gap-2 pt-1.5">
+              <button
+                onClick={() => s.addSet(entry.id)}
+                className="press flex h-11 items-center gap-1.5 font-mono text-label font-medium text-muted active:text-fg"
+              >
+                <Plus size={14} />
+                Add set
+              </button>
+              <span className="flex-1" />
+              <button
+                onClick={() => {
+                  const lastSet = entry.sets[entry.sets.length - 1];
+                  if (lastSet && entry.sets.length > 1)
+                    s.removeSet(entry.id, lastSet.id);
+                }}
+                disabled={entry.sets.length < 2}
+                className="press flex h-11 items-center px-2 font-mono text-label font-medium text-dim active:text-muted disabled:opacity-40"
+              >
+                Remove last
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/*
+          Everything that is not the set in front of you: the rest of the
+          workout, a way to add to it, and the note. `mt-auto` holds it against
+          the bottom edge when the exercise above it is short.
+        */}
+        <section className="mt-auto overflow-hidden rounded-2xl border border-cardrule bg-card">
+          <div className="px-5 pb-1 pt-4">
+            <Eyebrow className="tracking-[0.2em]">
+              {upNext ? "Up next" : "Other exercises"}
+            </Eyebrow>
+          </div>
+
+          {session.entries
+            .filter((e) => e.id !== entry.id)
+            .map((e) => {
+              const done = e.sets.filter((x) => x.done).length;
+              const complete = e.sets.every((x) => settled(x));
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => {
+                    setOpenId(e.id);
+                    setCursor(null);
+                  }}
+                  className="press press-row flex w-full items-center gap-3.5 px-5 py-3.5 text-left"
+                >
+                  <span
+                    className="min-w-0 flex-1 truncate text-[1rem] font-medium tracking-[-0.015em]"
+                    style={{
+                      color: complete ? DIM : undefined,
+                      textDecoration: complete ? "line-through" : undefined,
+                    }}
+                  >
+                    {s.exerciseById.get(e.exerciseId)?.name ?? "Exercise"}
+                  </span>
+                  <span className="whitespace-nowrap font-mono text-label font-medium text-muted">
+                    {complete
+                      ? "Complete"
+                      : done
+                        ? `${done} of ${e.sets.length} sets`
+                        : `${e.sets.length} sets`}
+                  </span>
+                  {/* A mark, not a word: `faint` is the floor for one of those. */}
+                  <ChevronRight size={16} className="shrink-0 text-faint" />
+                </button>
+              );
+            })}
+
+          <button
+            onClick={() => setPicker(true)}
+            className="press press-row group flex w-full items-center gap-2.5 px-5 pb-5 pt-4 text-left"
+          >
+            <span className="grid size-6 shrink-0 place-items-center rounded-full border border-faint text-fg transition-colors group-active:border-fg">
+              <Plus size={13} />
+            </span>
+            <span className="whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-fg">
+              Add exercise
+            </span>
+          </button>
+
+          <div className="border-t border-cardrule px-5 pb-5 pt-4">
+            <Eyebrow className="tracking-[0.18em]">Workout notes</Eyebrow>
+            <textarea
+              className="mt-2 w-full resize-none bg-transparent text-[0.9375rem] leading-relaxed outline-none placeholder:text-dim"
+              rows={2}
+              placeholder="How the session felt, what to change next time…"
+              value={session.note ?? ""}
+              onChange={(e) => s.setSessionNote(e.target.value)}
+            />
+          </div>
+        </section>
       </div>
+
+      {streak && (
+        <Celebration
+          streak={streak}
+          busy={completionSaving}
+          error={completionError}
+          onShare={shareCard.share}
+          canShare={shareCard.ready}
+          stats={[
+            { label: "Time", value: fmtDuration(elapsed) },
+            { label: "Sets", value: String(setsDone) },
+            { label: unit, value: num(volume, 0) },
+          ]}
+          onFinish={() => {
+            setCompletionSaving(true);
+            setCompletionError(null);
+            void s
+              .finishSession()
+              .then((completed) => {
+                if (completed) void auth.push();
+              })
+              .catch(() =>
+                setCompletionError(
+                  "Couldn't close this workout. Your progress is still saved.",
+                ),
+              )
+              .finally(() => setCompletionSaving(false));
+          }}
+          onKeepGoing={() => {
+            setCompletionSaving(true);
+            setCompletionError(null);
+            void s
+              .reopenPendingCompletion()
+              .then(() => {
+                dismissCelebration();
+                void auth.push();
+              })
+              .catch(() =>
+                setCompletionError(
+                  "Couldn't reopen this workout. Please try again.",
+                ),
+              )
+              .finally(() => setCompletionSaving(false));
+          }}
+        />
+      )}
+
+      {workoutDone && !pendingCompletion && completionSaving && (
+        <div
+          role="status"
+          className="fixed inset-x-5 bottom-[calc(env(safe-area-inset-bottom)+20px)] z-[70] mx-auto max-w-md rounded-[18px] border border-cardrule bg-card px-5 py-4 text-center font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted"
+        >
+          Saving workout…
+        </div>
+      )}
+
+      {workoutDone && !pendingCompletion && completionError && !completionSaving && (
+        <div
+          role="alert"
+          className="fixed inset-x-5 bottom-[calc(env(safe-area-inset-bottom)+20px)] z-[70] mx-auto max-w-md rounded-[18px] border border-cardrule bg-card p-5"
+        >
+          <p className="text-[0.875rem] leading-relaxed text-muted">
+            {completionError}
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4"
+            onClick={() => {
+              setCompletionError(null);
+              completionAttempted.current = false;
+              setCompletionRetry((n) => n + 1);
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      )}
 
       {shownPad && (
         <NumberPad
@@ -517,14 +788,6 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
                 ] || "",
               )) ||
             "—"
-          }
-          steps={
-            shownPad.field === "weight"
-              ? [-step * 2, -step, step, step * 2]
-              : [-2, -1, 1, 2]
-          }
-          onStep={(d) =>
-            bump(shownPad.entryId, shownPad.setId, shownPad.field, d)
           }
           onKey={press}
           onClose={() => setPad(null)}
@@ -575,24 +838,19 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   );
 }
 
-/**
- * The name of the workout, the clock, and one pip per set in the whole session.
- * The pips are the only place the session is still visible end to end.
- */
+/** The name of the workout, the clock, and the way out of it. */
 function Header({
   onBack,
   name,
   onRename,
   elapsed,
   onFinish,
-  pips,
 }: {
   onBack: () => void;
   name: string;
   onRename: (v: string) => void;
   elapsed: string;
   onFinish: () => void;
-  pips: string[];
 }) {
   return (
     <header className="sticky top-0 z-20 bg-ink/95 pt-[calc(env(safe-area-inset-top)+12px)] backdrop-blur-xl">
@@ -630,11 +888,6 @@ function Header({
           Finish
         </button>
       </div>
-      <div className="flex gap-1 px-5 pb-3.5">
-        {pips.map((bg, i) => (
-          <span key={i} className={`h-[3px] flex-1 transition-colors ${bg}`} />
-        ))}
-      </div>
     </header>
   );
 }
@@ -643,12 +896,16 @@ function Header({
  * One number, sized to be hit without looking, flanked by a step either way.
  * The number itself is the button that opens the pad, so a coarse adjustment
  * and an exact one are the same control.
+ *
+ * Boxed in the ground colour on a raised card: two of these sit side by side,
+ * and without a box of their own the pair read as four loose buttons in a row
+ * rather than as two dials. Black rather than a lighter grey because these are
+ * wells you set a number into, not more panels stacked on the panel.
  */
 function Dial({
   label,
   value,
   dim,
-  bottomRule,
   onLess,
   onMore,
   onEdit,
@@ -656,34 +913,267 @@ function Dial({
   label: string;
   value: string;
   dim: boolean;
-  bottomRule?: boolean;
   onLess: () => void;
   onMore: () => void;
   onEdit: () => void;
 }) {
-  const round =
-    "press size-[46px] shrink-0 rounded-full border border-faint font-mono text-[1.25rem] leading-none active:border-muted";
+  const step =
+    "press grid size-11 shrink-0 place-items-center text-muted active:text-fg";
   return (
-    <div
-      className={`flex items-center gap-3.5 border-t border-rule py-4 ${bottomRule ? "border-b" : ""}`}
-    >
-      <button onClick={onLess} aria-label={`Less ${label}`} className={round}>
-        −
+    <div className="flex min-w-0 items-center justify-center gap-0.5 rounded-2xl border border-cardrule bg-ink py-2.5">
+      <button onClick={onLess} aria-label={`Less ${label}`} className={step}>
+        <Minus size={18} />
       </button>
-      <button onClick={onEdit} className="min-w-0 flex-1 text-center">
+      <button onClick={onEdit} className="press min-w-0 flex-1 text-center">
         <span
-          className="block font-mono text-[3rem] font-medium leading-none tracking-[-0.04em]"
+          className="block font-mono text-[2.125rem] font-medium leading-none tracking-[-0.035em]"
           style={{ color: dim ? DIM : undefined }}
         >
           {value}
         </span>
-        <span className="mt-2 block font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.2em] text-muted">
+        <span className="mt-1.5 block font-mono text-label font-semibold uppercase tracking-[0.2em] text-muted">
           {label}
         </span>
       </button>
-      <button onClick={onMore} aria-label={`More ${label}`} className={round}>
-        +
+      <button onClick={onMore} aria-label={`More ${label}`} className={step}>
+        <Plus size={18} />
       </button>
+    </div>
+  );
+}
+
+/**
+ * The card that says the workout is over.
+ *
+ * It arrives on its own — the last set being accounted for is the event, not a
+ * button you pressed — so it has to say what happened and then get out of the
+ * way.
+ *
+ * What it leads with is the streak rather than the session. The three figures
+ * underneath are the last hour and they are already true; the number in the
+ * ring is the only thing on the card still at stake, and it is the reason to
+ * come back on a day you would rather not. The ring around it is that run
+ * measured against your best, so eight days reads as most of the way to
+ * something rather than as a number on its own.
+ *
+ * The warm tone is spent here and nowhere else in the app.
+ */
+function Celebration({
+  streak,
+  stats,
+  onFinish,
+  onKeepGoing,
+  onShare,
+  canShare,
+  busy,
+  error,
+}: {
+  streak: { days: number; grew: boolean; best: number; qualified: boolean };
+  stats: { label: string; value: string }[];
+  onFinish: () => void;
+  onKeepGoing: () => void;
+  onShare: () => void;
+  canShare: boolean;
+  busy: boolean;
+  error: string | null;
+}) {
+  // Escape reads as "not yet", which is the reversible half of the choice.
+  const panel = useDialog(true, onKeepGoing);
+
+  // The arc. A stroked circle whose dash pattern is its own circumference, so
+  // the visible length is a fraction of the whole and the entrance is that
+  // fraction being uncovered rather than a shape appearing.
+  const R = 84;
+  const CIRC = 2 * Math.PI * R;
+  const best = Math.max(streak.best, streak.days, 1);
+  const progress = Math.min(1, streak.days / best);
+
+  return (
+    <div className="animate-fade fixed inset-0 z-[60] mx-auto flex max-w-lg items-center justify-center bg-black/[0.88] p-7">
+      <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Workout complete"
+        tabIndex={-1}
+        className="animate-cb-card relative w-full overflow-hidden rounded-[20px] border border-cardrule bg-card text-center outline-none"
+      >
+        {/* A slow band of light crossing the card once every eight seconds.
+            Ambient rather than arrival motion: it starts long after everything
+            has landed, and it is there to keep the card alive while you decide
+            rather than to be watched. */}
+        <span
+          aria-hidden="true"
+          className="animate-cb-sheen pointer-events-none absolute -top-[40%] left-0 h-[180%] w-[30%] bg-gradient-to-r from-transparent via-white/[0.04] to-transparent"
+        />
+
+        <div
+          className="relative px-7 pb-[26px] pt-9"
+          style={{
+            background:
+              "radial-gradient(130% 80% at 50% 0%, rgba(255,150,70,.09), rgba(255,150,70,0) 72%)",
+          }}
+        >
+          <div className="relative mx-auto size-[184px]">
+            <svg
+              width="184"
+              height="184"
+              viewBox="0 0 184 184"
+              aria-hidden="true"
+              className="absolute inset-0 -rotate-90"
+            >
+              <circle
+                cx="92"
+                cy="92"
+                r={R}
+                fill="none"
+                stroke="#333333"
+                strokeWidth="3"
+              />
+              <circle
+                cx="92"
+                cy="92"
+                r={R}
+                fill="none"
+                stroke="var(--color-ember)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={CIRC}
+                className="animate-cb-arc"
+                style={
+                  {
+                    "--dash-full": CIRC,
+                    "--dash-off": CIRC * (1 - progress),
+                  } as CSSProperties
+                }
+              />
+            </svg>
+
+            <div
+              role="img"
+              aria-label={streak.days + " day streak"}
+              className="absolute inset-0 flex flex-col items-center justify-center gap-[9px]"
+            >
+              <span
+                aria-hidden="true"
+                className="animate-cb-ember absolute size-[104px] rounded-full blur-[30px]"
+                style={{
+                  background:
+                    "radial-gradient(closest-side, var(--color-ember), transparent)",
+                }}
+              />
+              <span
+                aria-hidden="true"
+                className="relative font-mono text-[68px] font-medium leading-[0.9] tracking-[-0.05em] text-ember"
+              >
+                {streak.grew ? (
+                  <span className="inline-block h-[1em] overflow-hidden align-text-bottom leading-[1em]">
+                    <span className="animate-cb-roll block">
+                      <span className="block h-[1em]">{streak.days - 1}</span>
+                      <span className="block h-[1em]">{streak.days}</span>
+                    </span>
+                  </span>
+                ) : (
+                  streak.days
+                )}
+              </span>
+              <span
+                aria-hidden="true"
+                className="relative whitespace-nowrap font-mono text-[10px] font-semibold uppercase tracking-[0.26em] text-muted"
+              >
+                Day streak
+              </span>
+            </div>
+
+            {/* The mark that used to be the whole card, now the size of a full
+                stop and hung on the rim of the ring. The workout being over is
+                the premise here, not the news. */}
+            <span
+              aria-hidden="true"
+              className="animate-cb-check absolute -bottom-[14px] left-1/2 -ml-[15px] grid size-[30px] place-items-center rounded-full border-4 border-card bg-fg text-black"
+            >
+              <Check size={14} />
+            </span>
+          </div>
+
+          <p
+            className="animate-cb-stat mt-[34px] text-[1.4375rem] font-semibold tracking-[-0.03em]"
+            style={{ animationDelay: "0.9s" }}
+          >
+            Workout complete
+          </p>
+          <p
+            className="animate-cb-stat mt-[9px] whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted"
+            style={{ animationDelay: "0.96s" }}
+          >
+            {/* A full ring with "best run 8" under it while you are on 8 reads
+                as a bug. At the top of your own ladder the line says so. */}
+            {!streak.qualified
+              ? "Streak unchanged · complete one set to extend it"
+              : streak.days >= streak.best
+              ? "Your best run yet"
+              : "Best run " + streak.best}
+          </p>
+        </div>
+
+        {/* One-pixel gaps, with the rule showing through as the grid lines. */}
+        <div className="grid grid-cols-3 gap-px border-t border-cardrule bg-cardrule">
+          {stats.map((stat, i) => (
+            <div
+              key={stat.label}
+              className="animate-cb-stat bg-card px-2 py-4"
+              style={{ animationDelay: `${1.02 + i * 0.05}s` }}
+            >
+              <div className="font-mono text-[1.375rem] font-medium tracking-[-0.02em]">
+                {stat.value}
+              </div>
+              <div className="mt-1.5 font-mono text-label font-semibold uppercase tracking-[0.18em] text-muted">
+                {stat.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-2.5 border-t border-cardrule px-7 pb-[26px] pt-[22px]">
+          <div className="flex gap-2.5">
+            <button
+              onClick={onFinish}
+              disabled={busy}
+              className="press animate-cb-stat h-13 flex-1 rounded-full bg-fg font-mono text-[0.75rem] font-semibold uppercase tracking-[0.14em] text-black disabled:opacity-40"
+              style={{ animationDelay: "1.18s" }}
+            >
+              {busy ? "Saving…" : "Finish"}
+            </button>
+            {/* Arrives last and on its own, a third of a second after the
+                buttons either side of it have settled. Sharing is an
+                afterthought by design: the card's job is to close the workout,
+                and an offer landing at the same moment as "Finish" competes
+                with it. */}
+            <button
+              onClick={onShare}
+              disabled={!canShare || busy}
+              aria-label="Share streak"
+              className="press animate-cb-stat grid size-13 shrink-0 place-items-center rounded-full border border-[#3a3a3a] text-fg transition-opacity disabled:opacity-40"
+              style={{ animationDelay: "1.55s" }}
+            >
+              <Share size={18} />
+            </button>
+          </div>
+          <button
+            onClick={onKeepGoing}
+            disabled={busy}
+            className="press animate-cb-stat h-11 w-full font-mono text-label font-semibold uppercase tracking-[0.14em] text-muted active:text-fg disabled:opacity-40"
+            style={{ animationDelay: "1.24s" }}
+          >
+            I ain&apos;t done yet
+          </button>
+          {error && (
+            <p role="alert" className="text-left text-[0.75rem] leading-relaxed text-danger">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -691,20 +1181,21 @@ function Dial({
 /**
  * Typing a number exactly. It sits over the screen rather than pushing it up,
  * so the set list stays visible while a figure is corrected.
+ *
+ * Just the keys. The row of ±step chips that used to sit above them is gone:
+ * the dial behind this pad now carries a step either side of the number, one
+ * tap away, and the pad is the place you go when stepping is not what you
+ * want.
  */
 function NumberPad({
   title,
   value,
-  steps,
-  onStep,
   onKey,
   onClose,
   open,
 }: {
   title: string;
   value: string;
-  steps: number[];
-  onStep: (d: number) => void;
   onKey: (k: string) => void;
   onClose: () => void;
   open: boolean;
@@ -736,25 +1227,14 @@ function NumberPad({
             {value}
           </span>
         </div>
-        <div className="flex gap-2.5 px-5 pb-0.5 pt-3.5">
-          {steps.map((d) => (
-            <button
-              key={d}
-              onClick={() => onStep(d)}
-              className="press h-11 flex-1 rounded-full border border-faint font-mono text-[0.75rem] font-medium active:border-muted"
-            >
-              {d > 0 ? `+${num(d)}` : num(d)}
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-3 px-5 pt-3">
+        <div className="grid grid-cols-3 px-5 pt-4">
           {["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "del"].map(
             (k) => (
               <button
                 key={k}
                 onClick={() => onKey(k)}
                 aria-label={k === "del" ? "Delete" : k}
-                className="press h-[54px] font-mono text-[1.375rem] font-medium active:text-muted"
+                className="press h-[54px] rounded-xl font-mono text-[1.375rem] font-medium active:bg-rule"
               >
                 {k === "del" ? "⌫" : k}
               </button>
@@ -780,12 +1260,16 @@ function FinishSheet({
   line,
   onSave,
   onDiscard,
+  saving,
+  error,
 }: {
   open: boolean;
   onClose: () => void;
   line: string;
   onSave: () => void;
   onDiscard: () => void;
+  saving: boolean;
+  error: string | null;
 }) {
   return (
     <Sheet
@@ -794,8 +1278,10 @@ function FinishSheet({
       title="Finish workout?"
       footer={
         <div className="space-y-2.5">
-          <Button onClick={onSave}>Save workout</Button>
-          <Button variant="danger" onClick={onDiscard}>
+          <Button disabled={saving} onClick={onSave}>
+            {saving ? "Saving…" : "Save workout"}
+          </Button>
+          <Button disabled={saving} variant="danger" onClick={onDiscard}>
             Discard workout
           </Button>
         </div>
@@ -805,6 +1291,11 @@ function FinishSheet({
       <p className="mt-2.5 text-[0.8125rem] text-muted">
         Sets you never logged are dropped on save.
       </p>
+      {error && (
+        <p role="alert" className="mt-3 text-[0.8125rem] text-danger">
+          {error}
+        </p>
+      )}
     </Sheet>
   );
 }

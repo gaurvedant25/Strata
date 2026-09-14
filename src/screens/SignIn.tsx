@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useAuth } from "../auth";
 import { Button, Eyebrow, TextTabs, inputCls } from "../components/ui";
+import { PRIVACY_URL, TERMS_URL } from "../lib/legal";
 
 /**
  * Create an account or sign in to one.
@@ -42,7 +43,23 @@ function explain(raw: string, mode: Mode) {
   return raw;
 }
 
-export function SignIn({ onSkip }: { onSkip: () => void }) {
+export function SignIn({
+  onSkip,
+  skipLabel = "Use without an account",
+  skipNote = "Without an account everything still works, but your logs live only on this device and go with it.",
+}: {
+  onSkip: () => void;
+  /**
+   * What leaving without signing in is called here.
+   *
+   * This screen is no longer the front door — it is opened deliberately, from
+   * Settings, by somebody who already has their logs on the device. "Use
+   * without an account" is the right words for a first run and the wrong ones
+   * for that, where the honest label is simply "not now".
+   */
+  skipLabel?: string;
+  skipNote?: string;
+}) {
   const auth = useAuth();
   const [mode, setMode] = useState<Mode>("in");
   const [email, setEmail] = useState("");
@@ -52,9 +69,38 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
   const [note, setNote] = useState<string | null>(null);
 
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSubmit = emailOk && password.length >= 6 && !busy;
+
+  /**
+   * Why the form cannot be sent yet, in words, or `null` when it can.
+   *
+   * This used to be a boolean that disabled the button, which is how a tap
+   * came to do nothing at all: a white pill at forty percent opacity on a
+   * black ground does not read as disabled, so the button looked live, did
+   * nothing when pressed, and said nothing about why. A control that declines
+   * has to give a reason — the reason is the whole point of declining.
+   *
+   * The six-character minimum is checked only when creating an account,
+   * because it is a rule about new passwords. Applied to signing in it locks
+   * out anyone whose existing password is shorter — they could not even
+   * attempt it, since the button would never enable. What an existing
+   * password has to be is between the account and the server.
+   */
+  function problem(): string | null {
+    if (!email.trim()) return "Enter your email address.";
+    if (!emailOk) return "That does not look like an email address.";
+    if (!password) return "Enter your password.";
+    if (mode === "up" && password.length < 6)
+      return "Passwords need to be at least 6 characters.";
+    return null;
+  }
 
   async function submit() {
+    const missing = problem();
+    if (missing) {
+      setErr(missing);
+      setNote(null);
+      return;
+    }
     setBusy(true);
     setErr(null);
     setNote(null);
@@ -151,7 +197,9 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && canSubmit) void submit();
+                // Not gated on the form being valid: Enter on an incomplete
+                // form should say what is missing, exactly as the button does.
+                if (e.key === "Enter") void submit();
               }}
             />
           </label>
@@ -179,7 +227,9 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
       </div>
 
       <div className="flex flex-col gap-3 pt-7">
-        <Button onClick={() => void submit()} disabled={!canSubmit}>
+        {/* Disabled only while a request is in flight. Everything else it
+            might object to, it objects to out loud in `submit`. */}
+        <Button onClick={() => void submit()} disabled={busy}>
           {busy ? "Working…" : mode === "up" ? "Create account" : "Sign in"}
         </Button>
 
@@ -200,15 +250,43 @@ export function SignIn({ onSkip }: { onSkip: () => void }) {
           Continue with Google
         </Button>
 
+        {/* Directly under both buttons that make an account, because this is
+            the moment the agreement is actually entered into — a link filed
+            away in Settings is a document nobody was asked about. It stays put
+            in either mode: signing in on a new device is also a moment to be
+            told what you are signing into. */}
+        <p className="px-1 text-center text-[0.75rem] leading-relaxed text-dim text-pretty">
+          By continuing you agree to the <LegalLink href={TERMS_URL}>Terms</LegalLink> and
+          the <LegalLink href={PRIVACY_URL}>Privacy&nbsp;Policy</LegalLink>.
+        </p>
+
         <Button variant="quiet" onClick={onSkip}>
-          Use without an account
+          {skipLabel}
         </Button>
         <p className="px-1 text-center text-[0.6875rem] leading-relaxed text-dim text-pretty">
-          Without an account everything still works, but your logs live only on
-          this device and go with it.
+          {skipNote}
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * A link inside a sentence, which is the one place in the app where a target
+ * smaller than 44px is unavoidable: the words have to stay in the line they
+ * belong to. The vertical padding is there anyway — on an inline box it grows
+ * what the finger can hit without moving the line it sits on.
+ */
+function LegalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="-my-1 py-1 text-muted underline decoration-[1.5px] underline-offset-[3px] active:text-fg"
+    >
+      {children}
+    </a>
   );
 }
 

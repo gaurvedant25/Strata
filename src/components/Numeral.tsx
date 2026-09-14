@@ -21,11 +21,11 @@ import { Scramble } from "./Callout";
 /**
  * The last value each figure showed, kept outside the tree.
  *
- * The callouts on the body map are deliberately remounted whenever the region
- * changes, so their boxes can re-arrive with the leader line. A component that
- * only knew its own history would treat every one of those as a first
- * appearance and scramble. Keyed by id, the value survives the remount and the
- * figure can roll from what the previous region showed.
+ * A component that only knew its own history would read every remount as a
+ * first appearance and scramble, so a figure inside a subtree that React
+ * replaces — a panel keyed on the thing it describes, say — could never roll.
+ * Keyed by id, the value outlives the element and the figure rolls from
+ * whatever was last on screen under that name.
  */
 const lastSeen = new Map<string, string>();
 
@@ -109,8 +109,8 @@ export function Numeral({
   perChar?: number;
 }) {
   // `from` is read once, at construction, before any effect has written this
-  // render's value back — which is what lets a remounted callout still know
-  // what the region before it showed.
+  // render's value back — which is what lets a figure that has just been
+  // remounted still know what stood in its place.
   const [state, setState] = useState<{ text: string; mode: Mode; seq: number }>(
     () => {
       const seen = lastSeen.get(id);

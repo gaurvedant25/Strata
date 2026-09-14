@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { Numeral } from "./Numeral";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 
 /**
  * The annotation that draws itself onto the figure: a leader line snaps out
@@ -21,8 +26,9 @@ import { Numeral } from "./Numeral";
  */
 const LABEL_FLOOR_PX = 11;
 
-/** Where a leader line lands, as a fraction of the figure's own box. */
-export type Anchor = [x: number, y: number, bilateral?: boolean];
+import type { Anchor } from "../lib/anatomy/anchors";
+
+export type { Anchor };
 
 export type CalloutLine = {
   text: string;
@@ -38,13 +44,6 @@ export type CalloutLine = {
    * attention to the one thing that had actually changed.
    */
   scramble?: boolean;
-  /**
-   * Animate this line as a figure instead: scrambling the first time the screen
-   * shows it, then rolling to each later value. Takes precedence over
-   * `scramble`, and the id is what lets it survive the box being remounted when
-   * the region changes.
-   */
-  numeralId?: string;
 };
 
 /**
@@ -81,12 +80,41 @@ export const VB_H = 100;
 const LINE_MS = 300;
 /** How long the box takes to open once it does. */
 const BOX_MS = 180;
+/**
+ * When the text inside the box starts to resolve.
+ *
+ * As the box begins to open, not after it has finished. A churning line is
+ * held invisible until its own turn comes, so waiting for the box to settle
+ * first meant a fully-drawn empty box sitting there for a fifth of a second —
+ * unnoticeable on arrival, but plain to see on every change of region once
+ * these lines churn rather than roll. Filling as it opens is one gesture.
+ */
+const CHURN_MS = LINE_MS;
 
 const SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789×@#%";
 
 const reduced = () =>
   typeof matchMedia === "function" &&
   matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Whether the page is out of sight.
+ *
+ * A hidden page does not run animation frames at all and clamps its timers to
+ * about a second, so an arrival started there does not play — it stalls partway
+ * and stays there. The line is the half that suffers: it is revealed on the
+ * next frame, which never comes, while the box is on a timer that eventually
+ * fires. What you come back to, or what the app switcher screenshotted while
+ * you were away, is a fully drawn box with its leader line stopping short of
+ * the corner — which reads as a broken drawing rather than as an animation
+ * caught in the middle.
+ *
+ * So an arrival nobody can watch is not played. It is not a shortcut for
+ * saving work; it is the only way the callout is guaranteed to be whole
+ * whenever it is next looked at.
+ */
+const hidden = () =>
+  typeof document !== "undefined" && document.visibilityState === "hidden";
 
 /**
  * Resolves text out of noise, one character at a time.
@@ -127,7 +155,11 @@ export function Scramble({
    * you saw the dashes, not the value resolving.
    */
   const [out, setOut] = useState(full);
-  const [churning, setChurning] = useState(() => reduced());
+  // Hidden pages get the value outright, for the reason given on `hidden`: the
+  // churn is driven by a timer that a hidden page clamps to about a second, and
+  // a line waiting its turn is not drawn at all — so an unwatched arrival would
+  // leave the box standing there with its values blank.
+  const [churning, setChurning] = useState(() => reduced() || hidden());
   const start = useRef(0);
   if (!start.current) start.current = performance.now();
 
@@ -141,12 +173,13 @@ export function Scramble({
     shown.current = full;
     start.current = performance.now();
     // A delayed replay hides again rather than showing the new value early.
-    if (delay > 0 && !reduced()) setChurning(false);
+    if (delay > 0 && !reduced() && !hidden()) setChurning(false);
   }
 
   useEffect(() => {
-    if (reduced()) {
+    if (reduced() || hidden()) {
       setOut(full);
+      setChurning(true);
       return;
     }
     const chars = full.split("");
@@ -170,7 +203,19 @@ export function Scramble({
     const id = setInterval(() => {
       if (tick()) clearInterval(id);
     }, 40);
-    return () => clearInterval(id);
+    // Walking away settles the value where it stands, so what you return to is
+    // the number and not a frozen row of noise.
+    const land = () => {
+      if (!hidden()) return;
+      clearInterval(id);
+      setOut(full);
+      setChurning(true);
+    };
+    document.addEventListener("visibilitychange", land);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", land);
+    };
   }, [full, delay, perChar, hold]);
 
   return (
@@ -182,23 +227,40 @@ export function Callout({
   side,
   lines,
   anchor,
+  onClick,
+  label,
 }: {
   side: "left" | "right";
   lines: CalloutLine[];
   anchor: Anchor;
+  /**
+   * Makes the box itself the control.
+   *
+   * A box reading "no data / log a lift" is an instruction with nowhere to go,
+   * and it is the thing on the screen people reach for first. Given a handler
+   * it becomes a real button — the only state in which the box takes pointer
+   * events at all, so a box that merely reports a number stays inert and out of
+   * the way of the figure behind it.
+   */
+  onClick?: () => void;
+  /** What the button announces, since the lines inside are fragments. */
+  label?: string;
 }) {
-  const [rx0, ry] = anchor;
+  const [rx, ry] = anchor;
   const isLeft = side === "left";
-  // Bilateral regions are drawn on both sides; mirror the anchor for the
-  // right-hand box so neither line crosses the body.
-  const rx = isLeft || !anchor[2] ? rx0 : 1 - rx0;
   const ax = (0.5 - FIG_FRAC / 2 + rx * FIG_FRAC) * VB_W;
   const ay = ry * VB_H;
   // The box's corner nearest the body. The line stops here rather than running
   // on across the box's top edge: arrival and expansion then happen in the same
   // place, so the two read as one gesture instead of the box opening from the
   // opposite end to the one the line reached.
-  const corner = isLeft ? 0.245 * VB_W : 0.755 * VB_W;
+  //
+  // Read off `BOX_FRAC` rather than written as its own number. It used to be a
+  // hardcoded 0.245 of the stage while the box was 0.27 of it, so the line
+  // overshot the corner by that 2.5% and ran on along the top edge — the exact
+  // thing the paragraph above says it must not do. One constant now decides
+  // both where the box starts and where the line lands, at every width.
+  const corner = isLeft ? BOX_FRAC * VB_W : (1 - BOX_FRAC) * VB_W;
   const boxY = Math.min(72, Math.max(8, ay - 9));
   // A short horizontal before the corner keeps the elbow, giving the eye
   // somewhere to land between the diagonal and the box.
@@ -217,10 +279,10 @@ export function Callout({
   // 0 = nothing, 1 = line drawn, 2 = box in.
   const start = useRef(0);
   if (!start.current) start.current = performance.now();
-  const [phase, setPhase] = useState(() => (reduced() ? 2 : 0));
+  const [phase, setPhase] = useState(() => (reduced() || hidden() ? 2 : 0));
 
   useEffect(() => {
-    if (reduced()) return;
+    if (reduced() || hidden()) return;
     // Timed, not polled. This used to check the clock every 60ms, so the box
     // waited for whichever tick came after the line landed — up to a frame and
     // a half of nothing happening, which is the pause that was visible. Firing
@@ -230,9 +292,16 @@ export function Callout({
       () => setPhase(2),
       Math.max(0, LINE_MS - (performance.now() - start.current)),
     );
+    // Leaving mid-arrival lands the whole thing, for the same reason: the
+    // frames it still needed are not going to be granted while you are away.
+    const land = () => {
+      if (hidden()) setPhase(2);
+    };
+    document.addEventListener("visibilitychange", land);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(id);
+      document.removeEventListener("visibilitychange", land);
     };
   }, []);
 
@@ -286,20 +355,26 @@ export function Callout({
         />
       </svg>
 
-      <div
+      <Box
+        onClick={onClick}
+        label={label}
         style={{
           position: "absolute",
           top: `${boxY}%`,
           [isLeft ? "left" : "right"]: 0,
+          // No pixel cap on top of the fraction: a cap that bit would put the
+          // box's edge somewhere the leader line, which is measured in stage
+          // fractions, could not know about. The stage is already bounded by
+          // the app's own max width, so the fraction alone is the whole rule.
           width: `${BOX_FRAC * 100}%`,
-          maxWidth: 116,
           textAlign: isLeft ? "left" : "right",
           padding: "7px 8px",
           boxSizing: "border-box",
           border: "1px solid var(--color-faint)",
           borderRadius: 3,
           background: "transparent",
-          pointerEvents: "none",
+          pointerEvents: onClick ? "auto" : "none",
+          cursor: onClick ? "pointer" : undefined,
           // Opens from the corner the line arrives at, so the box unfolds away
           // from the body rather than towards it.
           transformOrigin: isLeft ? "top right" : "top left",
@@ -325,16 +400,40 @@ export function Callout({
               overflowWrap: "break-word",
             }}
           >
-            {l.numeralId ? (
-              <Numeral id={l.numeralId} text={l.text} delay={480 + i * 53} />
-            ) : l.scramble ? (
-              <Scramble text={l.text} delay={480 + i * 53} />
+            {l.scramble ? (
+              <Scramble text={l.text} delay={CHURN_MS + i * 53} />
             ) : (
               l.text
             )}
           </div>
         ))}
-      </div>
+      </Box>
     </>
+  );
+}
+
+/**
+ * The callout box: a plain div when it only reports, a button when it acts.
+ *
+ * Kept as one component so the box's geometry is written once — the leader line
+ * is measured against it, and a second copy of these numbers would be a second
+ * place for the line to stop meeting the corner.
+ */
+function Box({
+  onClick,
+  label,
+  style,
+  children,
+}: {
+  onClick?: () => void;
+  label?: string;
+  style: CSSProperties;
+  children: ReactNode;
+}) {
+  if (!onClick) return <div style={style}>{children}</div>;
+  return (
+    <button type="button" onClick={onClick} aria-label={label} style={style}>
+      {children}
+    </button>
   );
 }

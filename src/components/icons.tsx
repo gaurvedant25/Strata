@@ -44,6 +44,28 @@ export const X = ({ className, size = 18 }: P) => (
   </svg>
 );
 
+/**
+ * The share mark: a sheet with something leaving the top of it.
+ *
+ * The platform arrow-out-of-a-box rather than the three linked dots. The dots
+ * are an Android convention and read as "connections" on an iPhone, where this
+ * one is the glyph on the button every share sheet in the OS opens from.
+ */
+export const Share = ({ className, size = 18 }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M12 16V4M8 8l4-4 4 4" />
+    <path d="M5 14v4.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V14" />
+  </svg>
+);
+
+/** The app's one warm mark: a compact flame for the training streak. */
+export const StreakIcon = ({ className, size = 20 }: P) => (
+  <svg {...base(size)} strokeWidth={1.9} className={className}>
+    <path d="M13.2 2.8c.5 3.4-1.7 4.7-3.2 6.6-1.2 1.5-1.4 3.1-.5 4.4.2-1.7 1.2-2.8 2.6-3.8-.1 2.3 2.5 3.2 2.5 6.1 0 2-1.2 3.8-3.1 4.7" />
+    <path d="M9.8 21c-3.2-.7-5.3-3.3-5.3-6.5 0-3.7 2.4-6.2 5.4-9.3-.1 2 .6 3.1 1.4 3.7 1.1-1.3 2.2-3.2 1.9-6.1 3.8 2.8 6.3 6.5 6.3 10.8 0 3.7-2.1 6.5-5.3 7.3" />
+  </svg>
+);
+
 export const ChevronRight = ({ className, size = 18 }: P) => (
   <svg {...base(size)} className={className}>
     <path d="M9 5l7 7-7 7" />

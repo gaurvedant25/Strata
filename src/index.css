@@ -9,31 +9,65 @@
 @import "@fontsource/ibm-plex-mono/600.css";
 
 @theme {
-  /* Ground. There is one surface colour and it is black — no panels, no cards. */
+  /* Ground. Black, and still the colour the screen sits on. */
   --color-ink: #000000;
+  /* The one panel colour. Two blocks on the strength screen — the figure and
+     everything read off it — now sit on a card rather than floating on the
+     ground, so the eye has somewhere to stop between them. It is barely
+     lighter than the ground on purpose: enough to read as a surface, not
+     enough to become a second colour. */
+  --color-card: #121212;
+  /*
+   * The line on a card: its own edge, and the dividers inside it.
+   *
+   * Lighter than `rule`, which is a hairline drawn on black. Raise the ground
+   * under it and that hairline disappears — and a card whose edge you cannot
+   * find is not a card, it is a slightly different black. This is the tone at
+   * which the edge survives the surface.
+   */
+  --color-cardrule: #262626;
   /* The only two greys that draw anything: a section rule and a row rule. */
   --color-rule: #1a1a1a;
   --color-subrule: #111111;
   /* Hierarchy is three text tones, never a lighter box.
-     Every one of them clears 4.5:1 against the darkest ground it is ever set
-     on (#161616, the selected card), so the ladder is built out of tones that
-     can all actually be read rather than out of one legible tone and two
-     suggestions of one. `faint` is deliberately NOT in that ladder — it is
-     below the text threshold and is only ever allowed to draw a mark, never a
-     word. See the note on it below. */
+     Every one of them clears 4.5:1 against the lightest ground it is ever set
+     on — the card at #121212 — so the ladder is built out of tones that can
+     all actually be read rather than out of one legible tone and two
+     suggestions of one. The one surface above that, a selected row at
+     #2a2a2a, carries only the top two tones; nothing sets `dim` on it, which
+     is the rule that keeps the selected state from costing legibility.
+     `faint` is deliberately NOT in that ladder — it is below the text
+     threshold and is only ever allowed to draw a mark, never a word. See the
+     note on it below. */
   --color-fg: #f5f5f5;
-  /* Secondary. 7.5:1 on black, 6.4:1 on a selected card. */
+  /* Secondary. 7.5:1 on black, 6.7:1 on a card, 5.1:1 on a selected row. */
   --color-muted: #9a9a9a;
   /* Tertiary, and the resting state of anything interactive that is currently
      off — an unselected tab, a placeholder. These are still words a person has
      to read to navigate, so this tone clears the text minimum too (5.3:1 on
-     black, 4.6:1 on a card) rather than fading toward the background. */
+     black, 4.7:1 on a card) rather than fading toward the background. It is
+     not used on a selected row, where it would fall to 3.6:1. */
   --color-dim: #808080;
   /* Not a text tone. The only things drawn in it are marks that carry no
      words — an unfilled pip, an empty set dot — which WCAG holds to 3:1 as
      non-text graphics rather than to 4.5:1. Setting type in this is a bug. */
   --color-faint: #646464;
   --color-danger: #ff453a;
+  /*
+   * The one warm colour in the app, and it is spent entirely on the streak.
+   *
+   * Everything else here is black, white and a grey between them, which is
+   * what makes a single warm tone worth so much: the streak is the only thing
+   * on the finish card that is not a fact about the last hour, and the colour
+   * is how it says so without needing a word. It appears on the arc, on the
+   * figure inside it, and nowhere else — the moment a second thing is drawn in
+   * it, the streak stops being the thing your eye goes to.
+   *
+   * Set in oklch because the ramp was picked there; `EMBER` in
+   * `src/lib/card/tokens.ts` is the sRGB clip of this same colour, for the
+   * canvas that draws the share card.
+   */
+  --color-ember: oklch(0.78 0.16 58);
 
   /*
    * The type scale, in rem rather than px.
@@ -171,6 +205,270 @@ input[type="number"]::-webkit-inner-spin-button {
   animation: fade 0.14s var(--ease-settle);
 }
 
+/*
+ * An exercise taking the card.
+ *
+ * Switching exercise replaces every word in the panel at once. Without this the
+ * change reads as the text being rewritten under you; with a short rise it
+ * reads as the next exercise arriving, which is what actually happened.
+ */
+@keyframes exswap {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-exswap {
+  animation: exswap 0.24s var(--ease-settle);
+}
+
+/*
+ * Setup, moving between questions.
+ *
+ * Eighteen questions in a row need to read as one thing travelling rather than
+ * eighteen screens replacing each other, so a step arrives from the side it
+ * came from: forward slides in from the right, Back from the left. Sideways
+ * rather than the app's usual rise, because the answer to "where did the last
+ * screen go" is the only thing this motion has to carry, and the direction is
+ * the whole answer.
+ *
+ * Restarted by keying the block on the step index, which remounts it — a class
+ * cannot replay an animation it is already wearing.
+ */
+@keyframes step-in-forward {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes step-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-step-forward {
+  animation: step-in-forward 0.42s var(--ease-settle) both;
+}
+
+.animate-step-back {
+  animation: step-in-back 0.42s var(--ease-settle) both;
+}
+
+/* The rows inside a step, landing one after another. Delay set per element so
+   a list settles top to bottom instead of appearing as a block. */
+@keyframes step-item {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-step-item {
+  animation: step-item 0.34s var(--ease-settle) both;
+}
+
+/*
+ * The head of the setup progress bar.
+ *
+ * The only looping animation in the app besides the slide-to-start shimmer, and
+ * it earns the loop the same way: the bar is a hairline two pixels tall, and a
+ * still dot on it is indistinguishable from the fill's end. Breathing is what
+ * separates "you are here" from "the line stops here". Absent on the intro,
+ * where nothing has been answered and there is no position to mark yet.
+ */
+@keyframes head-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.9);
+  }
+}
+
+.animate-head-pulse {
+  animation: head-pulse 2.2s ease-in-out infinite;
+}
+
+/*
+ * The end of a workout.
+ *
+ * The only celebratory motion in the app, and the only overshoot: the mark
+ * stamps past its size and settles back, with a ring thrown off it. Everything
+ * else here is the app's usual settle — the card scales up a little, and the
+ * lines under it come in one after another rather than all together, which is
+ * what gives the card somewhere to go after it has arrived.
+ */
+@keyframes cb-card {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cb-check {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes cb-ring {
+  from {
+    transform: scale(0.55);
+    opacity: 0.45;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes cb-stat {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-cb-card {
+  animation: cb-card 0.32s var(--ease-settle);
+}
+
+.animate-cb-check {
+  animation: cb-check 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.12s both;
+}
+
+.animate-cb-ring {
+  animation: cb-ring 0.8s ease-out 0.18s both;
+}
+
+/* Delay set per element, so a row of figures lands left to right. */
+.animate-cb-stat {
+  animation: cb-stat 0.4s ease-out both;
+}
+
+/*
+ * The arc that carries the streak, drawn against your best run.
+ *
+ * A stroked circle rather than a filled sweep: the same hairline vocabulary as
+ * every other rule in the app, and it leaves the middle free for the figure.
+ * It draws itself on rather than appearing, because the length of it is the
+ * message — a ring most of the way round says something a static ring cannot.
+ *
+ * The two lengths come in as custom properties from the element, since only
+ * the component knows the radius and the fraction.
+ */
+@keyframes cb-arc {
+  from {
+    stroke-dashoffset: var(--dash-full);
+  }
+  to {
+    stroke-dashoffset: var(--dash-off);
+  }
+}
+
+.animate-cb-arc {
+  animation: cb-arc 1.15s var(--ease-settle) 0.32s both;
+}
+
+/*
+ * The streak figure turning over.
+ *
+ * A two-place strip in a window one line tall: yesterday's number sits on top,
+ * today's below it, and the strip is dragged up by exactly one line. The app's
+ * `Numeral` odometer cannot do this one — it rolls from whatever it last had
+ * on screen, and the previous streak has never been on this card — so the
+ * pair is built by hand and travels once.
+ */
+@keyframes cb-roll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-1em);
+  }
+}
+
+.animate-cb-roll {
+  animation: cb-roll 0.62s var(--ease-settle) 0.7s both;
+}
+
+/*
+ * The heat behind the figure, and the light that passes over the card.
+ *
+ * Both are ambient rather than arrival motion: they start after everything has
+ * landed and run slowly enough not to be watched. The global reduced-motion
+ * rule collapses each to a single millisecond, which leaves the glow at its
+ * dimmest and the sheen off the edge — off, rather than removed.
+ */
+@keyframes cb-ember {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.34;
+    transform: scale(1.06);
+  }
+}
+
+.animate-cb-ember {
+  animation: cb-ember 6s ease-in-out 1.2s infinite;
+}
+
+@keyframes cb-sheen {
+  from {
+    transform: translateX(-130%) rotate(8deg);
+  }
+  to {
+    transform: translateX(230%) rotate(8deg);
+  }
+}
+
+.animate-cb-sheen {
+  animation: cb-sheen 8s linear 1.8s infinite;
+}
+
 /* One column of an odometer: a strip of every character the wheel turns past,
    inside a window one line tall. The travel is the whole strip less the one
    line on show, so a column spinning 2 through 9 covers seven places and one
@@ -190,6 +488,73 @@ input[type="number"]::-webkit-inner-spin-button {
   }
   to {
     transform: translateY(0);
+  }
+}
+
+/*
+ * The shimmer that says a control wants to be dragged.
+ *
+ * A slide-to-start track is a gesture with nothing on screen to announce it —
+ * the label has to do that work. A highlight travelling along the words in the
+ * direction the thumb should go reads as an instruction rather than as
+ * decoration, which is what earns it a loop: it is not celebrating anything, it
+ * is telling you which way to push.
+ *
+ * Stopped outright under reduced motion, where a permanent loop is the most
+ * intrusive thing an interface can do, and the label falls back to a plain tone.
+ */
+/*
+ * The travel is exactly one tile, which is the whole trick.
+ *
+ * A repeating background loops seamlessly only when it is shifted by a whole
+ * number of its own widths — land anywhere else and the pattern snaps back out
+ * of phase at the end of every cycle. The first version of this animated
+ * `background-position` in percentages, which measured 1.6 tiles per cycle and
+ * visibly jumped 0.6 of a tile every 2.4 seconds.
+ *
+ * Percentages are also the wrong unit here even at the right distance: a
+ * percentage background-position resolves against the difference between the
+ * element and the image, so the distance travelled changes with the width of
+ * the label — and with the reader's text size. In `em` the tile and the travel
+ * are the same known quantity, and the loop is seamless whatever the text says.
+ *
+ * The gradient is the same tone at both ends, so consecutive tiles meet without
+ * a seam of their own.
+ */
+@keyframes slide-glow {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: var(--glow-tile) 0;
+  }
+}
+
+.slide-glow {
+  --glow-tile: 28em;
+  color: transparent;
+  background-image: linear-gradient(
+    100deg,
+    var(--color-dim) 0%,
+    var(--color-dim) 38%,
+    var(--color-fg) 50%,
+    var(--color-dim) 62%,
+    var(--color-dim) 100%
+  );
+  background-size: var(--glow-tile) 100%;
+  background-repeat: repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: slide-glow 2.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-glow {
+    animation: none;
+    background-image: none;
+    color: var(--color-dim);
+    -webkit-text-fill-color: var(--color-dim);
   }
 }
 
@@ -302,4 +667,44 @@ input[type="number"]::-webkit-inner-spin-button {
   .press:active {
     transform: none;
   }
+}
+
+/*
+ * The floating stack: the tab bar and the workout pill.
+ *
+ * Neither sits on the ground any more — they hover over the content with the
+ * screen showing through them, which is what makes it safe for them to leave
+ * on scroll: nothing under them reflows when they go, because nothing was ever
+ * laid out around them. Declared once because the two have to read as one
+ * object at two sizes; the same translucency, the same hairline, the same lift.
+ *
+ * Unlayered, so the surface wins over a Tailwind `bg-*` on the same element and
+ * the whole treatment arrives from one class rather than five.
+ *
+ * `--lift` is the one part that differs. The bar is the thing you reach for and
+ * carries the full drop shadow; the pill above it is secondary and sits lower,
+ * so it gets a shallower one. Same surface, two heights off the page.
+ */
+.glass {
+  --lift: 0 14px 36px rgb(0 0 0 / 0.65), 0 2px 8px rgb(0 0 0 / 0.5);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  background: rgb(20 20 22 / 0.62);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    var(--lift);
+}
+
+/*
+ * Room under a screen's last row for the floating stack to hover in.
+ *
+ * The stack no longer takes any layout space, so every scrolling screen has to
+ * reserve it by hand. One utility rather than a number written down in nine
+ * places: the pill comes and goes with the workout, so this is sized for the
+ * taller of the two states and left there — a screen whose end you can reach
+ * beats a screen whose padding is exactly right half the time.
+ */
+@utility pb-stack {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 11.5rem);
 }

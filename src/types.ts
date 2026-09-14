@@ -1,3 +1,5 @@
+import type { BenchmarkLifts } from "./lib/strength";
+
 export type Unit = "kg" | "lb";
 
 /**
@@ -21,6 +23,13 @@ export type Exercise = Synced & {
   muscle: string;
   /** bodyweight exercises log reps only (weight = added weight) */
   bodyweight?: boolean;
+  /**
+   * What a set of this is counted in. Absent means reps, which is almost
+   * everything; a plank or a treadmill run is held for a duration instead, and
+   * asking those for a rep count only ever produced a 1 standing in for
+   * "I did it".
+   */
+  tracks?: "reps" | "time";
   createdAt: number;
   archived?: boolean;
 };
@@ -59,6 +68,16 @@ export type Split = Synced & {
 export type SetLog = {
   id: string;
   reps: number;
+  /**
+   * How long the set was held, for an exercise that tracks time.
+   *
+   * Kept beside `reps` rather than replacing it, and a timed set leaves `reps`
+   * at zero. Everything that scores training — volume, estimated 1RMs, personal
+   * bests — already ignores a set with no reps in it, so a minute of plank
+   * stays out of the strength maths on its own rather than each of those
+   * places having to learn what a timed set is.
+   */
+  seconds?: number;
   weight: number;
   rpe?: number;
   done: boolean;
@@ -96,6 +115,11 @@ export type Settings = {
   unit: Unit;
   /** drives which bodyweight-relative strength standards the body map scores against */
   gender: Gender;
+  /**
+   * The lift each region is scored on, where you named one during setup.
+   * Regions you never answered for are absent and use the built-in benchmark.
+   */
+  benchmarks?: BenchmarkLifts;
 };
 
 export const DEFAULT_SETTINGS: Settings = {

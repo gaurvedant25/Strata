@@ -25,6 +25,8 @@ type Auth = {
   signUp: (email: string, password: string) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  /** Delete the account and every synced row. Throws if the server refuses. */
+  deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Reconcile now. Safe to call when signed out — it does nothing. */
   push: () => Promise<void>;
@@ -145,6 +147,31 @@ export function AuthProvider({
       if (error) throw error;
     },
     /**
+     * Delete the account and everything synced to it.
+     *
+     * The client cannot do this alone: deleting a user needs the service-role
+     * key, so `supabase/functions/delete-account` does it and this only asks.
+     * The rows go with the user, by the cascade declared in `schema.sql`.
+     *
+     * Unlike signing out, this one is not allowed to give up quietly when the
+     * network is slow. A sign-out that fails locally still leaves the account
+     * intact; a deletion that *looks* like it worked but did not would leave
+     * someone believing their data is gone when it is still on a server. So
+     * any failure is thrown, and the caller says so rather than proceeding to
+     * erase the device.
+     */
+    async deleteAccount() {
+      if (!supabase) throw new Error("No account service is configured.");
+      const { error } = await supabase.functions.invoke("delete-account", {
+        method: "POST",
+      });
+      if (error) throw error;
+      // The user is gone, so the session it belonged to is meaningless; drop
+      // it locally rather than asking a server about a user it just deleted.
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      setSession(null);
+    },
+    /**
      * Sign out, whatever the network is doing.
      *
      * Both halves of this used to be unbounded awaits — a full sync, then a
@@ -170,9 +197,6 @@ export function AuthProvider({
         await supabase.auth.signOut({ scope: "local" }).catch(() => {});
       }
       setSession(null);
-      // Signing out should land on the sign-in screen, even for someone who
-      // once chose to go without an account.
-      localStorage.removeItem("gymlog.noAccount");
     },
     push: run,
   };

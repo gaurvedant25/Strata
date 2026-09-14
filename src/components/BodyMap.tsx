@@ -1,59 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { animate } from "motion";
+import { FLICK, rubberband, velocityOf } from "../lib/gesture";
 import {
   anatomy,
   groupForSlug,
   partPaths,
   type BodyView,
 } from "../lib/anatomy";
+import { anchorsFor } from "../lib/anatomy/anchors";
 import type { MuscleGroup, MuscleScore } from "../lib/strength";
 import type { Gender } from "../types";
 import {
   Callout,
   FIG_FRAC,
   STAGE_ASPECT,
-  type Anchor,
   type CalloutLine,
 } from "./Callout";
-
-/**
- * Where each region's leader line lands, as a fraction of the figure's box.
- * A third entry marks a bilateral region, whose right-hand callout mirrors the
- * anchor so neither line has to cross the body.
- */
-const ANCHOR: Record<BodyView, Partial<Record<MuscleGroup, Anchor>>> = {
-  front: {
-    chest: [0.5, 0.28],
-    shoulders: [0.255, 0.235, true],
-    biceps: [0.2, 0.35, true],
-    forearms: [0.14, 0.45, true],
-    abs: [0.5, 0.41],
-    obliques: [0.34, 0.42, true],
-    quadriceps: [0.385, 0.65, true],
-    calves: [0.39, 0.83, true],
-    traps: [0.5, 0.2],
-    lats: [0.3, 0.36, true],
-    lowerBack: [0.5, 0.46],
-    triceps: [0.19, 0.35, true],
-    hamstrings: [0.385, 0.68, true],
-    glutes: [0.5, 0.52],
-  },
-  back: {
-    traps: [0.5, 0.2],
-    lats: [0.32, 0.33, true],
-    lowerBack: [0.5, 0.45],
-    glutes: [0.5, 0.52],
-    triceps: [0.19, 0.35, true],
-    forearms: [0.14, 0.45, true],
-    hamstrings: [0.39, 0.66, true],
-    calves: [0.39, 0.83, true],
-    shoulders: [0.255, 0.235, true],
-    biceps: [0.2, 0.35, true],
-    chest: [0.5, 0.28],
-    abs: [0.5, 0.41],
-    obliques: [0.34, 0.42, true],
-    quadriceps: [0.385, 0.65, true],
-  },
-};
 
 export type Callouts = { left?: CalloutLine[]; right?: CalloutLine[] };
 
@@ -70,12 +32,12 @@ export type { BodyView };
  * drawn but unscorable. Those are scored regions now, so all it did was make
  * the knees the brightest thing on an unlit leg.
  */
-const SKIN = "#3b3b45";
-const STRUCTURE = "#34343d";
-const EDGE = "rgba(0,0,0,.72)";
+export const SKIN = "#3b3b45";
+export const STRUCTURE = "#34343d";
+export const EDGE = "rgba(0,0,0,.72)";
 
 /** Mixes a hex colour toward white (positive) or black (negative) for the sheen. */
-function shift(hex: string, amount: number) {
+export function shift(hex: string, amount: number) {
   const v = parseInt(hex.slice(1), 16);
   const mix = (c: number) =>
     Math.round(amount >= 0 ? c + (255 - c) * amount : c * (1 + amount));
@@ -96,6 +58,15 @@ const LAYERS = 10;
  * that does not exist.
  */
 const MAX_TILT = 26;
+
+/**
+ * Same check the scramble, the odometer and the chart's draw make. The global
+ * reduced-motion rule in the stylesheet only reaches CSS transitions, and the
+ * settle is a spring driven from script, so it has to ask for itself.
+ */
+const reduced = () =>
+  typeof matchMedia === "function" &&
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** Pointer travel, in px, that counts as a full turn. */
 const TRAVEL = 150;
 
@@ -106,6 +77,7 @@ function Figure({
   selected,
   onSelect,
   opacity,
+  svgRef,
 }: {
   gender: Gender;
   view: BodyView;
@@ -113,12 +85,15 @@ function Figure({
   selected: MuscleGroup | null;
   onSelect: (m: MuscleGroup) => void;
   opacity: number;
+  /** Lets the drag write this figure's opacity without a render. */
+  svgRef?: RefObject<SVGSVGElement | null>;
 }) {
   const { parts, viewBox } = anatomy(gender, view);
   // one sheen gradient per tier colour actually in play
   const lit = [...new Set(Object.values(scores).map((s) => s.color))];
   return (
     <svg
+      ref={svgRef}
       viewBox={viewBox}
       width="100%"
       height="100%"
@@ -205,6 +180,8 @@ export function BodyMap({
   showToggle = true,
   maxWidth = 250,
   callouts = null,
+  onCalloutClick,
+  onCalloutLabel,
 }: {
   gender: Gender;
   scores: Partial<Record<MuscleGroup, MuscleScore>>;
@@ -217,10 +194,60 @@ export function BodyMap({
   maxWidth?: number;
   /** Annotations drawn onto the figure for the selected region. */
   callouts?: Callouts | null;
+  /** Makes the callout box a control — see `Callout`. */
+  onCalloutClick?: () => void;
+  onCalloutLabel?: string;
 }) {
-  const [p, setP] = useState(0); // drag progress, -1..1
+  /**
+   * Drag progress, -1..1 — a ref, not state.
+   *
+   * It used to be `useState`, so every pointermove re-rendered this component
+   * and both figures inside it to move one number. The whole surface it drives
+   * is three inline styles, so it is written straight to those elements now and
+   * React never hears about the drag at all.
+   */
+  const p = useRef(0);
   const startX = useRef(0);
   const dragging = useRef(false);
+  /** Which finger owns the drag; later ones are ignored. */
+  const pointer = useRef<number | null>(null);
+  /** Recent positions, for measuring the speed of the release. */
+  const track = useRef<{ x: number; t: number }[]>([]);
+  /** The settle currently running, so a new gesture can cut it short. */
+  const settling = useRef<{ stop: () => void } | null>(null);
+
+  const stage = useRef<HTMLDivElement>(null);
+  const frontSvg = useRef<SVGSVGElement>(null);
+  const backSvg = useRef<SVGSVGElement>(null);
+
+  /**
+   * Writes the turn to the DOM.
+   *
+   * The single place `p` becomes visible: the tilt on the stage, and the
+   * cross-fade between the two drawings. `live` is on while a finger is down,
+   * which suppresses the figures' own opacity transition — a 225ms ease on a
+   * value being written every frame lags the finger by a quarter second.
+   */
+  const paint = (v: number, live: boolean) => {
+    p.current = v;
+    const k = Math.min(1, Math.abs(v));
+    const out = Math.max(0, 1 - k * 2);
+    const inc = Math.max(0, k * 2 - 1);
+    if (stage.current) {
+      stage.current.style.transform = `rotateY(${v * MAX_TILT}deg)`;
+    }
+    const near = view === "front" ? frontSvg.current : backSvg.current;
+    const far = view === "front" ? backSvg.current : frontSvg.current;
+    for (const [el, o] of [
+      [near, out],
+      [far, inc],
+    ] as const) {
+      if (!el) continue;
+      el.style.opacity = String(o);
+      el.style.pointerEvents = o > 0.5 ? "auto" : "none";
+      el.style.transition = live ? "none" : "opacity 225ms var(--ease-settle)";
+    }
+  };
 
   const front = anatomy(gender, "front");
   const [, , vbW, vbH] = front.viewBox.split(" ").map(Number);
@@ -245,51 +272,105 @@ export function BodyMap({
   }, [shown]);
 
   useEffect(() => {
-    setP(0);
+    settling.current?.stop();
+    settling.current = null;
+    paint(0, false);
+    // `paint` is recreated every render but only ever reads `view`, which is
+    // this effect's own dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
-  const k = Math.min(1, Math.abs(p));
   const other: BodyView = view === "front" ? "back" : "front";
 
-  /**
-   * The two drawings never overlap: the current one is gone by the halfway
-   * point and the next only starts arriving after it, so mid-turn you see the
-   * bare silhouette rather than a double exposure of front and back at once.
-   */
-  const outgoing = Math.max(0, 1 - k * 2);
-  const incoming = Math.max(0, k * 2 - 1);
-
   function down(e: React.PointerEvent) {
+    // A second finger arriving mid-drag is ignored rather than allowed to take
+    // over — without this, switching fingers jumps the figure to the new one.
+    if (dragging.current) return;
+    // Grabbing a figure still settling stops it where it is, so the drag picks
+    // up from what the eye can see rather than from where it was headed.
+    settling.current?.stop();
+    settling.current = null;
     startX.current = e.clientX;
     dragging.current = true;
+    pointer.current = e.pointerId;
+    track.current = [{ x: e.clientX, t: performance.now() }];
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
+
   function move(e: React.PointerEvent) {
-    if (!dragging.current) return;
+    if (!dragging.current || e.pointerId !== pointer.current) return;
     const dx = e.clientX - startX.current;
-    setP(Math.max(-1, Math.min(1, dx / TRAVEL)));
+    const raw = dx / TRAVEL;
+    // Past a full turn the figure keeps following, but less and less. A hard
+    // clamp here read as the drag having died under the finger.
+    const over = Math.abs(raw) - 1;
+    const next = over > 0 ? Math.sign(raw) * (1 + rubberband(over, 1)) : raw;
+    track.current.push({ x: e.clientX, t: performance.now() });
+    if (track.current.length > 8) track.current.shift();
+    paint(next, true);
   }
-  function up() {
-    if (!dragging.current) return;
+
+  function up(e: React.PointerEvent) {
+    if (!dragging.current || e.pointerId !== pointer.current) return;
     dragging.current = false;
-    if (Math.abs(p) > 0.45) onViewChange(other);
-    setP(0);
+    pointer.current = null;
+    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+
+    const v = velocityOf(track.current); // px/ms, signed
+    const travelled = p.current;
+    // A flick counts on its own. Requiring it to also cross half the travel is
+    // what made this gesture feel heavy: you threw the figure, nothing moved,
+    // and you learned to drag it instead.
+    const flicked =
+      Math.abs(v) > FLICK && Math.sign(v) === Math.sign(travelled);
+    if (Math.abs(travelled) > 0.45 || flicked) onViewChange(other);
+
+    if (reduced()) {
+      paint(0, false);
+      return;
+    }
+    // Back to rest on a spring rather than a fixed curve, handed the speed the
+    // finger had at release — so there is no seam between letting go and the
+    // figure carrying on. `p` is a plain number, so the spring drives it and
+    // `paint` puts it on screen.
+    const controls = animate(travelled, 0, {
+      type: "spring",
+      duration: 0.5,
+      bounce: 0.2,
+      velocity: -v / TRAVEL, // px/ms of finger -> units of `p` per ms
+      onUpdate: (value) => paint(value, false),
+    });
+    settling.current = { stop: () => controls.stop() };
+    void controls.finished.then(() => {
+      settling.current = null;
+    });
   }
 
-  const settle = dragging.current
-    ? "none"
-    : "transform 240ms var(--ease-settle)";
-
-  const anchor = (selected && ANCHOR[view][selected]) || ANCHOR[view].chest!;
-  // Callouts need room either side, so the figure gives up the outer 60% of the
-  // frame and the boxes live in it. Without them the figure keeps the width.
-  const showCallouts = !!callouts && !!selected && !!ANCHOR[view][selected];
+  /**
+   * Where this region's two lines leave the body, measured per figure and per
+   * side. Absent when the region is not drawn on the side being shown — the
+   * back of the figure has no chest to point at — and the callouts stay down.
+   */
+  const anchors = selected ? anchorsFor(gender, view, selected) : undefined;
+  /*
+   * Callouts need room either side, so the figure gives up the outer 60% of
+   * the frame and the boxes live in it.
+   *
+   * Geometry, not content: a screen that annotates the figure gives those
+   * gutters up for good, whether or not the region in view has anything to say
+   * in them. This used to follow the callouts themselves, so selecting a
+   * muscle with nothing logged against it handed the gutters back and the
+   * figure grew to fill the card — a tap on an unscored muscle looked like the
+   * whole chart zooming in, and tapping a scored one snapped it back.
+   */
+  const framed = callouts !== null;
+  const showCallouts = framed && !!anchors;
 
   return (
     <div className="select-none">
       <div
         style={
-          showCallouts
+          framed
             ? {
                 position: "relative",
                 width: "100%",
@@ -307,8 +388,8 @@ export function BodyMap({
             perspective: 900,
             touchAction: "pan-y",
             cursor: "grab",
-            position: showCallouts ? "absolute" : "relative",
-            ...(showCallouts
+            position: framed ? "absolute" : "relative",
+            ...(framed
               ? {
                   left: `${(0.5 - FIG_FRAC / 2) * 100}%`,
                   width: `${FIG_FRAC * 100}%`,
@@ -319,12 +400,14 @@ export function BodyMap({
           }}
         >
           <div
+            ref={stage}
             style={{
               position: "absolute",
               inset: 0,
               transformStyle: "preserve-3d",
-              transform: `rotateY(${p * MAX_TILT}deg)`,
-              transition: settle,
+              // The turn is written straight to this node by `paint`; React
+              // renders it at rest and never touches it again.
+              transform: "rotateY(0deg)",
             }}
           >
             {/* laminate: one cached silhouette bitmap repeated through the depth */}
@@ -356,7 +439,8 @@ export function BodyMap({
               scores={scores}
               selected={selected}
               onSelect={onSelect}
-              opacity={view === "front" ? outgoing : incoming}
+              svgRef={frontSvg}
+              opacity={view === "front" ? 1 : 0}
             />
             <Figure
               gender={gender}
@@ -364,7 +448,8 @@ export function BodyMap({
               scores={scores}
               selected={selected}
               onSelect={onSelect}
-              opacity={view === "back" ? outgoing : incoming}
+              svgRef={backSvg}
+              opacity={view === "back" ? 1 : 0}
             />
           </div>
         </div>
@@ -376,7 +461,7 @@ export function BodyMap({
                 key={`l-${view}-${selected}`}
                 side="left"
                 lines={callouts!.left}
-                anchor={anchor}
+                anchor={anchors!.left}
               />
             )}
             {callouts!.right && (
@@ -384,7 +469,9 @@ export function BodyMap({
                 key={`r-${view}-${selected}`}
                 side="right"
                 lines={callouts!.right}
-                anchor={anchor}
+                anchor={anchors!.right}
+                onClick={onCalloutClick}
+                label={onCalloutLabel}
               />
             )}
           </>

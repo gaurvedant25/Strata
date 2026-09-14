@@ -90,6 +90,7 @@ export async function loadAll() {
     settings,
     activeId,
     splitId,
+    pendingCompletionId,
   ] = await Promise.all([
     d.getAll("exercises"),
     d.getAll("routines"),
@@ -99,6 +100,7 @@ export async function loadAll() {
     d.get("meta", "settings") as Promise<Settings | undefined>,
     d.get("meta", "activeSessionId") as Promise<string | undefined>,
     d.get("meta", "activeSplitId") as Promise<string | undefined>,
+    d.get("meta", "pendingCompletionId") as Promise<string | undefined>,
   ]);
   return {
     exercises: live(exercises),
@@ -110,7 +112,33 @@ export async function loadAll() {
     settings: { ...DEFAULT_SETTINGS, ...(settings ?? {}) } as Settings,
     activeSessionId: activeId ?? null,
     activeSplitId: splitId ?? null,
+    pendingCompletionId: pendingCompletionId ?? null,
   };
+}
+
+/**
+ * Every exercise id in the store, tombstones included.
+ *
+ * `loadAll` hides buried rows, which is right for everything that reads the
+ * library but wrong for deciding what to add to it: an exercise somebody
+ * deleted would look absent and be written back on the next launch. This is the
+ * question "has this row ever existed here", which is the one topping the
+ * library up actually needs to ask.
+ */
+export async function allExerciseIds(): Promise<string[]> {
+  return (await (await db()).getAllKeys("exercises")) as string[];
+}
+
+/**
+ * Every exercise row, tombstones included.
+ *
+ * Repointing an old reference needs the buried rows as well as the living
+ * ones: a routine written against a copy that was deleted long ago still holds
+ * that id, and the only way left to work out what it meant is to read the name
+ * off the tombstone.
+ */
+export async function allExercises(): Promise<Exercise[]> {
+  return (await db()).getAll("exercises");
 }
 
 /**
@@ -122,6 +150,44 @@ const stamp = <T extends object>(v: T): T & { updatedAt: number } => ({
   ...v,
   updatedAt: Date.now(),
 });
+
+/**
+ * Marks an active session complete without closing it, so the celebration can
+ * survive a reload. The pending id distinguishes this from reopening an old
+ * historical workout for editing.
+ */
+export async function markSessionComplete(session: Session) {
+  const d = await db();
+  const tx = d.transaction(["sessions", "meta"], "readwrite");
+  await Promise.all([
+    tx.objectStore("sessions").put(stamp(session)),
+    tx.objectStore("meta").put(session.id, "pendingCompletionId"),
+    tx.done,
+  ]);
+}
+
+/** Close a workout and its pending celebration as one durable operation. */
+export async function commitFinishedSession(session: Session) {
+  const d = await db();
+  const tx = d.transaction(["sessions", "meta"], "readwrite");
+  await Promise.all([
+    tx.objectStore("sessions").put(stamp(session)),
+    tx.objectStore("meta").put(null, "activeSessionId"),
+    tx.objectStore("meta").put(null, "pendingCompletionId"),
+    tx.done,
+  ]);
+}
+
+/** Undo only an automatic completion; the active workout stays open. */
+export async function reopenPendingSession(session: Session) {
+  const d = await db();
+  const tx = d.transaction(["sessions", "meta"], "readwrite");
+  await Promise.all([
+    tx.objectStore("sessions").put(stamp(session)),
+    tx.objectStore("meta").put(null, "pendingCompletionId"),
+    tx.done,
+  ]);
+}
 
 export const put = {
   exercise: async (v: Exercise) => (await db()).put("exercises", stamp(v)),
@@ -135,6 +201,8 @@ export const put = {
     (await db()).put("meta", v, "activeSessionId"),
   activeSplitId: async (v: string | null) =>
     (await db()).put("meta", v, "activeSplitId"),
+  pendingCompletionId: async (v: string | null) =>
+    (await db()).put("meta", v, "pendingCompletionId"),
 };
 
 /**

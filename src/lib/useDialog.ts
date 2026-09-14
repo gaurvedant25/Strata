@@ -13,6 +13,7 @@ const dialogStack: symbol[] = [];
  *
  *  - locks the page behind it from scrolling,
  *  - takes focus when it opens and hands it back to whatever opened it,
+ *  - keeps keyboard focus inside the topmost dialog,
  *  - closes on Escape.
  *
  * `onClose` is held in a ref rather than listed as a dependency, because every
@@ -46,9 +47,36 @@ export function useDialog(open: boolean, onClose: () => void) {
     dialogStack.push(me);
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
       if (dialogStack[dialogStack.length - 1] !== me) return;
-      close.current();
+      if (e.key === "Escape") {
+        close.current();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const root = panel.current;
+      if (!root) return;
+      const focusable = [...root.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) =>
+        element.getClientRects().length > 0 &&
+        element.getAttribute("aria-hidden") !== "true",
+      );
+      if (!focusable.length) {
+        e.preventDefault();
+        root.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !root.contains(document.activeElement))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener("keydown", onKey);
     return () => {

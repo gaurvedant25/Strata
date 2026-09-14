@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Gym Log's privacy policy and terms and conditions.">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<title>Gym Log Privacy &amp; Terms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+  /*
+    The app's own vocabulary, extended to a document: black ground, three text
+    tones, hairline rules, DM Sans for language and IBM Plex Mono for anything
+    that labels rather than says. Deliberately single-theme — this is Gym Log's
+    screen, and it looks like it on any host.
+  */
+  :root {
+    --ink: #000000;
+    --panel: #0d0d0d;
+    --rule: #1e1e1e;
+    --subrule: #141414;
+    --fg: #f5f5f5;
+    --body: #c6c6ca;
+    --muted: #9a9a9a;
+    --dim: #808080;
+    --alert: #ff453a;
+    --measure: 63ch;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--body);
+    font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 1rem;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .mono {
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .bar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.875rem clamp(1.25rem, 5vw, 2.5rem);
+    border-bottom: 1px solid var(--rule);
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(16px);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+  }
+  .bar a { color: var(--dim); text-decoration: none; }
+  .bar a:hover { color: var(--fg); }
+  .bar .here { color: var(--fg); }
+  .barnav { display: flex; gap: 1.5rem; }
+
+  #privacy, #terms, #contact { scroll-margin-top: 3.5rem; }
+
+  .wrap {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 0 clamp(1.25rem, 5vw, 2.5rem);
+  }
+
+  header.doc { padding-top: clamp(3rem, 9vw, 5.5rem); }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+
+  h1 {
+    margin: 0.9rem 0 0;
+    font-size: clamp(2.1rem, 7vw, 3rem);
+    font-weight: 700;
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+    color: var(--fg);
+    text-wrap: balance;
+  }
+
+  .dateline {
+    margin-top: 1.1rem;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lede {
+    margin: 1.6rem 0 0;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--fg);
+    text-wrap: pretty;
+  }
+
+  /* ---------- the stat band, borrowed from the app ---------- */
+
+  .band {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-top: 2.25rem;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .band > div {
+    padding: 1rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .band > div + div { border-left: 1px solid var(--rule); padding-left: 1rem; }
+  .band > div:not(:last-child) { padding-right: 1rem; }
+  .band .fig {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    color: var(--fg);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .band .cap {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    line-height: 1.45;
+    color: var(--muted);
+  }
+
+  /* ---------- sections ---------- */
+
+  section.doc { padding-bottom: clamp(3rem, 8vw, 5rem); }
+
+  h2 {
+    margin: 3.25rem 0 0;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+    font-size: 1.4375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.022em;
+    color: var(--fg);
+    text-wrap: balance;
+  }
+  h2 .n {
+    display: block;
+    margin-bottom: 0.55rem;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  h3 {
+    margin: 2rem 0 0;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--fg);
+  }
+
+  p { margin: 1rem 0 0; text-wrap: pretty; }
+  strong { color: var(--fg); font-weight: 500; }
+
+  ul { margin: 1rem 0 0; padding-left: 1.15rem; }
+  li { margin-top: 0.55rem; padding-left: 0.25rem; }
+  li::marker { color: var(--dim); }
+
+  a { color: var(--fg); text-decoration-color: var(--dim); text-underline-offset: 4px; }
+  a:hover { text-decoration-color: var(--fg); }
+  a:focus-visible, .bar a:focus-visible {
+    outline: 2px solid var(--fg);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* The one place the page raises its voice. */
+  .alert {
+    margin-top: 1.75rem;
+    padding: 1.25rem 1.4rem;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-left: 2px solid var(--alert);
+  }
+  .alert .eyebrow { color: var(--alert); }
+  .alert p:first-of-type { margin-top: 0.7rem; }
+
+  /* Anything the developer still has to fill in before this goes public. */
+  .todo {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.8125rem;
+    color: var(--alert);
+    border-bottom: 1px dashed var(--alert);
+    padding-bottom: 1px;
+  }
+
+  .tablewrap { margin-top: 1.5rem; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  th {
+    text-align: left;
+    padding: 0 1rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.85rem 1rem 0.85rem 0;
+    border-bottom: 1px solid var(--subrule);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  th:last-child, td:last-child { padding-right: 0; }
+  td:first-child { color: var(--fg); }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding: 2.5rem 0 4rem;
+    color: var(--dim);
+    font-size: 0.875rem;
+  }
+  footer .mono { font-size: 0.6875rem; letter-spacing: 0.16em; text-transform: uppercase; }
+  /* The address, set to be read and copied rather than clicked: a mail app is
+     not guaranteed to exist, so the text itself has to be the useful part.
+     One click selects the whole address. */
+  .addr {
+    margin-top: 0.9rem;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: clamp(1rem, 3.5vw, 1.25rem);
+    letter-spacing: -0.01em;
+    color: var(--fg);
+    user-select: all;
+    -webkit-user-select: all;
+    word-break: break-all;
+  }
+  .addr a { text-decoration-color: var(--dim); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+
+  /* Store submissions get printed and attached as PDFs; this is the one place
+     the document leaves the app's screen, so it inverts rather than burning a
+     cartridge on a black page. */
+  @media print {
+    :root { --fg: #000; --body: #1a1a1a; --muted: #444; --dim: #555; --rule: #ccc; --subrule: #e2e2e2; --panel: #f6f6f6; }
+    body { background: #fff; color: #1a1a1a; font-size: 11pt; }
+    .bar { display: none; }
+    h2 { break-after: avoid; }
+    .alert { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<nav class="bar">
+  <span class="here">Gym&nbsp;Log</span>
+  <span class="barnav">
+    <a href="#privacy">Privacy</a>
+    <a href="#terms">Terms</a>
+    <a href="#contact">Contact</a>
+  </span>
+</nav>
+
+<main>
+
+<!-- ============================ PRIVACY ============================ -->
+<section class="doc" id="privacy">
+  <div class="wrap">
+    <header class="doc">
+      <span class="eyebrow">Gym Log</span>
+      <h1>Privacy Policy</h1>
+      <p class="dateline">Effective 9 September 2026 · Last updated 9 September 2026</p>
+
+      <p class="lede">Gym Log is a workout log that runs on your device. If you never sign in, nothing you enter leaves your phone: there is no account, no sync, and no copy of your training anywhere but the device in your hand.</p>
+
+      <p>If you do sign in, your training log is copied to your own account so that it survives a lost phone and reaches your other devices. Nothing else happens to it. There are no analytics, no advertising, no trackers, and no third party that receives your training data to use for its own purposes.</p>
+
+      <div class="band">
+        <div>
+          <span class="fig">0</span>
+          <span class="cap">Trackers or<br>analytics</span>
+        </div>
+        <div>
+          <span class="fig">1</span>
+          <span class="cap">Processor,<br>for sync only</span>
+        </div>
+        <div>
+          <span class="fig">100%</span>
+          <span class="cap">Usable offline,<br>no account</span>
+        </div>
+      </div>
+    </header>
+
+    <h2>Who is responsible</h2>
+    <p>Gym Log is made and operated by an individual developer. For anything in this policy, including any request about your data, write to <a href="mailto:gaurvedant479@gmail.com">gaurvedant479@gmail.com</a>.</p>
+
+    <h2>Two ways to use Gym Log</h2>
+    <p><strong>Without an account.</strong> Everything you enter is stored in a database inside the app on your device (IndexedDB). The app is built to work with no signal at all, so it never waits on the network to show you anything. In this mode Gym Log makes no request that carries your training data anywhere.</p>
+    <p><strong>With an account.</strong> Signing in turns on sync. Your log is copied to a set of rows that belongs to your account, and that copy is reconciled with your device when you sign in, when the network returns, and when you bring the app to the foreground. Your device remains the source of truth for reading; the server is a backup and a bridge between your own devices.</p>
+    <p>Signing in is optional and reversible. Signing out leaves your log on the device and stops the syncing.</p>
+
+    <h2>What is collected</h2>
+
+    <h3>Account information — only if you create an account</h3>
+    <ul>
+      <li>Your <strong>email address</strong>, if you sign up with an email and password.</li>
+      <li>Your <strong>name and email address as Google reports them</strong>, if you sign in with Google.</li>
+      <li>Your <strong>password</strong>, if you set one. It is stored by our authentication provider as a cryptographic hash, never in readable form, and is never visible to the developer.</li>
+      <li><strong>Authentication tokens</strong>, kept on your device so that you are not asked to sign in every time the app is launched.</li>
+    </ul>
+
+    <h3>Training data — copied to your account only while you are signed in</h3>
+    <ul>
+      <li>The <strong>exercises</strong> in your library, including any you add yourself.</li>
+      <li>Your <strong>routines and splits</strong> — the training days you have built and the programme they belong to.</li>
+      <li>Your <strong>workout sessions</strong>: for each set, the exercise, the number of reps, the weight, the RPE if you entered one, and whether the set was logged or skipped; plus any note you attach to an exercise, the date, and the start and end time of the session.</li>
+      <li>Your <strong>bodyweight entries</strong> and the date of each one.</li>
+    </ul>
+
+    <h3>Information that stays on the device and is never uploaded</h3>
+    <p>Even with an account signed in, the following never leave your device:</p>
+    <ul>
+      <li>your <strong>weight unit</strong> (kg or lb);</li>
+      <li>the <strong>sex</strong> setting, which is used only to choose which strength standards a lift is compared against;</li>
+      <li>interface state such as which lift the Progress screen opens on, and which day of your split is marked as next.</li>
+    </ul>
+
+    <h3>Technical information</h3>
+    <p>When your device contacts the sync server, ordinary internet request information reaches our hosting provider: your IP address, the time of the request, and your device's user agent string. This is how any network request works rather than a decision to collect information about you. It is not used to build a profile of you and it is not combined with your training data.</p>
+
+    <h2>Health-related information</h2>
+    <p>Your bodyweight and the sex setting are health-related, and are treated as sensitive.</p>
+    <p>The sex setting never leaves your device. Bodyweight is synced with the rest of your log only if you are signed in. Both are used solely to produce the figures the app shows you — estimated one-rep maxes, strength standards and tiers — and for nothing else. They are never used for advertising, never sold, and never shared.</p>
+    <p>Where the law requires a legal basis for handling information of this kind (for example the GDPR in the EEA, or the UK GDPR), that basis is <strong>your explicit consent</strong>, given by entering the information and, where sync is involved, by choosing to create an account. You can withdraw it at any time by deleting the entries, signing out, or deleting your account.</p>
+
+    <h2>What Gym Log never does</h2>
+    <ul>
+      <li><strong>No analytics or telemetry of any kind.</strong> The app contains no analytics SDK and makes no request to any analytics or crash-reporting service.</li>
+      <li><strong>No advertising</strong>, no advertising identifiers, no ad networks.</li>
+      <li><strong>No selling of personal information</strong>, and no “sharing” of it in the sense the California Consumer Privacy Act gives that word. There is no cross-context behavioural advertising.</li>
+      <li><strong>No profiling</strong> and no automated decision-making producing legal or similarly significant effects.</li>
+      <li><strong>No marketing email.</strong> The only email you may receive is one you asked for, such as a password reset.</li>
+      <li><strong>No use of your training data to train machine-learning models.</strong></li>
+    </ul>
+
+    <h2>Who else is involved</h2>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th scope="col">Who</th><th scope="col">Why</th><th scope="col">What they receive</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Supabase</td>
+            <td>Hosts the authentication service and the sync database</td>
+            <td>Your account record and your synced training data, processed on our instructions</td>
+          </tr>
+          <tr>
+            <td>Google</td>
+            <td>Only if you choose “Sign in with Google”</td>
+            <td>Google tells us your name and email address; your use of your Google account is governed by Google's own privacy policy</td>
+          </tr>
+          <tr>
+            <td>Apple App&nbsp;Store, Google&nbsp;Play</td>
+            <td>Distribution of the app</td>
+            <td>Install and crash information they collect under their own policies, which we do not control</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Supabase acts as a processor: it holds the data so the app can work, and does not use it for its own purposes. Every row in the database is guarded by row-level security keyed to your user id, so one account cannot read another account's rows, and the public key shipped inside the app reads nothing at all on its own.</p>
+    <p>Synced data is stored in the region selected for the project: <span class="todo">[SUPABASE PROJECT REGION]</span>.</p>
+    <p>Beyond the parties above, your data is disclosed only where the law compels it, and then only to the extent compelled.</p>
+
+    <h2>How long it is kept</h2>
+    <p><strong>On your device</strong>, your log is kept until you delete the app, clear its data, or restore a backup over it. There is no expiry and nothing is deleted on a schedule.</p>
+    <p><strong>In your account</strong>, your data is kept until you delete your account. When you delete a record, it syncs as a <em>tombstone</em> — a marker recording that the record with that id was removed, and when — so that a deletion made on one device is not undone by another device that has not seen it yet. A tombstone holds the identifier and the time, not the contents of what was deleted.</p>
+
+    <h2>Your rights</h2>
+    <p>Depending on where you live, you may have the right to access your data, to correct it, to delete it, to receive a portable copy of it, to object to or restrict its handling, to withdraw consent, and to complain to a data protection authority. This includes rights under the EU and UK GDPR, the California Consumer Privacy Act as amended, and India's Digital Personal Data Protection Act.</p>
+    <p>Most of these do not require asking anyone, because they are built into the app:</p>
+    <ul>
+      <li><strong>Access and portability</strong> — Settings → Your data → <em>Export backup</em> writes a JSON file containing everything the app holds on this device: exercises, routines, splits, sessions, bodyweight and settings. It is a plain, readable file you can keep or move to another device.</li>
+      <li><strong>Correction</strong> — any entry can be edited or deleted in the app at any time.</li>
+      <li><strong>Deletion, on the device</strong> — Settings → Your data → <em>Erase all data</em>, or delete the app.</li>
+      <li><strong>Withdrawing consent to sync</strong> — sign out. Your log stays on the device and stops being copied anywhere.</li>
+    </ul>
+
+    <h2 id="delete">Deleting your account</h2>
+    <p>In the app: <strong>Settings → Your data → Delete account</strong>. It is immediate and it is complete. Your account is deleted, every row of training data belonging to it is deleted with it, and the copy on the device you are holding is erased at the same time. Nothing is retained, there is no waiting period, and signing up again later starts from nothing rather than recovering anything.</p>
+    <p>Without the app installed: email <a href="mailto:gaurvedant479@gmail.com">gaurvedant479@gmail.com</a> from the address on the account and say that you want it deleted. The same deletion is carried out by hand within 30 days, and you are told when it is done. Any copy still sitting on a device you own goes when you delete the app from it.</p>
+    <p>There is no charge for any of this, and you will not be treated differently for asking. If you are asked to confirm who you are before an account is deleted by email, that is only so that nobody else can delete yours.</p>
+
+    <h2>Children</h2>
+    <p>Gym Log is not directed at children. Do not create an account if you are under 13, or under 16 where you live if your country sets that age for consent to data handling. If you believe a child has created an account, write to the address above and it will be removed.</p>
+
+    <h2>Security</h2>
+    <ul>
+      <li>All network traffic uses TLS.</li>
+      <li>Every database row is protected by row-level security tied to your user id.</li>
+      <li>Passwords are stored only as hashes, by the authentication provider.</li>
+      <li>The key shipped inside the app is a public one and can read nothing without a valid session.</li>
+      <li>Your device keeps its own copy, so losing the network or the account never costs you the log in front of you.</li>
+    </ul>
+    <p>No system is perfectly secure, and this is a small independent app rather than a company with a security team. One thing worth knowing: <strong>a backup file you export is plain, unencrypted JSON.</strong> Anyone who opens it can read your training history. Store it the way you would any other personal file.</p>
+
+    <h2>Changes to this policy</h2>
+    <p>If this policy changes, the date at the top changes with it. If a change materially affects how your data is handled, you will be told inside the app before it takes effect, and where the law requires consent for the change, you will be asked for it.</p>
+
+    <h2>Contact</h2>
+    <p><a href="mailto:gaurvedant479@gmail.com">gaurvedant479@gmail.com</a></p>
+    <p>If you are in the EEA or the UK and believe your data has been mishandled, you may also complain to your national data protection authority.</p>
+  </div>
+</section>
+
+<!-- ============================ TERMS ============================ -->
+<section class="doc" id="terms">
+  <div class="wrap">
+    <header class="doc">
+      <span class="eyebrow">Gym Log</span>
+      <h1>Terms and Conditions</h1>
+      <p class="dateline">Effective 9 September 2026 · Last updated 9 September 2026</p>
+    </header>
+
+    <h2><span class="n">01</span>Agreement</h2>
+    <p>These terms are the agreement between you and the developer of Gym Log (“Gym Log”, “we”, “us”) covering your use of the Gym Log app on any platform — installed from the App Store or Google Play, or used on the web. By installing or using Gym Log you accept them. If you do not accept them, do not use the app.</p>
+
+    <h2><span class="n">02</span>What Gym Log is</h2>
+    <p>Gym Log is a tool for recording your own training: the exercises you do, the sets, reps and weights you lift, the days you train, and your bodyweight over time. It arranges what you type into charts, estimates and comparisons.</p>
+    <p>Everything it shows you is arithmetic performed on numbers you entered yourself. It is a notebook that can add up, not a coach and not a clinician.</p>
+
+    <h2><span class="n">03</span>Not medical or professional advice</h2>
+    <div class="alert">
+      <span class="eyebrow">Read this one</span>
+      <p>Estimated one-rep maxes, strength standards, tier ratings, muscle-group summaries and every other figure in Gym Log are calculated from what you typed, using published general-purpose formulas. They are <strong>not</strong> an assessment of your body, your technique, your readiness to lift a given weight, or your health. They do not account for injury, illness, medication, pregnancy, fatigue, sleep, nutrition, form, or anything else about you.</p>
+      <p><strong>Resistance training carries a real risk of serious injury.</strong> If a number in this app suggests you could lift something, that is not a recommendation that you try to.</p>
+    </div>
+    <ul>
+      <li>Gym Log does not give medical, physiotherapeutic, nutritional or coaching advice, and nothing in it should be treated as any of those.</li>
+      <li><strong>Consult a qualified professional</strong> before starting, changing or resuming a training programme, and particularly if you have any medical condition, are recovering from injury, or are unsure whether an activity is safe for you.</li>
+      <li>You train at your own risk, and you are solely responsible for deciding what to attempt, how much to lift, and when to stop.</li>
+      <li>If you feel unwell or in pain while training, stop and seek medical help.</li>
+    </ul>
+
+    <h2><span class="n">04</span>Eligibility and your account</h2>
+    <p>You must be at least 13 years old to use Gym Log, or 16 if that is the age of digital consent where you live.</p>
+    <p>An account is optional; the app is fully usable without one. If you create one:</p>
+    <ul>
+      <li>give an email address you actually control;</li>
+      <li>keep your password to yourself, and choose one you do not use elsewhere;</li>
+      <li>you are responsible for what happens under your account;</li>
+      <li>tell us at <a href="mailto:gaurvedant479@gmail.com">gaurvedant479@gmail.com</a> if you believe someone else has access to it.</li>
+    </ul>
+    <p>An account is for one person. Do not share it.</p>
+
+    <h2><span class="n">05</span>Your data belongs to you</h2>
+    <p>Your training log is yours. We claim no ownership of it.</p>
+    <p>You grant us only the narrow permission needed to run the service you asked for: to store your data, to copy it between your devices, to back it up, and to restore it. That permission exists for no other purpose. Your training data is never published, never sold, never given to anyone else for their own use, and never used to train machine-learning models. It ends when you delete your account.</p>
+    <p>How your data is handled in detail is set out in the <a href="#privacy">Privacy Policy</a>, which forms part of these terms.</p>
+
+    <h2><span class="n">06</span>Acceptable use</h2>
+    <p>Do not:</p>
+    <ul>
+      <li>try to reach data that is not yours, or work around the row-level security that separates accounts;</li>
+      <li>attack, overload or probe the service, or send it automated bulk traffic;</li>
+      <li>reverse engineer the app in order to break its security (this does not restrict anything the law expressly permits you to do, such as interoperability work where that right applies);</li>
+      <li>use Gym Log to break the law, or to harm anyone.</li>
+    </ul>
+    <p>We may suspend or end access to the sync service for an account that does any of these. Your data on your own device is not affected.</p>
+
+    <h2><span class="n">07</span>Availability, sync, and the honest limits of both</h2>
+    <p>Gym Log is offered as it is, and it is free. There is no uptime commitment and no guaranteed level of service.</p>
+    <p>The app is built to work offline, and your device holds the authoritative copy of your log. Sync is a best-effort reconciliation on top of that; it can be delayed, and it can fail, without your local log being affected.</p>
+    <p>Two limits are worth stating in plain terms rather than burying:</p>
+    <ul>
+      <li><strong>Conflicts are resolved last-write-wins.</strong> If the same record is changed on two devices while both are offline, the edit with the later timestamp is kept and the earlier one is lost. This is the right trade for one person's training log, but it can lose an edit.</li>
+      <li><strong>This relies on your devices' clocks being roughly correct.</strong> A device with a badly wrong clock can order edits wrongly.</li>
+    </ul>
+
+    <h2><span class="n">08</span>Backups are your responsibility</h2>
+    <p>Export a backup regularly: <strong>Settings → Your data → Export backup</strong>.</p>
+    <p>Deleting the app, clearing its data, or restoring a backup over your log will remove what is on the device, and if you are not signed in there is no other copy. We are not able to recover data that was never synced, and we do not guarantee that synced data can be recovered either.</p>
+
+    <h2><span class="n">09</span>Price and changes to the app</h2>
+    <p>Gym Log is currently free and contains no advertising and no purchases. If that ever changes, you will be told in advance, and you will always be able to export your data.</p>
+    <p>We may change, add to, or discontinue features, and we may stop offering the app or the sync service entirely. Where we discontinue the sync service, we will give reasonable notice so that you can export your data first.</p>
+
+    <h2><span class="n">10</span>Disclaimer of warranties</h2>
+    <p>To the fullest extent the law allows, Gym Log is provided <strong>“as is” and “as available”, without warranty of any kind</strong>, whether express, implied or statutory, including any implied warranty of merchantability, fitness for a particular purpose, accuracy, or non-infringement. We do not warrant that the app will be uninterrupted, error-free, or that its calculations are accurate or suitable for any purpose.</p>
+
+    <h2><span class="n">11</span>Limitation of liability</h2>
+    <p>To the fullest extent the law allows, we are not liable for any indirect, incidental, special, consequential or punitive damages, nor for any loss of data, profit, revenue or goodwill, arising out of or relating to your use of Gym Log — including any injury or loss connected to training you undertook while using it.</p>
+    <p>Where liability cannot be excluded, our total liability to you for all claims is limited to the greater of the amount you have paid us for Gym Log in the twelve months before the claim (which, while the app is free, is nothing) or <strong>USD 50</strong>.</p>
+    <p>Nothing in these terms limits liability for death or personal injury caused by negligence, for fraud, or for anything else that cannot lawfully be limited. <strong>If you are a consumer, your statutory rights are not affected by these terms.</strong></p>
+
+    <h2><span class="n">12</span>Indemnity</h2>
+    <p>You agree to indemnify us against claims and costs arising from your misuse of Gym Log or your breach of these terms. This does not apply to anything we are responsible for.</p>
+
+    <h2><span class="n">13</span>Ending the agreement</h2>
+    <p>You may stop using Gym Log at any time by deleting the app, and you may delete your account as described in the Privacy Policy. We may suspend or end your access to the sync service if you materially breach these terms, or if we discontinue the service.</p>
+    <p>Clauses 03, 05, 10, 11, 12 and 16 survive the end of this agreement.</p>
+
+    <h2><span class="n">14</span>Additional terms for the Apple App Store</h2>
+    <p>Where you obtained Gym Log from the Apple App Store, the following apply and prevail over anything inconsistent above:</p>
+    <ul>
+      <li>This agreement is between you and us alone, <strong>not with Apple</strong>. Apple is not responsible for Gym Log or its content.</li>
+      <li>Gym Log is <strong>licensed, not sold</strong>, to you, for use on any Apple-branded device you own or control, as permitted by Apple's Usage Rules.</li>
+      <li><strong>Apple has no obligation to provide any maintenance or support</strong> for Gym Log.</li>
+      <li>If Gym Log fails to conform to any applicable warranty, you may notify Apple and Apple will refund any purchase price. To the maximum extent permitted by law, Apple has no other warranty obligation of any kind.</li>
+      <li><strong>Apple is not responsible</strong> for addressing any claim by you or a third party relating to Gym Log, including product liability claims, claims that it fails to conform to a legal requirement, and claims arising under consumer protection or privacy law.</li>
+      <li>If a third party claims Gym Log infringes their intellectual property, <strong>we, not Apple</strong>, are responsible for the defence and settlement of that claim.</li>
+      <li>You confirm that you are not located in a country subject to a US Government embargo or designated as terrorist-supporting, and that you are not on any US Government list of prohibited or restricted parties.</li>
+      <li><strong>Apple and its subsidiaries are third-party beneficiaries of these terms</strong> and may enforce them against you.</li>
+    </ul>
+
+    <h2><span class="n">15</span>Additional terms for Google Play</h2>
+    <p>Where you obtained Gym Log from Google Play, your use is also subject to the Google Play Terms of Service. Google is not a party to this agreement and is not responsible for Gym Log.</p>
+
+    <h2><span class="n">16</span>Governing law</h2>
+    <p>These terms are governed by the laws of <span class="todo">[YOUR COUNTRY / STATE]</span>, and the courts of that place have exclusive jurisdiction, except that if you are a consumer you may also bring proceedings in the country where you live, and you keep the protection of any mandatory law there.</p>
+
+    <h2><span class="n">17</span>Everything else</h2>
+    <p>If any clause is found unenforceable, the rest stands. Not enforcing a term on one occasion does not waive it. These terms, with the Privacy Policy, are the whole agreement about Gym Log. We may update them; the date at the top will change, and material changes will be shown in the app before they take effect.</p>
+
+    <h2><span class="n">18</span>Contact</h2>
+    <p><a href="mailto:gaurvedant479@gmail.com">gaurvedant479@gmail.com</a></p>
+  </div>
+</section>
+
+<footer id="contact">
+  <div class="wrap">
+    <span class="eyebrow">Contact</span>
+    <p class="addr"><a href="mailto:gaurvedant479@gmail.com">gaurvedant479@gmail.com</a></p>
+    <p>One address for all of it: questions about either document, a request to see or delete your data, and corrections. If tapping it does not open a mail app, the address above selects in one click so you can copy it.</p>
+    <p style="margin-top:2rem"><span class="mono">Gym Log</span> — Privacy Policy and Terms and Conditions, effective 9 September 2026. Written to describe what the app actually does; if you find a place where it does not, say so and it will be corrected.</p>
+  </div>
+</footer>
+
+</main>
+</body>
+</html>

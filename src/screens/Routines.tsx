@@ -1,13 +1,22 @@
 import { useState } from "react";
 import { useConfirm } from "../components/confirm";
 import { ExercisePicker } from "../components/ExercisePicker";
-import { Button, Empty, Eyebrow, Row, Sheet, inputCls } from "../components/ui";
+import { SlideToStart } from "../components/SlideToStart";
+import {
+  Button,
+  Empty,
+  Eyebrow,
+  IconButton,
+  Row,
+  Sheet,
+  inputCls,
+} from "../components/ui";
 import { PRESETS, type Preset } from "../lib/presets";
-import { uid } from "../lib/util";
+import { fmtClock, uid } from "../lib/util";
 import { useStore } from "../store";
 import type { Routine, RoutineItem, Split } from "../types";
 
-export function Routines() {
+export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
   const s = useStore();
   const [editing, setEditing] = useState<Routine | null>(null);
   // held open when switching splits, so the chooser is reachable after picking
@@ -37,34 +46,23 @@ export function Routines() {
   }
 
   const days = s.splitRoutines;
-  const exCount = days.reduce((t, d) => t + d.items.length, 0);
+
+  // Which day is up next is kept by the store: it is set by hand here, and
+  // moved on by finishing a workout, so it has to outlive this screen.
+  const hero = days.find((d) => d.id === s.nextUpId) ?? days[0] ?? null;
+  const rest = days.filter((d) => d.id !== hero?.id);
 
   return (
-    <div className="min-h-full pb-40">
-      <div className="px-5 pt-[calc(env(safe-area-inset-top)+14px)]">
-        <div className="flex items-baseline justify-between">
-          <Eyebrow>Routines</Eyebrow>
-          <Button variant="link" onClick={() => setChoosing(true)}>
-            Change split
-          </Button>
-        </div>
-        <h1 className="mt-5 text-[1.6875rem] font-bold leading-none tracking-[-0.025em]">
-          {s.activeSplit.name}
-        </h1>
-        <button
-          onClick={() => setEditSplit(true)}
-          aria-label={`Edit ${s.activeSplit.name}`}
-          className="mb-3 mt-0.5 flex h-11 items-center"
-        >
-          <Eyebrow className="tracking-[0.14em]">
-            {days.length} {days.length === 1 ? "day" : "days"} · {exCount}{" "}
-            exercises · Edit
-          </Eyebrow>
-        </button>
+    <div className="min-h-full pb-stack">
+      <div className="flex items-center justify-between gap-3 px-5 pt-[calc(env(safe-area-inset-top)+16px)]">
+        <Eyebrow>Routines</Eyebrow>
+        <Button variant="link" onClick={() => setChoosing(true)}>
+          Change split <span className="text-dim">↗</span>
+        </Button>
       </div>
 
       {days.length === 0 ? (
-        <div className="border-t border-rule px-5">
+        <div className="mt-4 border-t border-rule px-5">
           <Empty
             eyebrow="No days yet"
             title="A day is a list of exercises with target sets and reps."
@@ -75,55 +73,90 @@ export function Routines() {
           />
         </div>
       ) : (
-        <div className="border-t border-rule">
-          {days.map((r) => (
-            <div key={r.id} className="border-b border-rule px-5 py-[18px]">
-              <div className="flex items-baseline justify-between gap-3">
-                <button
-                  onClick={() => setEditing(r)}
-                  aria-label={`Edit ${r.name}`}
-                  className="-my-2.5 flex min-w-0 items-center py-2.5 text-left"
+        <div className="flex flex-col gap-3 px-4 pt-[18px]">
+          {/*
+            The next workout is the whole reason this screen is opened, so it
+            stops being a row in a list and becomes the screen's subject — the
+            name at display size, and the one control that matters underneath it.
+          */}
+          {hero && (
+            <section className="rounded-[28px] border border-rule bg-[#101010] px-[22px] pb-6 pt-[22px]">
+              <div className="flex items-start justify-between gap-3">
+                <Eyebrow className="tracking-[0.22em]">Next up</Eyebrow>
+                <IconButton
+                  label={`Edit ${hero.name}`}
+                  onClick={() => setEditing(hero)}
+                  // The canvas draws this at 40px; 44 is the floor every other
+                  // control in the app is held to, and four pixels on a pencil
+                  // in a card corner is a cheaper deviation than a control that
+                  // is harder to hit than the rest of the app.
+                  size={44}
+                  className="-mr-2.5 -mt-2.5 border border-faint bg-[#0a0a0a]"
                 >
-                  <p className="truncate text-[1.0625rem] font-medium tracking-[-0.01em]">
-                    {r.name}
-                  </p>
-                </button>
-                <Button
-                  variant="link"
-                  onClick={() => void s.startSession(r)}
-                  className={
-                    r.items.length ? "" : "pointer-events-none opacity-30"
+                  <PencilIcon />
+                </IconButton>
+              </div>
+              <h1 className="mb-6 mt-2.5 text-[3.125rem] font-bold leading-[0.9] tracking-[-0.035em] text-pretty">
+                {hero.name}
+              </h1>
+              {/*
+                With a workout already running the slide is a way back into it,
+                not a way to begin another — there is only ever one, and asking
+                for a second used to overwrite it: the first stayed in the log
+                unfinished, with nothing left that could end or discard it.
+              */}
+              <SlideToStart
+                verb={s.active ? "Resume" : "Start"}
+                label={s.active ? s.active.name : hero.name}
+                disabled={!s.active && hero.items.length === 0}
+                onStart={() => {
+                  if (s.active) {
+                    onOpenLogger();
+                    return;
                   }
-                >
-                  Start
-                </Button>
-              </div>
-              <div className="mt-3">
-                {r.items.length === 0 ? (
-                  <p className="text-[0.8125rem] text-dim">No exercises yet</p>
-                ) : (
-                  r.items.map((i, n) => (
-                    <div
-                      key={`${i.exerciseId}-${n}`}
-                      className="flex items-baseline justify-between gap-3 py-[5px]"
-                    >
-                      <span className="min-w-0 truncate text-[0.8125rem] text-muted">
-                        {s.exerciseById.get(i.exerciseId)?.name ?? "?"}
-                      </span>
-                      <span className="shrink-0 font-mono text-[0.75rem] text-muted">
-                        {i.sets}×{i.reps}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
+                  void s.startSession(hero);
+                }}
+              />
+              {hero.items.length === 0 && (
+                <p className="mt-3 text-center text-[0.8125rem] text-dim">
+                  Add an exercise before you can start this one.
+                </p>
+              )}
+            </section>
+          )}
+
+          {rest.length > 0 && (
+            <div className="px-1.5 pb-0.5 pt-3">
+              <Eyebrow tone="dim">The rest of the week</Eyebrow>
             </div>
+          )}
+
+          {rest.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => s.makeNextUp(r.id)}
+              className="press press-row flex w-full items-center justify-between gap-3 rounded-[20px] border border-rule bg-[#101010] px-[22px] py-5 text-left"
+            >
+              <span className="min-w-0 truncate text-[1.5rem] font-semibold tracking-[-0.02em]">
+                {r.name}
+              </span>
+              <span className="shrink-0 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-dim">
+                Make next ↑
+              </span>
+            </button>
           ))}
-          <Row onClick={() => setEditing(blank())} className="py-[22px]">
-            <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg">
-              + New day
+
+          <button
+            onClick={() => setEditing(blank())}
+            className="press flex w-full items-center gap-3 rounded-[20px] border border-dashed border-faint px-[22px] py-5 text-left"
+          >
+            <span className="grid size-6 shrink-0 place-items-center rounded-full border border-faint text-[0.9375rem] leading-none text-dim">
+              +
             </span>
-          </Row>
+            <span className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-fg">
+              New day
+            </span>
+          </button>
         </div>
       )}
 
@@ -137,6 +170,24 @@ export function Routines() {
         />
       )}
     </div>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+    </svg>
   );
 }
 
@@ -241,7 +292,7 @@ function SplitChooser({
   }
 
   return (
-    <div className="min-h-full pb-40">
+    <div className="min-h-full pb-stack">
       <div className="px-5 pb-5 pt-[calc(env(safe-area-inset-top)+14px)]">
         <div className="flex items-baseline justify-between">
           <Eyebrow>Choose a split</Eyebrow>
@@ -467,12 +518,23 @@ function RoutineEditor({
                 min={1}
                 onChange={(v) => patch(i, { sets: v })}
               />
-              <Counter
-                label="Reps"
-                value={item.reps}
-                min={1}
-                onChange={(v) => patch(i, { reps: v })}
-              />
+              {s.exerciseById.get(item.exerciseId)?.tracks === "time" ? (
+                <Counter
+                  label="Time"
+                  value={item.reps}
+                  min={5}
+                  step={5}
+                  format={fmtClock}
+                  onChange={(v) => patch(i, { reps: v })}
+                />
+              ) : (
+                <Counter
+                  label="Reps"
+                  value={item.reps}
+                  min={1}
+                  onChange={(v) => patch(i, { reps: v })}
+                />
+              )}
             </div>
           </div>
         ))}
@@ -488,7 +550,16 @@ function RoutineEditor({
         open={picker}
         onClose={() => setPicker(false)}
         onPick={(ex) => {
-          setItems((l) => [...l, { exerciseId: ex.id, sets: 3, reps: 8 }]);
+          // The per-set target is read according to the exercise, so a held
+          // one starts at a plausible hold rather than at eight seconds.
+          setItems((l) => [
+            ...l,
+            {
+              exerciseId: ex.id,
+              sets: 3,
+              reps: ex.tracks === "time" ? 45 : 8,
+            },
+          ]);
           setPicker(false);
         }}
       />
@@ -501,11 +572,16 @@ function Counter({
   value,
   onChange,
   min = 0,
+  step = 1,
+  format,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   min?: number;
+  step?: number;
+  /** How the number reads, when it is not simply a count. */
+  format?: (v: number) => string;
 }) {
   return (
     <div className="flex items-center justify-between">
@@ -514,16 +590,16 @@ function Counter({
       </span>
       <div className="flex items-center gap-1">
         <button
-          onClick={() => onChange(Math.max(min, value - 1))}
+          onClick={() => onChange(Math.max(min, value - step))}
           className="-my-1.5 grid size-11 place-items-center text-muted active:text-fg"
         >
           −
         </button>
-        <span className="w-6 text-center font-mono text-[0.9375rem]">
-          {value}
+        <span className="min-w-6 text-center font-mono text-[0.9375rem]">
+          {format ? format(value) : value}
         </span>
         <button
-          onClick={() => onChange(value + 1)}
+          onClick={() => onChange(value + step)}
           className="-my-1.5 grid size-11 place-items-center text-muted active:text-fg"
         >
           +

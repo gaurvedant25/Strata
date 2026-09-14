@@ -3,8 +3,10 @@ import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
 import { Button, Eyebrow, Segmented, Sheet, inputCls } from "../components/ui";
 import { exportBackup, importBackup, wipe } from "../lib/db";
+import { PRIVACY_URL, TERMS_URL } from "../lib/legal";
 import { fmtRelative, todayKey } from "../lib/util";
 import { useStore } from "../store";
+import { SignIn } from "./SignIn";
 import type { Gender, Unit } from "../types";
 
 export function Settings({ onBack }: { onBack: () => void }) {
@@ -15,6 +17,8 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [exOpen, setExOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  // Sign-in is no longer a gate in front of the app, so this is the way to it.
+  const [signInOpen, setSignInOpen] = useState(false);
 
   async function doExport() {
     const data = await exportBackup();
@@ -52,8 +56,38 @@ export function Settings({ onBack }: { onBack: () => void }) {
     }
   }
 
+  /*
+   * A sign-in that worked is the end of this screen's job.
+   *
+   * Nothing used to close it but the "not now" button, so signing in
+   * successfully left the filled-in form sitting there — session live, sync
+   * already running, and the screen still saying "Welcome back." Pressing the
+   * button appeared to do nothing at all, and the only way to see that it had
+   * in fact worked was to reload, which reset this flag.
+   *
+   * The session closes it rather than a callback from `SignIn`, so every route
+   * in is covered by one rule: a password, Google coming back through a
+   * redirect, or a confirmation link opened in another tab. Adjusted during
+   * render rather than in an effect, the way `usePresence` is and for the same
+   * reason — an effect runs after this render has committed, which would show
+   * the stale form for a frame after it had already succeeded.
+   */
+  if (signInOpen && auth.session) setSignInOpen(false);
+
+  if (signInOpen) {
+    return (
+      <div className="mx-auto flex min-h-full max-w-lg flex-col">
+        <SignIn
+          onSkip={() => setSignInOpen(false)}
+          skipLabel="Not now"
+          skipNote="Your logs stay on this device. You can connect an account whenever you want them backed up."
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-full pb-40">
+    <div className="min-h-full pb-stack">
       <div className="flex items-center justify-between px-5 pb-5 pt-[calc(env(safe-area-inset-top)+14px)]">
         <Eyebrow>Settings</Eyebrow>
         <button
@@ -137,13 +171,8 @@ export function Settings({ onBack }: { onBack: () => void }) {
                 only on this device.
               </p>
               <div className="pt-3.5">
-                <Button
-                  onClick={() => {
-                    localStorage.removeItem("gymlog.noAccount");
-                    void auth.signInWithGoogle();
-                  }}
-                >
-                  Sign in with Google
+                <Button onClick={() => setSignInOpen(true)}>
+                  Sign in or create account
                 </Button>
               </div>
             </div>
@@ -222,11 +251,47 @@ export function Settings({ onBack }: { onBack: () => void }) {
         <span className="text-danger">→</span>
       </button>
 
+      {/* Only for someone who has an account to delete. Signed out, the row
+          above already erases everything that exists. */}
+      {auth.session && (
+        <button
+          onClick={async () => {
+            const yes = await ask({
+              title: "Delete your account?",
+              body: "Your account, and every workout synced to it, is deleted from the server and from this device. This cannot be undone, and it cannot be recovered by signing in again.",
+              confirmLabel: "Delete account",
+              danger: true,
+            });
+            if (!yes) return;
+            try {
+              // The server first. If it refuses, the device still has the only
+              // copy, and saying so beats erasing it on a false promise.
+              await auth.deleteAccount();
+            } catch {
+              setMsg("Could not reach the server. Nothing was deleted — try again with a connection.");
+              return;
+            }
+            await wipe();
+            location.reload();
+          }}
+          className="flex w-full items-center justify-between border-b border-rule px-5 py-3.5 text-left active:bg-[#0b0b0b]"
+        >
+          <span className="text-[0.9375rem] text-danger">Delete account</span>
+          <span className="text-danger">→</span>
+        </button>
+      )}
+
       <p className="px-5 pt-6 text-[0.75rem] leading-[1.7] text-muted text-pretty">
         {auth.session
           ? "Your workouts are stored on this device and in your account, and the two reconcile whenever you have a connection. Everything keeps working offline; clearing your browser data only clears this device."
           : "Everything lives on this device only — nothing is uploaded. Clearing your browser data or deleting the app also deletes your logs, so back up regularly."}
       </p>
+
+      {/* Both documents ship inside the app, so this works with no signal —
+          and so the address a store listing points at is the app's own. */}
+      <Group title="Legal" />
+      <LinkRow label="Privacy policy" href={PRIVACY_URL} rule="subrule" />
+      <LinkRow label="Terms and conditions" href={TERMS_URL} />
 
       {msg && (
         <div className="fixed inset-x-0 bottom-28 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 border-y border-rule bg-ink px-5 py-3.5 text-[0.875rem]">
@@ -276,6 +341,37 @@ function SettingRow({
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * The same row as `ActionRow`, but an anchor rather than a button.
+ *
+ * These two go somewhere rather than doing something, and the difference is
+ * not cosmetic: a real link can be opened in a new tab, copied, and read out
+ * by a screen reader as a destination.
+ */
+function LinkRow({
+  label,
+  href,
+  rule = "rule",
+}: {
+  label: string;
+  href: string;
+  rule?: "rule" | "subrule";
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className={`flex w-full items-center justify-between px-5 py-3.5 text-left active:bg-[#0b0b0b] ${
+        rule === "rule" ? "border-b border-rule" : "border-b border-subrule"
+      }`}
+    >
+      <span className="text-[0.9375rem]">{label}</span>
+      <span className="font-mono text-[0.75rem] text-muted">↗</span>
+    </a>
   );
 }
 

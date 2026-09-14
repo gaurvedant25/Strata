@@ -29,6 +29,22 @@
         </provider>
     </application>
 
+    <!--
+        Who this app is allowed to see.
+
+        From Android 11 an app cannot enumerate the packages on the phone, so
+        anything that asks "who can receive an image?" gets an empty answer
+        unless it has declared the question first. Sharing a card would then
+        fail by doing nothing at all, which is the hardest kind of failure to
+        notice. This declares exactly the one question the share plugin asks.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="image/*" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

@@ -28,7 +28,21 @@ export const supabase: SupabaseClient | null = cloudConfigured
     })
   : null;
 
-/** Where Google should send the user back to after they approve. */
+/**
+ * Where Google, a confirmation link and a password reset should come back to.
+ *
+ * Resolved with `URL` rather than concatenated, because this app is built with
+ * `base: "./"` so that it also works from a sub-path — which makes
+ * `BASE_URL` the *relative* string `"./"`, not `"/"`. Pasting that onto an
+ * origin produced `https://gym-log.vercel.app./`: a hostname with a trailing
+ * dot, which is a different origin as far as the browser is concerned and
+ * matches nothing in Supabase's redirect allowlist. Sign-in got all the way
+ * through Google and then came back signed out, every time, with no error
+ * anywhere to explain it.
+ *
+ * `new URL` resolves `"./"` against the origin to `https://host/`, and still
+ * does the right thing if the base is ever a real sub-path like `/gym/`.
+ */
 export function redirectTo() {
-  return `${window.location.origin}${import.meta.env.BASE_URL ?? "/"}`;
+  return new URL(import.meta.env.BASE_URL || "/", window.location.origin).href;
 }

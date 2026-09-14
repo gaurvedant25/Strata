@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <path fill="#eee6d8" d="M0 0h800v1000H0z"/>
+  <path fill="#8e5d38" d="M800 0h800v1000H800z"/>
+  <path fill="#252525" d="M0 650h1600v350H0z"/>
+  <g fill="none" stroke="#ff9a3f" stroke-width="18"><circle cx="800" cy="400" r="220"/><path d="M800 0v1000M0 400h1600"/></g>
+  <g font-family="sans-serif" font-size="80" fill="#111"><text x="80" y="130">LEFT</text><text x="1180" y="130">RIGHT</text></g>
+  <text x="550" y="880" font-family="sans-serif" font-size="60" fill="#fff">CROP TEST</text>
+</svg>
