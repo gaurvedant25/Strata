@@ -45,10 +45,16 @@ function explain(raw: string, mode: Mode) {
 
 export function SignIn({
   onSkip,
+  initialMode = "in",
   skipLabel = "Use without an account",
   skipNote = "Without an account everything still works, but your logs live only on this device and go with it.",
 }: {
   onSkip: () => void;
+  /**
+   * Which tab opens first. "Create account" in the Pro invitation would be a
+   * lie if it landed on the sign-in form, so the caller says which it meant.
+   */
+  initialMode?: Mode;
   /**
    * What leaving without signing in is called here.
    *
@@ -61,7 +67,7 @@ export function SignIn({
   skipNote?: string;
 }) {
   const auth = useAuth();
-  const [mode, setMode] = useState<Mode>("in");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

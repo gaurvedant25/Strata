@@ -8,6 +8,11 @@
  * page that describes it. The Markdown in `docs/` is the readable source the
  * page was built from; the page is what people actually read.
  *
+ * The credits page is part of the same document for the same reason: two of
+ * the image sets the exercise thumbnails are built from are licensed on
+ * condition that they are credited, and a credit that only loads when there is
+ * signal is not a credit.
+ *
  * The same pair of links has to appear in three places that are legally
  * distinct: the sign-in screen, where agreeing to them is part of what the
  * button does; Settings, where someone goes to read them again later; and the
@@ -21,3 +26,4 @@ const base = import.meta.env.BASE_URL || "/";
 
 export const PRIVACY_URL = `${base}legal.html#privacy`;
 export const TERMS_URL = `${base}legal.html#terms`;
+export const CREDITS_URL = `${base}legal.html#credits`;

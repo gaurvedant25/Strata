@@ -1,6 +1,7 @@
 import type { Exercise, Gender, Session } from "../types";
 import { e1rm, personalRecords, working, type PR } from "./stats";
 import type { SetLog } from "../types";
+import { daysSince, todayKey } from "./util";
 
 /**
  * Regions the body map scores.
@@ -124,23 +125,17 @@ export const REGION_SECTIONS: RegionSection[] = [
  * overhead press alongside 25 kg dumbbell presses, 160 kg deadlift alongside a
  * 100 kg shrug.
  *
- * Only free weights rank. A barbell, a dumbbell and your own bodyweight are
- * the same load in every gym, and a rank is a comparison — against the
- * standards, and against what you lifted last year. A stack is not: fifty on
- * one chest press is not fifty on the one across town, and a cable's pulley
- * ratio is nobody's business but the manufacturer's. Machine and cable work is
- * still logged, still charted, still holds its own personal records on the
- * progress screen; it just does not decide a tier.
+ * Free weights rank. A barbell, a dumbbell and your own bodyweight are stable
+ * enough to compare between gyms. A stack is not: fifty on one chest press is
+ * not fifty on the one across town, and a cable's pulley ratio is set by the
+ * manufacturer. Machine and cable work is still logged, charted and eligible
+ * for personal records on Progress; it simply does not decide a strength tier.
  *
- * The exceptions are the places where the honest free-weight replacement is
- * worse than the stack: the triceps pushdown, the lat pulldown and the cable
- * crunch, along with the pulldown and pushdown variants beside them. They are
- * how those muscles are actually trained, the thresholds below were written
- * against them, and a close-grip bench is a chest lift that happens to tire the
- * triceps — a region is not improved by being ranked on a lift nobody trains it
- * with. The cable crunch is the newest of them and the clearest case: it is the
- * only way most people load their abs at all, and the alternative was a region
- * that stayed dark unless you owned a dip belt.
+ * There are two deliberately narrow cable exceptions: lat-pulldown movements
+ * (including the close-grip variant) and the seated cable row. Their common
+ * fixed-path stack setup is consistent enough for the app's intentionally
+ * approximate ranks, and both are primary ways people train their lats. No
+ * other cable or selectorised-machine exercise belongs in this list.
  *
  * Two conventions they depend on. A dumbbell lift is the weight of one
  * dumbbell, not the pair — the same reading the entry seeds in `REGION_SEED`
@@ -190,7 +185,7 @@ export type RankingLift = {
  * sets the scale of the whole ab ladder below, and every threshold there was
  * written with this number already in it.
  */
-const PLANK_SHARE = 0.6;
+export const PLANK_SHARE = 0.6;
 
 /**
  * A hold, read as a weight: what you were holding, scaled by how long you held
@@ -239,13 +234,18 @@ export const RANKING_LIFTS: Record<MuscleGroup, RankingLift[]> = {
     { name: "Chin-up", factor: 2.4, added: true, carriesBodyweight: true },
   ],
   triceps: [
-    { name: "Triceps Pushdown", factor: 1 },
-    { name: "Close-Grip Bench Press", factor: 2.2 },
-    { name: "Rope Pushdown", factor: 0.85 },
-    { name: "Skull Crusher", factor: 0.8 },
-    { name: "Overhead Triceps Extension", factor: 0.7 },
-    { name: "Triceps Kickback", factor: 0.3 },
-    { name: "Dip", factor: 2.6, added: true, carriesBodyweight: true },
+    // Factors were rebased from the old pushdown benchmark to close-grip bench
+    // when cable isolation work became personal-progress only.
+    { name: "Close-Grip Bench Press", factor: 1 },
+    { name: "Skull Crusher", factor: 0.8 / 2.2 },
+    { name: "Overhead Triceps Extension", factor: 0.7 / 2.2 },
+    { name: "Triceps Kickback", factor: 0.3 / 2.2 },
+    {
+      name: "Dip",
+      factor: 2.6 / 2.2,
+      added: true,
+      carriesBodyweight: true,
+    },
   ],
   forearms: [
     { name: "Hammer Curl", factor: 1 },
@@ -270,7 +270,6 @@ export const RANKING_LIFTS: Record<MuscleGroup, RankingLift[]> = {
     { name: "Barbell Row", factor: 1.2 },
     { name: "Seated Cable Row", factor: 1.1 },
     { name: "One-Arm Dumbbell Row", factor: 0.5 },
-    { name: "Straight-Arm Pulldown", factor: 0.5 },
     { name: "Pull-up", factor: 1, added: true, carriesBodyweight: true },
   ],
   lowerBack: [
@@ -296,12 +295,8 @@ export const RANKING_LIFTS: Record<MuscleGroup, RankingLift[]> = {
    * That credit is the reason the ab ladder is the one ladder in this file read
    * in kilos rather than in multiples of bodyweight — see `ABSOLUTE`. Dividing
    * by bodyweight would cancel exactly the thing the plank is here to measure.
-   *
-   * The weighted lifts stay, converted into plank-equivalents through factors
-   * cut against an eighty-kilo lifter, and the cable crunch is back among them
-   * as the one loaded ab movement most gyms actually offer. Obliques are
-   * untouched: a twist is still a plate held through a rotation, and there is
-   * no held equivalent of one.
+   * Weighted bodyweight movements remain, converted into plank-equivalents;
+   * cable crunches remain available as personal-progress records only.
    */
   abs: [
     {
@@ -311,7 +306,6 @@ export const RANKING_LIFTS: Record<MuscleGroup, RankingLift[]> = {
       carriesBodyweight: true,
       hold: true,
     },
-    { name: "Cable Crunch", factor: 0.9 },
     { name: "Hanging Leg Raise", factor: 0.2, added: true },
     { name: "Sit-up", factor: 0.23, added: true },
     { name: "Ab Wheel Rollout", factor: 0.17, added: true },
@@ -606,8 +600,10 @@ const STANDARDS: Record<MuscleGroup, Record<Gender, number[]>> = {
   },
   // — estimated, with no chart behind them —
   triceps: {
-    male: [0.3, 0.45, 0.6, 0.8, 1.0],
-    female: [0.18, 0.25, 0.35, 0.5, 0.65],
+    // Rebased from a pushdown-equivalent to close-grip bench while preserving
+    // the tier earned by every remaining free-weight lift.
+    male: [0.3 * 2.2, 0.45 * 2.2, 0.6 * 2.2, 0.8 * 2.2, 1.0 * 2.2],
+    female: [0.18 * 2.2, 0.25 * 2.2, 0.35 * 2.2, 0.5 * 2.2, 0.65 * 2.2],
   },
   forearms: {
     male: [0.2, 0.3, 0.4, 0.55, 0.75],
@@ -663,7 +659,7 @@ const SCORE_AT_TIER = [0.2, 0.4, 0.6, 0.8, 1.0];
  * more of yourself through the same hold is more work, not less — and dividing
  * it out again would leave the region measuring nothing but time.
  */
-const ABSOLUTE: Partial<Record<MuscleGroup, true>> = { abs: true };
+export const ABSOLUTE: Partial<Record<MuscleGroup, true>> = { abs: true };
 
 function scoreFromRatio(
   ratio: number,
@@ -685,6 +681,59 @@ function scoreFromRatio(
     }
   }
   return { score: 1, tier };
+}
+
+/**
+ * What is above the rung you are standing on, and how far up it you are.
+ *
+ * `score` is not this. That is the whole ladder read as one 0..1 figure, so it
+ * moves a fifth per rung and says nothing about the rung you are on — a lifter
+ * two kilos off Diamond and one who just scraped into Platinum are 0.61 and
+ * 0.79, two numbers that answer a question nobody asked. This answers the local
+ * one instead: how much of *this* band is behind you, and what clearing it
+ * costs.
+ *
+ * `progress` is linear in `ratio` between the threshold you have passed and the
+ * one you have not — the same interpolation `scoreFromRatio` runs — so the
+ * percentage on screen and the glow on the figure can never disagree.
+ */
+export type NextRung = {
+  /** The rung above the one you are on. */
+  tier: Tier;
+  /** 0..1 through the band between them. */
+  progress: number;
+  /**
+   * What clearing it costs, on the lift that won the region and in the unit
+   * that lift is logged in: kilos to add to the bar, or to the belt on a lift
+   * that carries you. Null for a hold, which is not cleared by loading it.
+   */
+  remaining: number | null;
+  /** The hold that would clear it, in seconds — null unless a hold won. */
+  holdSeconds: number | null;
+};
+
+/**
+ * Where `ratio` sits inside its own rung, and which rung is next.
+ *
+ * `threshold` comes back out with it because the caller has to convert it: it
+ * is in whatever the region is read in, and turning it into a weight means
+ * undoing the same two divisions the ratio went through.
+ */
+function nextRung(
+  ratio: number,
+  points: number[],
+  tier: Tier,
+): { tier: Tier; progress: number; threshold: number } | null {
+  const i = TIERS.indexOf(tier);
+  const above = TIERS[i + 1];
+  // Titan has nothing over it, so there is no band left to be partway through.
+  if (!above) return null;
+  const floor = i === 0 ? 0 : points[i - 1];
+  const threshold = points[i];
+  const span = threshold - floor;
+  const progress =
+    span <= 0 ? 1 : Math.min(1, Math.max(0, (ratio - floor) / span));
+  return { tier: above, progress, threshold };
 }
 
 export type MuscleScore = {
@@ -719,6 +768,25 @@ export type MuscleScore = {
   equivalent: number;
   /** The lift the thresholds are written against — `lift` unless converted. */
   benchmark: string;
+  /**
+   * The local day this region last improved: when the winning figure was first
+   * reached.
+   *
+   * "Last improved" and "when the current best was set" are the same date, and
+   * that is worth seeing rather than deriving. A region is ranked on the best
+   * of its whole set, so it moves only when something beats what already stood
+   * — a second-best lift landing today changes nothing and must not read as
+   * progress. Taking the date off the winner gets that right for free.
+   *
+   * Read from the set that won on the figure the rank uses, which on a lift
+   * that carries you is not the same set as the heaviest belt, and so not the
+   * same date either.
+   *
+   * Null only for a record with no dated session behind it.
+   */
+  bestDate: string | null;
+  /** The rung above this one, and the way there. Null at Titan. */
+  next: NextRung | null;
 };
 
 /**
@@ -763,6 +831,8 @@ type Best = {
   added: number | null;
   /** The stopwatch, for a lift held rather than counted. */
   hold: { seconds: number; added: number } | null;
+  /** The local day `total` was first reached. */
+  date: string | null;
 };
 
 function bestFor(
@@ -772,17 +842,28 @@ function bestFor(
   prs: Map<string, PR>,
   bodyweight: number,
 ): Best {
-  if (!lift.carriesBodyweight)
+  if (!lift.carriesBodyweight) {
+    // `personalRecords` stamps the date only when a set beats the standing
+    // best, so what comes back is the day the record was set rather than the
+    // last day it was equalled.
+    const pr = bestNamed(exercises, prs, lift.name);
     return {
-      total: bestNamed(exercises, prs, lift.name)?.bestE1rm ?? 0,
+      total: pr?.bestE1rm ?? 0,
       added: null,
       hold: null,
+      date: pr?.date ?? null,
     };
+  }
   const ids = new Set(
     exercises.filter((e) => e.name === lift.name).map((e) => e.id),
   );
-  if (!ids.size) return { total: 0, added: null, hold: null };
-  const out: Best = { total: 0, added: lift.hold ? null : 0, hold: null };
+  if (!ids.size) return { total: 0, added: null, hold: null, date: null };
+  const out: Best = {
+    total: 0,
+    added: lift.hold ? null : 0,
+    hold: null,
+    date: null,
+  };
   for (const s of sessions)
     for (const entry of s.entries) {
       if (!ids.has(entry.exerciseId)) continue;
@@ -796,6 +877,7 @@ function bestFor(
           if (whole > out.total) {
             out.total = whole;
             out.hold = { seconds, added: set.weight };
+            out.date = s.date;
           }
         }
         continue;
@@ -809,10 +891,49 @@ function bestFor(
         if (whole > out.total) {
           out.total = whole;
           out.added = e1rm(set.weight, set.reps);
+          out.date = s.date;
         }
       }
     }
   return out;
+}
+
+/**
+ * The next rung priced in the lift you got here on.
+ *
+ * "Sixty-eight percent of the way to Diamond" is a true sentence that tells you
+ * nothing about what to do on Thursday. This turns the threshold back into a
+ * weight by undoing the two conversions the ratio went out through — the
+ * lifter, unless the region is absolute, and then the winning lift's factor —
+ * and subtracts what you already lift, so the figure is kilos to add to the
+ * movement you are actually best at rather than to the benchmark you may never
+ * have touched.
+ */
+function nextCost(
+  rung: { tier: Tier; progress: number; threshold: number },
+  muscle: MuscleGroup,
+  best: Best & { lift: RankingLift },
+  bodyweight: number,
+): NextRung {
+  const target =
+    (ABSOLUTE[muscle] ? rung.threshold : rung.threshold * bodyweight) *
+    best.lift.factor;
+  return {
+    tier: rung.tier,
+    progress: rung.progress,
+    // On a lift that carries you, `target` and `total` both include the body,
+    // so their difference is what goes on the belt either way.
+    remaining: best.hold ? null : Math.max(0, target - best.total),
+    // `holdFigure` scales with the square root of the time, so the time it
+    // wants scales with the square of the figure. Read at the load you last
+    // held: the answer is "hold this for that long", not "hold something else".
+    holdSeconds: best.hold
+      ? Math.round(
+          60 *
+            Math.pow(target / (PLANK_SHARE * bodyweight + best.hold.added), 2),
+        )
+      : null,
+  };
 }
 
 /** No bodyweight means nothing can be normalized, so every region stays unscored. */
@@ -854,6 +975,7 @@ export function computeMuscleScores(
       ? best.equivalent
       : best.equivalent / bodyweight;
     const { score, tier } = scoreFromRatio(ratio, STANDARDS[muscle][gender]);
+    const rung = nextRung(ratio, STANDARDS[muscle][gender], tier);
     out[muscle] = {
       ratio,
       score,
@@ -865,7 +987,155 @@ export function computeMuscleScores(
       lift: best.lift.name,
       equivalent: best.equivalent,
       benchmark,
+      bestDate: best.date,
+      next: rung && nextCost(rung, muscle, best, bodyweight),
     };
   }
   return out;
+}
+
+/* ------------------------------------------------------------------------ *
+ * Trend: how the ranking lift has moved lately.
+ * ------------------------------------------------------------------------ */
+
+/** The windows the figure's right-hand callout cycles through. */
+export const TREND_PERIODS = ["week", "month", "year"] as const;
+export type TrendPeriod = (typeof TREND_PERIODS)[number];
+
+/**
+ * Each window in whole local calendar days, counting today as the first.
+ *
+ * Calendar days rather than elapsed milliseconds, because a lifter who trains
+ * at seven in the morning and again a fortnight later at nine in the evening
+ * has not trained "fourteen days and fourteen hours" apart — they trained a
+ * fortnight apart. Reading the day key also makes the boundary behave the way
+ * a person expects across midnight: a set finished at 23:59 and one finished
+ * two minutes later fall on different days and are counted as such.
+ */
+export const TREND_DAYS: Record<TrendPeriod, number> = {
+  week: 7,
+  month: 30,
+  year: 365,
+};
+
+/** The next window in the cycle: week, month, year, and round again. */
+export function nextPeriod(p: TrendPeriod): TrendPeriod {
+  return TREND_PERIODS[(TREND_PERIODS.indexOf(p) + 1) % TREND_PERIODS.length];
+}
+
+/**
+ * What the trend callout has to say.
+ *
+ * `hold` is its own answer rather than a zero. A plank has no estimated 1RM to
+ * move — that is the whole reason it is scored from a stopwatch — so quoting a
+ * percentage for one would mean inventing the figure the percentage is of.
+ */
+export type LiftTrend =
+  | { kind: "hold" }
+  /** Nothing to compare against: fewer than two workouts carry a reading. */
+  | { kind: "sparse"; readings: number }
+  | {
+      kind: "change";
+      /** (latest - first) / first, as a percentage. */
+      percent: number;
+      first: number;
+      latest: number;
+      readings: number;
+    };
+
+/** The ranking entry for a lift, by name. A name is loaded the same way in
+ *  every region it appears in, so the first match answers for all of them. */
+export function rankingLiftByName(name: string): RankingLift | undefined {
+  for (const lifts of Object.values(RANKING_LIFTS))
+    for (const l of lifts) if (l.name === name) return l;
+  return undefined;
+}
+
+/**
+ * How the lift that currently ranks a region has moved across a window.
+ *
+ * Deliberately not built on `personalRecords`. That map holds one all-time
+ * best per exercise, and an all-time best is exactly the thing a trend must
+ * not be measured against: a lifter whose best bench was set two years ago
+ * would read as flat forever, and one who set a record inside the window would
+ * have it counted as both ends of the comparison. This reads the window and
+ * nothing but the window.
+ *
+ * One reading per workout, taken as that workout's best qualifying set, so a
+ * session where you worked up to a heavy single and then dropped back to
+ * back-off sets is represented by the single rather than by whichever set
+ * happened to be logged last. The first and latest of those readings are what
+ * get compared, which is why the readings are sorted by when the session
+ * started rather than trusted to arrive in order: sessions reach this function
+ * in whatever order the store holds them, and a restored backup or a synced
+ * device can put an older workout after a newer one.
+ *
+ * A set qualifies if it was actually performed and produces an honest estimate:
+ * finished workout, set ticked off, not skipped, counted in reps rather than
+ * held against a clock, and carrying some load once the app's conventions are
+ * applied.
+ */
+export function liftTrend(
+  sessions: Session[],
+  exercises: Exercise[],
+  lift: string,
+  period: TrendPeriod,
+  bodyweight: number | null,
+  today = todayKey(),
+): LiftTrend {
+  const meta = rankingLiftByName(lift);
+  if (meta?.hold) return { kind: "hold" };
+
+  // Resolved by name across every exercise carrying it, for the same reason
+  // `bestNamed` does: a library can hold duplicates of a name, and picking
+  // whichever one `find` returns would read a different history each time.
+  const ids = new Set(
+    exercises.filter((e) => e.name === lift).map((e) => e.id),
+  );
+  if (!ids.size) return { kind: "sparse", readings: 0 };
+
+  // On a pull-up, a chin-up or a dip the lifter is most of the load, so the
+  // estimate has to include them — the same reading `computeMuscleScores`
+  // takes. Without a bodyweight on file there is no honest figure to take.
+  const carries = !!meta?.carriesBodyweight;
+  if (carries && !bodyweight) return { kind: "sparse", readings: 0 };
+
+  const days = TREND_DAYS[period];
+  const readings: { at: number; value: number }[] = [];
+
+  for (const s of sessions) {
+    if (!s.endedAt || s.deleted) continue;
+    if (daysSince(s.date, today) >= days) continue;
+    let best = 0;
+    for (const entry of s.entries) {
+      if (!ids.has(entry.exerciseId)) continue;
+      for (const set of entry.sets) {
+        // `skipped` and `seconds` are already implied by `done` and `reps`,
+        // and are checked anyway: they are the two ways a set can look like
+        // work without being a rep-counted effort, and an estimate drawn from
+        // either would be a number with nothing behind it.
+        if (!set.done || set.skipped) continue;
+        if (set.seconds) continue;
+        if (set.reps <= 0) continue;
+        const load = carries ? (bodyweight ?? 0) + set.weight : set.weight;
+        if (load <= 0) continue;
+        const est = e1rm(load, set.reps);
+        if (est > best) best = est;
+      }
+    }
+    if (best > 0) readings.push({ at: s.startedAt, value: best });
+  }
+
+  if (readings.length < 2) return { kind: "sparse", readings: readings.length };
+  readings.sort((a, b) => a.at - b.at);
+  const first = readings[0].value;
+  const latest = readings[readings.length - 1].value;
+  if (first <= 0) return { kind: "sparse", readings: readings.length };
+  return {
+    kind: "change",
+    percent: ((latest - first) / first) * 100,
+    first,
+    latest,
+    readings: readings.length,
+  };
 }

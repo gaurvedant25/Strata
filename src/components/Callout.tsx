@@ -36,6 +36,16 @@ export type CalloutLine = {
   weight?: number;
   /** Sentence case and no tracking, for a value rather than a label. */
   tight?: boolean;
+  /**
+   * Let a `tight` line break across lines.
+   *
+   * `tight` normally implies `nowrap`, because the things set that way are
+   * figures — "100 × 10", "+13.3%" — and a figure broken in half is not a
+   * figure. A sentence is the exception: it wants the plain case and the
+   * ordinary tracking a figure gets, and it has to be allowed to wrap, because
+   * the box is a quarter of the stage wide and no sentence fits that.
+   */
+  wrap?: boolean;
   dim?: boolean;
   /**
    * Resolve this line out of noise. Off by default: only the values in a
@@ -396,7 +406,7 @@ export function Callout({
               lineHeight: 1.35,
               color: l.dim ? "var(--color-dim)" : "var(--color-fg)",
               marginTop: i ? 3 : 0,
-              whiteSpace: l.tight ? "nowrap" : "normal",
+              whiteSpace: l.tight && !l.wrap ? "nowrap" : "normal",
               overflowWrap: "break-word",
             }}
           >

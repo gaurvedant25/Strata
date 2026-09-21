@@ -4,6 +4,8 @@ import { useShareCard } from "../lib/card/useShareCard";
 import { BodyMap, type BodyView, type Callouts } from "../components/BodyMap";
 import { drawnInView, groupsInView } from "../lib/anatomy/anchors";
 import { LogBestSet } from "../components/LogBestSet";
+import { RankIntroCard, useRankIntro } from "../components/RankIntroCard";
+import { RankingGuide } from "../components/RankingGuide";
 import { Numeral, resetNumerals } from "../components/Numeral";
 import { Share, Tune } from "../components/icons";
 import {
@@ -18,6 +20,8 @@ import {
 import {
   BACK_GROUPS,
   benchmarkLift,
+  liftTrend,
+  nextPeriod,
   MUSCLE_LABEL,
   TIERS,
   TIER_COLOR,
@@ -28,10 +32,13 @@ import {
   type MuscleGroup,
   type MuscleScore,
   type Tier,
+  type TrendPeriod,
 } from "../lib/strength";
 import { personalRecords } from "../lib/stats";
 import { fmtClock, num, parseKey, todayKey } from "../lib/util";
 import { useStore } from "../store";
+import { useEntitlement, useWriteGate } from "../lib/useEntitlement";
+import type { GateSubject } from "../lib/entitlement";
 
 /**
  * What the figure says about a region nothing has been logged against.
@@ -54,33 +61,34 @@ const reduced = () =>
   matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * Score to an approximate percentile.
+ * The trend figure, for the box beside the figure.
  *
- * There is no population data in the app, so this is read off the same tier
- * thresholds that produce the score in the first place — it says where the
- * lift sits on our own ladder, not against real lifters, which is why the
- * callout labels it an estimate rather than stating it as fact.
+ * What used to sit there was a "Top 1%", interpolated out of a six-row table
+ * of numbers that were simply written down — no lifter outside this phone was
+ * ever counted for it. A percentage reads as evidence, so the strongest thing
+ * on the screen was also the only invented one.
+ *
+ * This is a percentage the app can actually stand behind: the reader's own
+ * estimated 1RM on the lift that ranks the region, first reading against
+ * latest, inside a window they choose by tapping the box.
+ *
+ * A true minus sign rather than a hyphen, because the two sit beside a plus in
+ * the same column and a hyphen is visibly shorter and lower than the bar of a
+ * plus. Anything that rounds to nothing is "0%" without a sign: "+0.0%" claims
+ * a direction the number does not have.
  */
-const PCT: [number, number][] = [
-  [0, 90],
-  [0.2, 60],
-  [0.4, 35],
-  [0.6, 15],
-  [0.8, 5],
-  [1, 1],
-];
-
-function percentile(score: number) {
-  for (let i = 1; i < PCT.length; i++) {
-    if (score <= PCT[i][0] || i === PCT.length - 1) {
-      const [x0, y0] = PCT[i - 1];
-      const [x1, y1] = PCT[i];
-      const t = x1 === x0 ? 1 : (score - x0) / (x1 - x0);
-      return Math.max(1, Math.round(y0 + t * (y1 - y0)));
-    }
-  }
-  return 50;
+function fmtChange(percent: number) {
+  const r = Number(percent.toFixed(1));
+  if (r === 0) return "0%";
+  return `${r > 0 ? "+" : "−"}${Math.abs(r)}%`;
 }
+
+/** How the period reads aloud, where the box only has room for one word. */
+const PERIOD_SPOKEN: Record<TrendPeriod, string> = {
+  week: "the past 7 days",
+  month: "the past 30 days",
+  year: "the past 365 days",
+};
 
 /**
  * The tier dot. The only colour on the screen besides the figure itself.
@@ -108,6 +116,142 @@ function Dot({ score, size = 7 }: { score?: MuscleScore; size?: number }) {
 
 /** The bar colour for a region with nothing logged against it yet. */
 const UNSCORED = "var(--color-faint)";
+
+/**
+ * How far the selected region is up its current rung.
+ *
+ * It sits above the figure rather than in the panel below because it is the one
+ * thing on this screen that is about the future: everything under the body map
+ * reports what you have already lifted, and this says what is left. It also
+ * answers the question the tier name alone provokes — "Platinum, and then?" —
+ * so it reads best next to the figure whose colour raised the question.
+ *
+ * Three rows in seventy-four pixels: the rung you are on and the one above it,
+ * how far along you are, and what it costs. The top row names both ranks, each
+ * in its own tier colour, so the pair reads as a step rather than a label — the
+ * muscle is not repeated here, since the panel below already carries its name.
+ * The bar fills in the colour of the rank you hold: what has been filled in is
+ * what you have earned, and the rank above is a destination, not a
+ * measurement. Everything else is the white and grey the rest of the screen is
+ * built from, and there is no glow, no gradient and no second card inside this
+ * one.
+ */
+function RankProgress({
+  score,
+  muscle,
+  unitLabel,
+}: {
+  score: MuscleScore;
+  muscle: MuscleGroup;
+  unitLabel: string;
+}) {
+  const next = score.next;
+  // Titan is the top of the ladder, so the bar is full and the rank named is
+  // the one already held. Rounding down below the top keeps a lifter from being
+  // shown "100%" at a rank they have not reached.
+  const pct = next ? Math.min(99, Math.floor(next.progress * 100)) : 100;
+
+  /*
+   * What is left, in the terms it is actually measured in.
+   *
+   * `remaining` is a gap in estimated 1RM — the region is scored on
+   * `bestE1rm`, so the figure is how much that estimate has to rise, not how
+   * much to put on the bar for a working set. Said as a bare weight it reads
+   * as the latter, which is a promise the model never made: at five reps a
+   * 14 kg gain in estimated 1RM is around 12 kg on the bar. So the lift on the
+   * left carries "est. 1RM" and the weight on the right is only ever "to go".
+   *
+   * A hold is not closed by loading it, so it quotes the hold that reaches the
+   * threshold instead of a difference.
+   */
+  const cost = !next
+    ? "Top rank"
+    : next.holdSeconds != null
+      ? `${fmtClock(next.holdSeconds)} hold needed`
+      : `${num(next.remaining ?? 0, 1)} ${unitLabel} to go`;
+
+  return (
+    <section className="mb-2.5 rounded-[15px] bg-card px-[13px] py-[10px]">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-[0.8125rem] leading-none">
+          <span style={{ color: score.color }}>{score.tier}</span>
+          {/* An arrow only where there is somewhere to go. */}
+          {next && (
+            <>
+              <span className="text-muted"> → </span>
+              <span style={{ color: TIER_COLOR[next.tier] }}>{next.tier}</span>
+            </>
+          )}
+        </span>
+        <span className="shrink-0 font-mono text-[1.3125rem] font-semibold leading-none tracking-[-0.02em]">
+          <Numeral id="home:next" text={String(pct)} delay={30} />
+          <span className="text-[0.8125rem] font-medium text-muted">%</span>
+        </span>
+      </div>
+
+      <div
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={
+          next
+            ? `${pct}% of the way from ${score.tier} to ${next.tier} in ${MUSCLE_LABEL[muscle]}`
+            : `${MUSCLE_LABEL[muscle]} is at the top rank`
+        }
+        className="mt-1.5 h-1 overflow-hidden rounded-full bg-[#2a2a2a]"
+      >
+        <div
+          className="h-full rounded-full transition-[width] duration-[560ms] ease-settle"
+          style={{
+            // A sliver at the low end, so an early rung still reads as started
+            // rather than as a region with nothing logged against it.
+            width: `${Math.max(2, pct)}%`,
+            background: score.color,
+          }}
+        />
+      </div>
+
+      {/* The lift the rank was read from, and what closing the gap costs. Wraps
+          rather than crushes: a long exercise name truncates first, and at a
+          larger text size the cost drops to its own line and the card grows
+          with it. */}
+      <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[0.75rem] leading-[1.4] text-muted">
+        <span className="flex min-w-0 items-baseline">
+          <span className="truncate text-fg">{score.lift}</span>
+          {next?.remaining != null && (
+            <span className="shrink-0">&nbsp;· est. 1RM</span>
+          )}
+        </span>
+        <span className="shrink-0">{cost}</span>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The permanent way into the ranking explanation.
+ *
+ * The one-time card retires itself, so this is what is left: the question
+ * "what is a Platinum?" does not stop being asked once somebody has dismissed
+ * an introduction, and an explanation you can only ever see before you have
+ * lifted anything is an explanation nobody reads. Quiet, and at the end of
+ * whatever it follows, because it is a reference rather than a prompt.
+ */
+function GuideLink({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="press press-row flex min-h-11 w-full items-center justify-between gap-2.5 rounded-[9px] px-1 text-left"
+    >
+      <span className="text-[0.8125rem] text-muted">How rankings work</span>
+      <span aria-hidden="true" className="font-mono text-[0.875rem] text-muted">
+        &rsaquo;
+      </span>
+    </button>
+  );
+}
 
 /**
  * A section's own tier: the average of the regions inside it.
@@ -219,8 +363,19 @@ function Row({
   );
 }
 
-export function Home({ onSettings }: { onSettings: () => void }) {
+export function Home({
+  onSettings,
+  onUnlock,
+}: {
+  onSettings: () => void;
+  /** Opens whichever of the invitation or the paywall this person needs. */
+  onUnlock: (feature: GateSubject) => void;
+}) {
   const s = useStore();
+  const pro = useEntitlement();
+  // Every action on this screen goes through one guard rather than each one
+  // growing its own conditional.
+  const { guard } = useWriteGate(() => onUnlock("start-workout"));
   const [bwOpen, setBwOpen] = useState(false);
   const [bw, setBw] = useState("");
   /**
@@ -238,6 +393,36 @@ export function Home({ onSettings }: { onSettings: () => void }) {
   const [view, setView] = useState<BodyView>("front");
   /** The region whose "no data" box was tapped, and so the one being scored. */
   const [logging, setLogging] = useState<MuscleGroup | null>(null);
+  /** Whether the ranking explanation is up. Openable from two places. */
+  const [guideOpen, setGuideOpen] = useState(false);
+  /**
+   * The window the trend callout is reading, cycled by tapping the box.
+   *
+   * Held here rather than beside the selection, so it survives turning the
+   * figure and picking another muscle — someone comparing regions over a month
+   * should not be dropped back to a week each time they tap a new one. It
+   * starts at a week on every visit to the screen, which is the reading most
+   * likely to answer "is what I did this week working".
+   */
+  const [period, setPeriod] = useState<TrendPeriod>("week");
+
+  /*
+   * The week is free; the month and the year are Pro.
+   *
+   * The callout is the first thing on the app's main screen, so gating it
+   * outright would make a free account look broken. Gating the *comparison*
+   * instead keeps the reading everyone gets — how this lift has moved lately —
+   * and sells the longer view, which is what "period-over-period" actually
+   * means. Tapping while free opens the gate rather than doing nothing.
+   */
+  const cycleTrend = () => {
+    if (!pro.can("trend-periods")) {
+      onUnlock("trend-periods");
+      return;
+    }
+    setPeriod(nextPeriod);
+  };
+  const intro = useRankIntro();
   const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
 
   const latestBw = s.bodyweight[s.bodyweight.length - 1];
@@ -295,8 +480,27 @@ export function Home({ onSettings }: { onSettings: () => void }) {
   // leader line, so there is nothing on screen for a value to travel from; a
   // roll also ran its whole course behind a box that was still opening, which
   // is why switching region looked like it animated nothing at all.
+  /**
+   * How the ranking lift has moved across the chosen window.
+   *
+   * Recomputed when the window changes, which is the point of the tap.
+   */
+  const trend = useMemo(
+    () =>
+      detail
+        ? liftTrend(
+            s.sessions,
+            s.exercises,
+            detail.lift,
+            period,
+            latestBw?.weight ?? null,
+          )
+        : null,
+    [detail, s.sessions, s.exercises, period, latestBw?.weight],
+  );
+
   const callouts: Callouts = useMemo(() => {
-    if (!detail) return NO_DATA;
+    if (!detail || !trend) return NO_DATA;
     const prs = personalRecords(s.sessions.filter((x) => x.endedAt));
     const pr = bestNamed(s.exercises, prs, detail.lift);
     if (!pr) return NO_DATA;
@@ -320,18 +524,71 @@ export function Home({ onSettings }: { onSettings: () => void }) {
           dim: true,
         },
       ],
-      right: [
-        {
-          text: `Top ${percentile(detail.score)}%`,
-          size: 14,
-          weight: 600,
-          tight: true,
-          scramble: true,
-        },
-        { text: "estimated", size: 8, weight: 600, dim: true },
-      ],
+      right:
+        trend.kind === "hold"
+          ? [
+              // A hold is scored from a stopwatch and has no estimated 1RM to
+              // move, so this box reports that rather than a percentage of a
+              // figure that was never estimated.
+              {
+                text: "Timed hold",
+                size: 11,
+                weight: 600,
+                tight: true,
+              },
+              { text: "no 1RM", size: 8, weight: 600, dim: true },
+            ]
+          : trend.kind === "change"
+            ? [
+                {
+                  text: fmtChange(trend.percent),
+                  size: 14,
+                  weight: 600,
+                  tight: true,
+                  scramble: true,
+                },
+                {
+                  text: `est. 1RM · ${period}`,
+                  size: 8,
+                  weight: 600,
+                  dim: true,
+                },
+              ]
+            : [
+                // Nothing to plot is not an error, and set in tracked capitals
+                // over four lines it read like one. Two plain sentences: what
+                // is missing, and the one thing that fixes it.
+                {
+                  text: "Not enough data",
+                  size: 11,
+                  weight: 600,
+                  tight: true,
+                  wrap: true,
+                },
+                {
+                  text: "Log your workouts",
+                  size: 11,
+                  weight: 500,
+                  tight: true,
+                  wrap: true,
+                  dim: true,
+                },
+              ],
     };
-  }, [detail, s.exercises, s.sessions]);
+  }, [detail, trend, period, s.exercises, s.sessions]);
+
+  /** What the trend box announces, since the lines inside it are fragments. */
+  const trendLabel = !detail
+    ? `Score ${MUSCLE_LABEL[active]} from your best set`
+    : trend?.kind === "change"
+      ? `${detail.lift} estimated one-rep max, ${
+          Number(trend.percent.toFixed(1)) === 0
+            ? "unchanged"
+            : `${trend.percent > 0 ? "up" : "down"} ${Math.abs(
+                Number(trend.percent.toFixed(1)),
+              )} percent`
+        } over ${PERIOD_SPOKEN[period]}. Activate to change the period.`
+      : `${detail.lift} estimated one-rep max: not enough data over ${PERIOD_SPOKEN[period]}. Activate to change the period.`;
 
   // A section opens when it holds the selected region, so tapping a muscle on
   // the figure reveals it in the list rather than hiding it inside a heading.
@@ -380,9 +637,31 @@ export function Home({ onSettings }: { onSettings: () => void }) {
     window.scrollTo({ top: 0, behavior: reduced() ? "auto" : "smooth" });
   }
 
+  /*
+   * Save the weigh-in — unless what was typed was not a weight.
+   *
+   * Every entry is offered to the server first, which answers yes or no and
+   * keeps its reasons to itself. Almost always the answer is no and the number
+   * is saved exactly as before; on the one value that is not a weight, the
+   * entry is swallowed instead, leaving the body-weight history untouched.
+   *
+   * The check has to be server-side. A comparison written here would ship in
+   * the bundle and in the APK, where minification hides nothing, and the
+   * entitlement it grants is a row this client is not allowed to write anyway.
+   *
+   * It fails towards saving: an unreachable server, a refusal or a rate limit
+   * all come back false, and a real weigh-in is never lost to a network
+   * problem.
+   */
   async function saveBw() {
-    const v = parseFloat(bw.replace(",", "."));
+    const raw = bw.replace(",", ".").trim();
+    const v = parseFloat(raw);
     if (!isFinite(v) || v <= 0) return;
+    if (await pro.redeem(raw)) {
+      setBw("");
+      setBwOpen(false);
+      return;
+    }
     await s.logBodyWeight(todayKey(), v);
     setBw("");
     setBwOpen(false);
@@ -397,7 +676,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
               figure is a picture of nothing. */}
           {shareCard.ready && (
             <button
-              onClick={shareCard.share}
+              onClick={guard(shareCard.share)}
               aria-label="Share body chart"
               className="grid size-11 place-items-center text-muted active:text-fg"
             >
@@ -414,17 +693,49 @@ export function Home({ onSettings }: { onSettings: () => void }) {
         </div>
       </div>
 
-      {!latestBw ? (
-        <Empty
-          eyebrow="Nothing scored yet"
-          title="Every score here is a lift measured against your bodyweight."
-          body="Nothing shows up until we know what you weigh."
-          action={
-            <Button onClick={() => setBwOpen(true)}>Log body weight</Button>
-          }
+      {/* Before anything the screen reports, because it is what the colours in
+          all of it mean. Setup seeds a chart, so even a first run arrives here
+          with ranks on screen and no account of where they came from. */}
+      {intro.show && (
+        <RankIntroCard
+          onOpen={() => {
+            intro.dismiss();
+            setGuideOpen(true);
+          }}
+          onDismiss={intro.dismiss}
         />
+      )}
+
+      {!latestBw ? (
+        <>
+          <Empty
+            eyebrow="Nothing scored yet"
+            title="Every score here is a lift measured against your bodyweight."
+            body="Nothing shows up until we know what you weigh."
+            action={
+              <Button onClick={guard(() => setBwOpen(true))}>Log body weight</Button>
+            }
+          />
+          {/* The empty state is exactly where the explanation is most worth
+              having, and it is the one state that draws none of the card the
+              permanent entry normally sits in. */}
+          <div className="mt-2 px-4">
+            <GuideLink onOpen={() => setGuideOpen(true)} />
+          </div>
+        </>
       ) : (
         <>
+          {/* Only for a region that has a rank to climb out of. An unscored one
+              has its own prompt in the panel below, and a bar at nothing on top
+              of the screen would be the second time it said so. */}
+          {detail && (
+            <RankProgress
+              score={detail}
+              muscle={active}
+              unitLabel={unitLabel}
+            />
+          )}
+
           {/*
             The figure and the numbers read off it are two things, so they sit
             on two cards. A card is the quietest way to say "this belongs
@@ -444,8 +755,18 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                 showToggle={false}
                 maxWidth={268}
                 callouts={callouts}
-                onCalloutClick={detail ? undefined : () => setLogging(active)}
-                onCalloutLabel={`Score ${MUSCLE_LABEL[active]} from your best set`}
+                /* A scored region cycles the trend window; an empty one
+                   still offers the shortcut that fills it. A hold has no
+                   window to cycle, so its box stays inert and lets the
+                   figure behind it keep the whole gesture. */
+                onCalloutClick={
+                  !detail
+                    ? guard(() => setLogging(active))
+                    : trend?.kind === "hold"
+                      ? undefined
+                      : cycleTrend
+                }
+                onCalloutLabel={trendLabel}
               />
             </div>
 
@@ -456,9 +777,22 @@ export function Home({ onSettings }: { onSettings: () => void }) {
             as one more annotation on the figure instead of a headline of its
             own. Tapping it is still how you update it.
           */}
-            <div className="-mt-2 flex justify-end">
+            {/*
+              The stage is a fixed 0.92 rectangle and the figure is letterboxed
+              inside it, which leaves a band of nothing under the feet — about
+              9% of the card's width, and growing with it. This pulls the
+              bodyweight up into that band so the number sits just under the
+              figure rather than floating in the empty part of the card.
+
+              A percentage rather than pixels because the band is a share of the
+              width, as is the flanking callout: its box is capped at 72% down
+              the stage and the tallest one bottoms out around 9.4%, so at 8%
+              the number clears a callout on the calves at any size the card is
+              drawn.
+            */}
+            <div className="-mt-[8%] flex justify-end">
               <button
-                onClick={() => setBwOpen(true)}
+                onClick={guard(() => setBwOpen(true))}
                 aria-label={`Body weight ${num(latestBw.weight)} ${unitLabel}, tap to update`}
                 // No box, so the figure aligns to the content edge like everything
                 // else on the screen. `min-w-11` keeps the target at 44px now that
@@ -471,19 +805,23 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                 // padded 14px. Left flush with its own card, this number would
                 // be the only thing on the screen standing 8px further right
                 // than everything under it, so it gives that 8px back.
-                className="press min-w-11 py-2.5 pl-3 pr-2 text-right"
+                // `py-1.5` rather than a roomier pad: the row still stands 49px
+                // tall, clear of the 44px floor, and the eight pixels it gives
+                // back are eight the band under the figure was only padding
+                // with.
+                className="press min-w-11 py-1.5 pl-3 pr-2 text-right"
               >
                 <span className="block font-mono text-[1.375rem] font-medium leading-none tracking-[-0.02em]">
                   <Numeral id="home:bw" text={num(latestBw.weight)} />
                 </span>
-                <span className="mt-1.5 block font-mono text-[0.6875rem] font-semibold uppercase leading-none tracking-[0.16em] text-muted">
+                <span className="mt-1 block font-mono text-[0.6875rem] font-semibold uppercase leading-none tracking-[0.16em] text-muted">
                   {unitLabel}
                 </span>
               </button>
             </div>
 
             <TextTabs
-              className="justify-center pb-3.5"
+              className="justify-center pb-2.5"
               gap="gap-6"
               options={[
                 { id: "front", label: "front" },
@@ -577,7 +915,7 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                 // always named the lift to log; it may as well be the way to
                 // log it, for anyone who reads the panel before the diagram.
                 <button
-                  onClick={() => setLogging(active)}
+                  onClick={guard(() => setLogging(active))}
                   className="mt-3 text-left text-[0.8125rem] leading-relaxed text-muted active:text-fg"
                 >
                   Log a {benchmarkLift(active, s.settings.benchmarks)} set to
@@ -660,6 +998,12 @@ export function Home({ onSettings }: { onSettings: () => void }) {
                 );
               })}
             </div>
+
+            {/* Ruled off from the list so it cannot be mistaken for a
+                fifteenth region. */}
+            <div className="mt-3.5 border-t border-cardrule pt-2">
+              <GuideLink onOpen={() => setGuideOpen(true)} />
+            </div>
           </section>
         </>
       )}
@@ -687,6 +1031,18 @@ export function Home({ onSettings }: { onSettings: () => void }) {
         open={!!logging}
         muscle={logging}
         onClose={() => setLogging(null)}
+      />
+
+      {/* Reads the selected region so its worked example is the reader's own
+          rank rather than an invented one. */}
+      <RankingGuide
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+        muscle={active}
+        score={detail}
+        bodyweight={latestBw?.weight ?? null}
+        benchmark={benchmarkLift(active, s.settings.benchmarks)}
+        unitLabel={unitLabel}
       />
     </div>
   );

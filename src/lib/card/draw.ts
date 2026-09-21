@@ -46,7 +46,7 @@ export type Layout = {
     image: HTMLImageElement;
     /** 1 fills the frame; values below 1 reveal the black canvas. */
     zoom: number;
-    /** Image alignment from near edge (0) through centred (.5) to far edge (1). */
+    /** Image centre as a fraction of the canvas; may extend beyond its edges. */
     x: number;
     y: number;
     /** Clockwise rotation in degrees. */
@@ -79,9 +79,6 @@ export function beginOverlay(L: Layout) {
   const { ctx, w, h } = L;
   const o = L.overlay ?? DEFAULT_OVERLAY;
   ctx.save();
-  ctx.beginPath();
-  roundPath(L, 4, 4, 92, L.H - 8, 2.4);
-  ctx.clip();
   ctx.translate(o.x * w, o.y * h);
   ctx.translate(w / 2, h / 2);
   ctx.rotate((o.rotation * Math.PI) / 180);

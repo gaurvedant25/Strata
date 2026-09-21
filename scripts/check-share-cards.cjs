@@ -21,14 +21,16 @@ for (const aspect of ['story', 'square']) {
   const dragged = pinchOverlay(next, current, { x: current.x + 0.02, y: current.y }, 1, aspect);
   assert.ok(Math.abs(dragged.x - next.x - 0.02) < 1e-9, 'One-finger continuation must not jump');
   for (const scale of [0.1, 0.35, 0.7, 1, 3]) for (const direction of [-1, 1]) {
-    const bounded = constrainOverlay({ x: direction * 10, y: direction * 10, scale, rotation: 0 }, aspect);
-    const H = aspect === 'story' ? 1920 / 10.8 : 100;
+    const bounded = constrainOverlay({ x: direction, y: direction, scale, rotation: 0 });
     assert.ok(bounded.scale >= 0.35 && bounded.scale <= 1);
-    assert.ok(0.5 + bounded.x - 0.44 * bounded.scale >= 0.05 - 1e-9);
-    assert.ok(0.5 + bounded.x + 0.44 * bounded.scale <= 0.95 + 1e-9);
-    assert.ok(0.5 + bounded.y + (9 / H - 0.5) * bounded.scale >= 5 / H - 1e-9);
-    assert.ok(0.5 + bounded.y + (1 - 7 / H - 0.5) * bounded.scale <= 1 - 5 / H + 1e-9);
+    assert.equal(bounded.x, direction, 'No invisible horizontal inset');
+    assert.equal(bounded.y, direction, 'No invisible vertical inset');
   }
+  const edge = pinchOverlay({ x: 0, y: 0, scale: 1, rotation: 0 },
+    { x: 0.08, y: 0.6 }, { x: 0, y: 0.6 }, 1, aspect);
+  assert.equal(edge.x, -0.08, 'Stats starting at 8% can reach the actual left edge');
+  assert.equal(constrainOverlay({ ...start, scale: 1, rotation: 45 }).scale, 1,
+    'Tilting must not silently shrink the overlay');
   const tilted = pinchOverlay({ x: 0, y: 0, scale: 0.5, rotation: 10 },
     { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 }, 0.8, aspect, 25);
   assert.equal(tilted.rotation, 35, 'Two-finger rotation tilts the complete stats overlay');
@@ -45,14 +47,37 @@ for (const aspect of ['story', 'square']) {
   const next = pinchPhoto(start, image, frame, origin, current, 0.2);
   const before = photoSize(image, frame, start.zoom);
   const after = photoSize(image, frame, next.zoom);
-  const sx = (origin.x + (before.width - frame.width) * start.x) / before.width;
-  const sy = (origin.y + (before.height - frame.height) * start.y) / before.height;
-  assert.ok(Math.abs(sx * after.width - (after.width - frame.width) * next.x - current.x) < 1e-9);
-  assert.ok(Math.abs(sy * after.height - (after.height - frame.height) * next.y - current.y) < 1e-9);
+  const sx = (origin.x - frame.width * start.x) / before.width;
+  const sy = (origin.y - frame.height * start.y) / before.height;
+  assert.ok(Math.abs(sx * after.width + frame.width * next.x - current.x) < 1e-9);
+  assert.ok(Math.abs(sy * after.height + frame.height * next.y - current.y) < 1e-9);
   assert.ok(after.width < frame.width && after.height < frame.height, 'Zooming out reveals black canvas');
   assert.equal(pinchPhoto(start, image, frame, origin, origin, 0).zoom, MIN_PHOTO_ZOOM);
   const tilted = pinchPhoto(start, image, frame, origin, origin, 0.8, 32);
   assert.equal(tilted.rotation, 32, 'Two-finger rotation tilts the photo');
+}
+// Exact-fit, smaller and larger photos all translate one-to-one, on both axes.
+for (const frame of [{ width: 360, height: 640 }, { width: 360, height: 360 }]) {
+  for (const zoom of [0.01, 0.2, 1, 2, 8]) for (const rotation of [0, 35, 90]) {
+    const image = { width: 1600, height: 1200 };
+    const start = { x: 0.5, y: 0.5, zoom, rotation };
+    const origin = { x: 130, y: 160 };
+    const current = { x: -40, y: 700 };
+    const next = pinchPhoto(start, image, frame, origin, current, 1);
+    assert.ok(Math.abs((next.x - start.x) * frame.width - (current.x - origin.x)) < 1e-9);
+    assert.ok(Math.abs((next.y - start.y) * frame.height - (current.y - origin.y)) < 1e-9);
+    const size = photoSize(image, frame, zoom);
+    for (const direction of [-1, 1]) {
+      const dx = direction * (frame.width - size.width) / 2;
+      const dy = direction * (frame.height - size.height) / 2;
+      const aligned = pinchPhoto({ ...start, rotation: 0 }, image, frame, origin,
+        { x: origin.x + dx, y: origin.y + dy }, 1);
+      assert.ok(Math.abs(aligned.x * frame.width + direction * size.width / 2 -
+        (direction === 1 ? frame.width : 0)) < 1e-9, 'Photo reaches left/right edges exactly');
+      assert.ok(Math.abs(aligned.y * frame.height + direction * size.height / 2 -
+        (direction === 1 ? frame.height : 0)) < 1e-9, 'Photo reaches top/bottom edges exactly');
+    }
+  }
 }
 const base = { name: 'Bench press', currentStreak: 6, metricId: 'e1rm', metricLabel: 'Estimated 1RM', unit: 'kg', sinceLabel: '', stats: [], decimals: 1 };
 const make = (values, history = values) => liftCard({ ...base, values, history, dates: values.map((_, i) => `${i + 1} Sep 2026`) });
@@ -78,20 +103,41 @@ for (const aspect of ['story', 'square']) for (const values of [[80], [80, 80], 
   const data = make(values);
   data.name = 'Single-arm Incline Dumbbell Bench Press';
   const H = aspect === 'story' ? 1920 / 10.8 : 100;
+  let drawnText = [];
+  let drawnRects = [];
+  let clips = 0;
   const ctx = new Proxy({
     font: '', globalAlpha: 1,
+    clip() { clips++; },
+    fillRect(...args) { drawnRects.push(args); },
     createLinearGradient() { return { addColorStop() {} }; },
     measureText(s) { const size = Number(this.font.match(/([\d.]+)px/)?.[1] || 10); return { width: s.length * size * 0.6, actualBoundingBoxAscent: size * 0.75, actualBoundingBoxDescent: size * 0.2 }; },
-    fillText(s, x, y) { assert.ok(Number.isFinite(x) && Number.isFinite(y)); assert.ok(y <= H * 10.8 + 1 && y >= 0, `Text outside ${aspect}: ${s}`); },
+    fillText(s, x, y) {
+      drawnText.push({ s, y });
+      assert.ok(Number.isFinite(x) && Number.isFinite(y));
+      assert.ok(y <= H * 10.8 + 1 && y >= 0, `Text outside ${aspect}: ${s}`);
+    },
   }, { get(obj, key) { return key in obj ? obj[key] : (...args) => args.filter(a => typeof a === 'number').forEach(a => assert.ok(Number.isFinite(a))); } });
   const L = { ctx, w: 1080, h: H * 10.8, u: 10.8, H, aspect };
   const photo = { image: { naturalWidth: 1600, naturalHeight: 1200 }, zoom: 1.2, x: 0.5, y: 0.5, rotation: -12 };
   for (const template of [liftMoment, liftPoster, liftJourney]) if (!template.fits || template.fits(data)) {
     template.draw(L, data);
     template.draw({ ...L, photo }, data);
-    template.draw({ ...L, photo, overlay: constrainOverlay({ x: 0.18, y: -0.12, scale: 0.7, rotation: 14 }, aspect) }, data);
+    template.draw({ ...L, photo, overlay: constrainOverlay({ x: 0.18, y: -0.12, scale: 0.7, rotation: 14 }) }, data);
+    drawnRects = []; clips = 0;
     template.draw({ ...L, photo, renderMode: 'background' }, data);
+    assert.deepEqual(drawnRects[0], [0, 0, 1080, H * 10.8], 'Photo background covers the full canvas');
+    assert.equal(clips, 0, 'No inset clips on the photo');
+    drawnText = [];
     template.draw({ ...L, photo, renderMode: 'overlay' }, data);
+    assert.equal(clips, 0, 'No inset clips on the stats');
+    if (template !== liftJourney) {
+      assert.ok(drawnText.length <= 5, 'Snapshot and record overlays have at most five lines');
+      const span = Math.max(...drawnText.map(t => t.y)) - Math.min(...drawnText.map(t => t.y));
+      assert.ok(span < 38 * L.u, `Compact ${template.id} height: ${span / L.u} units (${data.current}, ${aspect})`);
+      assert.ok(drawnText.some(t => t.s === 'Estimated 1RM'), 'Estimated metric remains explicit');
+      assert.ok(drawnText.some(t => t.s.includes('6 day streak')), 'Subtle current streak remains');
+    }
   }
 }
 console.log('Share cards: data, records, streaks, photos, movable overlays, and both layout sizes passed.');

@@ -13,8 +13,8 @@ import {
   working,
 } from "../stats";
 import { fmtClock, fmtDuration, num, parseKey, todayKey } from "../util";
-import type { Exercise, Gender, Session } from "../../types";
-import type { BodyData, LiftData, StreakData, WorkoutData } from "./types";
+import type { Gender, Session } from "../../types";
+import type { BodyData, LiftData, StreakData } from "./types";
 
 /**
  * The four payloads, built from values the screens already hold.
@@ -97,61 +97,7 @@ function sessionStats(session: Session, now: number, unit: string) {
   ];
 }
 
-export function workoutCard(
-  session: Session,
-  exerciseById: Map<string, Exercise>,
-  now: number,
-  unit: string,
-  prBest: Map<string, number>,
-): WorkoutData {
-  const exercises = session.entries.map((e) => {
-    const ex = exerciseById.get(e.exerciseId);
-    const sets = working(e.sets);
-    const top = sets.reduce(
-      (best, s) => (s.weight > best.weight ? s : best),
-      sets[0] ?? { weight: 0, reps: 0 },
-    );
-    // The same rule the history page flags a PR by, so a card never claims one
-    // the app itself does not.
-    const best = prBest.get(e.exerciseId) ?? 0;
-    const pr =
-      ex?.tracks !== "time" &&
-      best > 0 &&
-      sets.some((s) => e1rm(s.weight, s.reps) >= best - 0.01);
-    return {
-      name: ex?.name ?? "Exercise",
-      detail: sets.length
-        ? `${num(top.weight)} ${unit} × ${top.reps}`
-        : `${plural(e.sets.length, "set")}`,
-      pr,
-    };
-  });
-
-  // The heaviest working set of the session, whatever it was on.
-  let topSet: WorkoutData["topSet"] = null;
-  let heaviest = 0;
-  for (const e of session.entries) {
-    const ex = exerciseById.get(e.exerciseId);
-    if (ex?.tracks === "time") continue;
-    for (const s of working(e.sets))
-      if (s.weight > heaviest) {
-        heaviest = s.weight;
-        topSet = {
-          lift: ex?.name ?? "Exercise",
-          value: `${num(s.weight)} ${unit}`,
-          detail: `${plural(s.reps, "rep")} · est. ${num(e1rm(s.weight, s.reps), 0)} ${unit} 1rm`,
-        };
-      }
-  }
-
-  return {
-    name: session.name,
-    dateLabel: dayLabel(session.date),
-    stats: sessionStats(session, now, unit),
-    exercises,
-    topSet,
-  };
-}
+export { workoutCard } from "./workoutData";
 
 /**
  * The lift, as the three cards need it.

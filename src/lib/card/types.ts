@@ -66,9 +66,18 @@ export type BodyData = {
 export type WorkoutData = {
   name: string;
   dateLabel: string;
-  stats: Stat[];
-  exercises: { name: string; detail: string; pr: boolean }[];
-  topSet: { lift: string; value: string; detail: string } | null;
+  unit: string;
+  volume: string;
+  volumeRecord: boolean;
+  duration: string;
+  sets: number;
+  exerciseCount: number;
+  currentStreak: number;
+  /** Strict improvements over earlier completions, one record per metric. */
+  records: { name: string; metric: "Estimated 1RM" | "Exercise volume"; value: string }[];
+  /** Broad groups from completed exercises, not a muscle-intensity estimate. */
+  muscles: MuscleGroup[];
+  gender: Gender;
 };
 
 export type DataFor = {
@@ -93,6 +102,15 @@ export type CardTemplate<S extends CardSubject = CardSubject> = {
   id: string;
   name: string;
   subject: S;
+  /**
+   * Behind Pro.
+   *
+   * A marked template is still rendered and still swipeable — somebody has to
+   * be able to see what they would be paying for, and a paywall in front of the
+   * picture is a paywall in front of the only argument for buying. What Pro
+   * buys is the export.
+   */
+  pro?: true;
   fits?: (d: DataFor[S]) => boolean;
   draw: (L: Layout, d: DataFor[S]) => void;
 };

@@ -8,6 +8,8 @@ import type { Aspect, Layout, OverlayTransform } from "./draw";
 export type DeckCard = {
   id: string;
   name: string;
+  /** Carried through from the template so the sheet can mark and gate it. */
+  pro?: boolean;
   url: string;
   file?: File;
   /** Present for the directly manipulated Progress preview. */
@@ -49,7 +51,7 @@ export function useShareDeck(
   const [outcome, setOutcome] = useState<ShareOutcome | null>(null);
   const [sending, setSending] = useState(false);
   const [retry, setRetry] = useState(0);
-  const layered = subject === "lift" && overlays != null;
+  const layered = (subject === "lift" || subject === "workout") && overlays != null;
   const photoPresent = !!photo;
   const photoImage = photo?.image;
   const layerPhoto = useMemo<Layout["photo"]>(() => photoImage
@@ -84,7 +86,7 @@ export function useShareDeck(
           if (!alive) return;
           if (!overlay) throw new Error("Overlay encoding failed");
           const overlayUrl = URL.createObjectURL(overlay); urls.push(overlayUrl);
-          made.push({ id: t.id, name: t.name, url: backgroundUrl, backgroundUrl, overlayUrl });
+          made.push({ id: t.id, name: t.name, pro: t.pro, url: backgroundUrl, backgroundUrl, overlayUrl });
         }
         if (alive) setLayers({ data, aspect, photoPresent, overlayColor, cards: made, error: null });
       } catch {
@@ -113,7 +115,7 @@ export function useShareDeck(
             if (!blob) throw new Error("Image encoding failed");
             const file = new File([blob], filename, { type: "image/png" });
             const url = URL.createObjectURL(file); urls.push(url);
-            made.push({ id: t.id, name: t.name, url, file });
+            made.push({ id: t.id, name: t.name, pro: t.pro, url, file });
           }
           if (alive) setResult({ data, aspect, photo, overlays, overlayColor, cards: made, error: null });
         } catch {

@@ -77,6 +77,21 @@ export function mostCommonWeekdayLabel(dates: string[]) {
   return WEEKDAYS[top] + "s";
 }
 
+/**
+ * Whole local days from a YYYY-MM-DD key to today.
+ *
+ * Both ends are put through `parseKey`, so the arithmetic is between two local
+ * midnights rather than between two instants: a personal best set last night
+ * and one set this morning are one day apart and nought days apart
+ * respectively, which is how a person counts them. Rounding absorbs the hour a
+ * daylight-saving boundary adds or removes in between.
+ */
+export function daysSince(key: string, today: string = todayKey()) {
+  const then = parseKey(key).getTime();
+  const now = parseKey(today).getTime();
+  return Math.max(0, Math.round((now - then) / 864e5));
+}
+
 export function fmtRelative(ts: number, now = Date.now()) {
   const diff = Math.max(0, now - ts);
   const min = Math.round(diff / 60000);

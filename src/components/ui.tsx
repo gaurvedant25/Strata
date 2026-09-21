@@ -348,7 +348,13 @@ export function TextTabs<T extends string>({
   gap = "gap-5",
   dense = false,
 }: {
-  options: { id: T; label: string }[];
+  /**
+   * `locked` marks an option that is behind Pro. It stays tappable — a control
+   * that silently ignores a tap reads as broken — and carries a small dot plus
+   * a spoken label, so the state is knowable before anybody presses it rather
+   * than only afterwards.
+   */
+  options: { id: T; label: string; locked?: boolean }[];
   value: T;
   onChange: (v: T) => void;
   className?: string;
@@ -368,6 +374,7 @@ export function TextTabs<T extends string>({
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
+          aria-label={o.locked ? `${o.label} — Pro` : undefined}
           className={cls(
             // The hit area is widened past the word with a pseudo-element
             // rather than with padding, because the bottom border is the
@@ -384,6 +391,12 @@ export function TextTabs<T extends string>({
           )}
         >
           {o.label}
+          {o.locked && (
+            <span
+              aria-hidden="true"
+              className="ml-1 mb-[3px] size-1 shrink-0 self-end rounded-full bg-faint"
+            />
+          )}
         </button>
       ))}
     </div>
@@ -396,7 +409,13 @@ export function Segmented<T extends string>({
   value,
   onChange,
 }: {
-  options: { id: T; label: string }[];
+  /**
+   * `locked` marks an option that is behind Pro. It stays tappable — a control
+   * that silently ignores a tap reads as broken — and carries a small dot plus
+   * a spoken label, so the state is knowable before anybody presses it rather
+   * than only afterwards.
+   */
+  options: { id: T; label: string; locked?: boolean }[];
   value: T;
   onChange: (v: T) => void;
 }) {
@@ -406,12 +425,19 @@ export function Segmented<T extends string>({
         <button
           key={o.id}
           onClick={() => onChange(o.id)}
+          aria-label={o.locked ? `${o.label} — Pro` : undefined}
           className={cls(
             "press flex h-11 min-w-[52px] items-center justify-center rounded-full px-3.5 font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em]",
             value === o.id ? "bg-fg text-black" : "text-muted",
           )}
         >
           {o.label}
+          {o.locked && (
+            <span
+              aria-hidden="true"
+              className="ml-1 mb-[3px] size-1 shrink-0 self-end rounded-full bg-faint"
+            />
+          )}
         </button>
       ))}
     </div>

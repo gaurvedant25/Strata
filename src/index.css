@@ -640,6 +640,25 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 /*
+ * A picture that cannot be lifted out of the interface.
+ *
+ * iOS raises its own menu on a long press over an image — Save Image, Copy,
+ * Open — which hands somebody a 168px file to look at full size, which is the
+ * one size it looks bad at. `pointer-events: none` on the image takes it out
+ * of hit testing and covers the press, the right click and the drag on every
+ * other engine; this covers the callout, which is the one thing that reaches
+ * an image on iOS regardless.
+ *
+ * Declared here rather than inline: the property exists only in Safari, and
+ * React drops an unknown style key on the floor rather than writing it out, so
+ * setting it from the component means setting it nowhere. A stylesheet keeps
+ * it, and the engines that do not implement it ignore the line.
+ */
+.no-callout {
+  -webkit-touch-callout: none;
+}
+
+/*
  * Motion the viewer has asked not to see.
  *
  * The scramble, the odometer and the chart's draw check this query in script

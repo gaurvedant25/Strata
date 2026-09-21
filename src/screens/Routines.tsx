@@ -11,13 +11,26 @@ import {
   Sheet,
   inputCls,
 } from "../components/ui";
+import { canStartWorkout } from "../lib/entitlement";
+import { useEntitlement, useWriteGate } from "../lib/useEntitlement";
 import { PRESETS, type Preset } from "../lib/presets";
 import { fmtClock, uid } from "../lib/util";
 import { useStore } from "../store";
 import type { Routine, RoutineItem, Split } from "../types";
 
-export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
+export function Routines({
+  onOpenLogger,
+  onLocked,
+}: {
+  onOpenLogger: () => void;
+  /** Opens the subscription sheet when the preview has been spent. */
+  onLocked: () => void;
+}) {
   const s = useStore();
+  const { ent } = useEntitlement();
+  const canStart = canStartWorkout(ent);
+  // Building and rearranging routines is an action too, not just running one.
+  const { guard } = useWriteGate(onLocked);
   const [editing, setEditing] = useState<Routine | null>(null);
   // held open when switching splits, so the chooser is reachable after picking
   const [choosing, setChoosing] = useState(false);
@@ -56,7 +69,7 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
     <div className="min-h-full pb-stack">
       <div className="flex items-center justify-between gap-3 px-5 pt-[calc(env(safe-area-inset-top)+16px)]">
         <Eyebrow>Routines</Eyebrow>
-        <Button variant="link" onClick={() => setChoosing(true)}>
+        <Button variant="link" onClick={guard(() => setChoosing(true))}>
           Change split <span className="text-dim">↗</span>
         </Button>
       </div>
@@ -68,7 +81,7 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
             title="A day is a list of exercises with target sets and reps."
             body="Start a workout from one and it comes pre-filled."
             action={
-              <Button onClick={() => setEditing(blank())}>Add a day</Button>
+              <Button onClick={guard(() => setEditing(blank()))}>Add a day</Button>
             }
           />
         </div>
@@ -85,7 +98,7 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
                 <Eyebrow className="tracking-[0.22em]">Next up</Eyebrow>
                 <IconButton
                   label={`Edit ${hero.name}`}
-                  onClick={() => setEditing(hero)}
+                  onClick={guard(() => setEditing(hero))}
                   // The canvas draws this at 40px; 44 is the floor every other
                   // control in the app is held to, and four pixels on a pencil
                   // in a card corner is a cheaper deviation than a control that
@@ -110,8 +123,18 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
                 label={s.active ? s.active.name : hero.name}
                 disabled={!s.active && hero.items.length === 0}
                 onStart={() => {
+                  /*
+                   * Resuming is never gated. A workout already running is work
+                   * already being done, and locking somebody out of it would
+                   * lose the sets they have logged since — including the case
+                   * that matters most, a preview that runs out mid-session.
+                   */
                   if (s.active) {
                     onOpenLogger();
+                    return;
+                  }
+                  if (!canStart) {
+                    onLocked();
                     return;
                   }
                   void s.startSession(hero);
@@ -120,6 +143,14 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
               {hero.items.length === 0 && (
                 <p className="mt-3 text-center text-[0.8125rem] text-dim">
                   Add an exercise before you can start this one.
+                </p>
+              )}
+              {/* The state is readable before the control is pressed, rather
+                  than only discovered by pressing it. */}
+              {!canStart && !s.active && (
+                <p className="mt-3 text-center text-[0.8125rem] leading-relaxed text-dim">
+                  Your Pro preview has ended. Everything you have logged stays
+                  here to read — adding to it needs Pro.
                 </p>
               )}
             </section>
@@ -134,7 +165,7 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
           {rest.map((r) => (
             <button
               key={r.id}
-              onClick={() => s.makeNextUp(r.id)}
+              onClick={guard(() => void s.makeNextUp(r.id))}
               className="press press-row flex w-full items-center justify-between gap-3 rounded-[20px] border border-rule bg-[#101010] px-[22px] py-5 text-left"
             >
               <span className="min-w-0 truncate text-[1.5rem] font-semibold tracking-[-0.02em]">
@@ -147,7 +178,7 @@ export function Routines({ onOpenLogger }: { onOpenLogger: () => void }) {
           ))}
 
           <button
-            onClick={() => setEditing(blank())}
+            onClick={guard(() => setEditing(blank()))}
             className="press flex w-full items-center gap-3 rounded-[20px] border border-dashed border-faint px-[22px] py-5 text-left"
           >
             <span className="grid size-6 shrink-0 place-items-center rounded-full border border-faint text-[0.9375rem] leading-none text-dim">

@@ -51,6 +51,12 @@ export type ExercisePoint = {
   e1rm: number;
   volume: number;
   reps: number;
+  /**
+   * The heaviest set that went on the bar, kept as a set rather than as a
+   * weight: `topWeight` alone cannot say how long it was held for, and the
+   * screen quotes it as "85×10".
+   */
+  heaviest: { weight: number; reps: number };
 };
 
 /** One point per session in which the exercise was actually worked, oldest first. */
@@ -64,23 +70,33 @@ export function exerciseHistory(
       if (e.exerciseId !== exerciseId) continue;
       const sets = working(e.sets);
       if (!sets.length) continue;
-      let topWeight = 0;
+      // Seeded from the first set rather than from zero, so the heaviest is a
+      // real set of the day's from the outset and cannot come back as a
+      // placeholder the screen would have to guard against.
       let best = 0;
+      let heaviest = { weight: sets[0].weight, reps: sets[0].reps };
       let volume = 0;
       let reps = 0;
       for (const set of sets) {
-        topWeight = Math.max(topWeight, set.weight);
         best = Math.max(best, e1rm(set.weight, set.reps));
+        // Equal weight is settled on reps: two sets at the same load are not
+        // the same set, and the longer one is the one worth quoting.
+        if (
+          set.weight > heaviest.weight ||
+          (set.weight === heaviest.weight && set.reps > heaviest.reps)
+        )
+          heaviest = { weight: set.weight, reps: set.reps };
         volume += setVolume(set);
         reps += set.reps;
       }
       out.push({
         date: s.date,
         at: s.startedAt,
-        topWeight,
+        topWeight: heaviest.weight,
         e1rm: best,
         volume,
         reps,
+        heaviest,
       });
     }
   }
@@ -119,7 +135,20 @@ export function personalRecords(sessions: Session[]): Map<string, PR> {
           cur.at = s.startedAt;
           cur.date = s.date;
         }
-        if (set.weight > cur.heaviest) {
+        /*
+         * Equal weight is settled on reps, not ignored.
+         *
+         * Testing only for a heavier bar froze the rep count against the first
+         * session that ever reached the weight: 100×3 followed months later by
+         * 100×8 left the band still reading "100×3", because 100 is not
+         * greater than 100. The heaviest set is the most you have done at the
+         * most you have lifted, and the same tie-break `exerciseHistory` uses
+         * for one day is the one that gets that right across all of them.
+         */
+        if (
+          set.weight > cur.heaviest ||
+          (set.weight === cur.heaviest && set.reps > cur.heaviestReps)
+        ) {
           cur.heaviest = set.weight;
           cur.heaviestReps = set.reps;
         }

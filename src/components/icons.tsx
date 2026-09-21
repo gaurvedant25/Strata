@@ -84,9 +84,36 @@ export const ArrowDown = ({ className, size = 18 }: P) => (
   </svg>
 );
 
+/**
+ * Two lanes going opposite ways: one lift out, another in.
+ *
+ * Not the circular arrows, which in this app's vocabulary would read as refresh
+ * or undo. This is an exchange — something takes the place of something else —
+ * which is what replacing an exercise is.
+ */
+export const Swap = ({ className, size = 18 }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M3.5 8.5h13M13.5 5.5l3 3-3 3" />
+    <path d="M20.5 15.5h-13M10.5 12.5l-3 3 3 3" />
+  </svg>
+);
+
 export const Trash = ({ className, size = 18 }: P) => (
   <svg {...base(size)} className={className}>
     <path d="M4 7h16M9 7V5h6v2M6 7l1 12h10l1-12" />
+  </svg>
+);
+
+/**
+ * A dumbbell, small.
+ *
+ * Stands in for an exercise with no photograph of its own — one somebody
+ * created themselves. It says "a lift" without pretending to say which, which
+ * is the most an empty slot in a list of photographs should claim.
+ */
+export const Dumbbell = ({ className, size = 18 }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="M4 9.5v5M7 7.5v9M17 7.5v9M20 9.5v5M7 12h10" />
   </svg>
 );
 

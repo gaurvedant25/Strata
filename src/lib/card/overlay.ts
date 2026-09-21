@@ -6,38 +6,14 @@ export function normalizeRotation(degrees: number) {
   return ((degrees + 180) % 360 + 360) % 360 - 180;
 }
 
-/** Keep the complete template inside the card, including its footer. */
-export function constrainOverlay(value: OverlayTransform, aspect: Aspect): OverlayTransform {
-  const height = ASPECTS[aspect].h / 10.8;
+/** Bound resizing, not placement. The canvas itself clips at its actual edges. */
+export function constrainOverlay(value: OverlayTransform): OverlayTransform {
   const rotation = normalizeRotation(value.rotation);
-  const radians = (rotation * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(radians));
-  const sin = Math.abs(Math.sin(radians));
-  const contentWidth = 88;
-  const contentHeight = height - 16;
-  const fit = Math.min(1,
-    90 / (contentWidth * cos + contentHeight * sin),
-    (height - 10) / (contentWidth * sin + contentHeight * cos));
-  const scale = clamp(value.scale, 0.35, fit);
-
-  const corners = [[6, 9], [94, 9], [94, height - 7], [6, height - 7]]
-    .map(([x, y]) => {
-      const dx = (x - 50) * scale;
-      const dy = (y - height / 2) * scale;
-      return {
-        x: 50 + dx * Math.cos(radians) - dy * Math.sin(radians),
-        y: height / 2 + dx * Math.sin(radians) + dy * Math.cos(radians),
-      };
-    });
-  const minX = Math.min(...corners.map(point => point.x));
-  const maxX = Math.max(...corners.map(point => point.x));
-  const minY = Math.min(...corners.map(point => point.y));
-  const maxY = Math.max(...corners.map(point => point.y));
   return {
-    scale,
+    scale: clamp(value.scale, 0.35, 1),
     rotation,
-    x: clamp(value.x, (5 - minX) / 100, (95 - maxX) / 100),
-    y: clamp(value.y, (5 - minY) / height, (height - 5 - maxY) / height),
+    x: value.x,
+    y: value.y,
   };
 }
 
@@ -61,5 +37,5 @@ export function pinchOverlay(start: OverlayTransform,
     rotation,
     x: (current.x * 100 - 50 - nextX) / 100,
     y: (current.y * height - height / 2 - nextY) / height,
-  }, aspect);
+  });
 }

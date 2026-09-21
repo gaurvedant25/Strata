@@ -643,6 +643,46 @@ function useProvideStore() {
         entries: d.entries.filter((e) => e.id !== entryId),
       }));
     },
+    /**
+     * Swaps one exercise for another without disturbing the workout around it.
+     *
+     * A replacement is not a removal followed by an addition: it keeps the
+     * entry's place in the running order and its own id, so the exercise you
+     * swapped stays where it was in the list rather than reappearing at the
+     * bottom, and anything on screen still pointing at that entry — an open
+     * card, a menu — stays pointed at it.
+     *
+     * The plan carries over and the numbers do not. How many sets you intended
+     * is a decision about the session; what to load them with is a fact about
+     * the lift, so the new sets open on the best set from the last time this
+     * lift was trained, exactly as an added exercise does. Only when the new
+     * lift has never been logged does the old plan's rep target stand in, which
+     * is a better guess than the default eight.
+     *
+     * Anything already logged into the old exercise goes with it. That is real
+     * work disappearing, so the caller is the one that has to ask first.
+     */
+    replaceEntry(entryId: string, exerciseId: string) {
+      patchActive((d) => {
+        const i = d.entries.findIndex((e) => e.id === entryId);
+        if (i < 0) return d;
+        const old = d.entries[i];
+        const was = lastBestSet(s.sessions, exerciseId, d.id);
+        const planned = old.sets[0];
+        d.entries[i] = {
+          ...old,
+          exerciseId,
+          sets: Array.from({ length: Math.max(1, old.sets.length) }, () =>
+            blankSet(s.exercises.find((x) => x.id === exerciseId), {
+              weight: was?.weight,
+              reps: was?.reps ?? planned?.reps,
+              seconds: was?.seconds ?? planned?.seconds,
+            }),
+          ),
+        };
+        return d;
+      });
+    },
     moveEntry(entryId: string, dir: -1 | 1) {
       patchActive((d) => {
         const i = d.entries.findIndex((e) => e.id === entryId);

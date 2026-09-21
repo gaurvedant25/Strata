@@ -15,6 +15,8 @@ import {
   numInputCls,
 } from "../components/ui";
 import { exerciseHistory, personalRecords, streakSummary } from "../lib/stats";
+import { useEntitlement, useWriteGate } from "../lib/useEntitlement";
+import type { GateSubject } from "../lib/entitlement";
 import { num, parseKey } from "../lib/util";
 import { liftCard } from "../lib/card/select";
 import { ProgressSharePreview } from "../components/ProgressSharePreview";
@@ -48,13 +50,20 @@ const longDate = (key: string) =>
  */
 const CHART_W = 304;
 
-/** How far back the curve reaches. Matches the windows History offers. */
+/**
+ * How far back the curve reaches. Matches the windows History offers.
+ *
+ * `pro` marks the long windows. Everyone keeps a readable picture of where they
+ * are — all-time and the last month are the basic progress the free tier is
+ * promised — and Pro is the quarter and the year, which is where a trend stops
+ * being "how am I doing" and starts being analysis.
+ */
 type Range = "all" | "30d" | "90d" | "year";
-const RANGES: { id: Range; label: string; days: number }[] = [
+const RANGES: { id: Range; label: string; days: number; pro?: true }[] = [
   { id: "all", label: "All", days: Infinity },
   { id: "30d", label: "30d", days: 30 },
-  { id: "90d", label: "90d", days: 90 },
-  { id: "year", label: "1y", days: 365 },
+  { id: "90d", label: "90d", days: 90, pro: true },
+  { id: "year", label: "1y", days: 365, pro: true },
 ];
 
 /**
@@ -81,7 +90,14 @@ function StarIcon({ on }: { on: boolean }) {
   );
 }
 
-export function Progress() {
+export function Progress({
+  onUnlock,
+}: {
+  /** Opens whichever of the invitation or the paywall this person needs. */
+  onUnlock: (feature: GateSubject) => void;
+}) {
+  const { can } = useEntitlement();
+  const { guard } = useWriteGate(() => onUnlock("start-workout"));
   const s = useStore();
   const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
   const [metric, setMetric] = useState<Metric>("e1rm");
@@ -229,10 +245,54 @@ export function Progress() {
   const shown = at ? at[metric] : last;
 
   /*
+   * The band reads whatever the figure above it is reading.
+   *
+   * With the curve scrubbed, the top of the card described one session and the
+   * three boxes underneath described a career, so the card said two things at
+   * once and the eye had no way to tell which. Touching a point now swaps all
+   * three to that day, and letting go returns them to the records.
+   *
+   * The three boxes are the three metrics — estimate, heaviest set, volume —
+   * so whichever one the curve is drawing, the other two are underneath it and
+   * the day can be read whole without switching tabs to go and find them.
+   */
+  const band = at
+    ? [
+        { id: "progress:best", label: "Est. 1RM", value: num(at.e1rm, 1) },
+        {
+          id: "progress:heaviest",
+          label: "Heaviest set",
+          value: `${num(at.heaviest.weight)}×${at.heaviest.reps}`,
+        },
+        { id: "progress:volume", label: "Volume", value: num(at.volume, 0) },
+      ]
+    : pr
+      ? [
+          {
+            id: "progress:best",
+            label: "Best est. 1RM",
+            value: num(pr.bestE1rm, 1),
+          },
+          {
+            id: "progress:heaviest",
+            label: "Heaviest set",
+            value: `${num(pr.heaviest)}×${pr.heaviestReps}`,
+          },
+          {
+            id: "progress:volume",
+            label: "Best session",
+            value: num(pr.bestVolume, 0),
+          },
+        ]
+      : null;
+
+  /*
    * The lift as a picture. Everything here is already on the screen — the same
    * series the curve draws, the same percentage the line under the figure
-   * quotes, the same three records in the band — so a card cannot disagree
-   * with the page it was sent from.
+   * quotes, and the records the band rests on when nothing is selected — so a
+   * card cannot disagree with the page it was sent from. It stays on the
+   * records while the band follows a finger: a card is sent as the story of
+   * the whole run, not of whichever point was being held when Share was hit.
    */
   const liftData = current && values.length > 0 && values.every(Number.isFinite)
     ? liftCard({
@@ -352,7 +412,7 @@ export function Progress() {
         <Eyebrow>Progress</Eyebrow>
         {liftData && (
           <button
-            onClick={() => setSharing(true)}
+            onClick={guard(() => setSharing(true))}
             aria-label="Share this lift"
             className="-my-3 -mr-3 grid size-11 place-items-center text-muted active:text-fg"
           >
@@ -436,9 +496,17 @@ export function Progress() {
                 dense
                 options={METRICS}
                 value={metric}
+                /*
+                 * The selection survives the switch.
+                 *
+                 * `points` is built from the lift and the window, not from the
+                 * metric, so the index still names the same session — and
+                 * clearing it meant a tap on Top set threw the day away and
+                 * dropped the band back to all-time records. The curve and the
+                 * figure change; the session being read does not.
+                 */
                 onChange={(m) => {
                   setMetric(m);
-                  setScrub(null);
                   setSweeping(false);
                 }}
               />
@@ -451,9 +519,25 @@ export function Progress() {
                 // metrics reads as a spilled continuation of them rather than
                 // as the second switch.
                 className="ml-auto"
-                options={RANGES.map((r) => ({ id: r.id, label: r.label }))}
+                options={RANGES.map((r) => ({
+                  id: r.id,
+                  label: r.label,
+                  locked: !!r.pro && !can("progress-windows"),
+                }))}
                 value={range}
                 onChange={(r) => {
+                  /*
+                   * The long windows are Pro. Tapping one while free opens the
+                   * invitation or the paywall rather than doing nothing, and
+                   * returns *before* `setRange` — so dismissing whatever opens
+                   * leaves the curve on the window that was already showing
+                   * instead of on a blank Pro one.
+                   */
+                  const picked = RANGES.find((x) => x.id === r);
+                  if (picked?.pro && !can("progress-windows")) {
+                    onUnlock("progress-windows");
+                    return;
+                  }
                   setRange(r);
                   setScrub(null);
                   setSweeping(false);
@@ -522,40 +606,21 @@ export function Progress() {
               />
             </div>
 
-            {pr && (
+            {band && (
               <div className="mt-3 shrink-0">
                 <StatBand
                   size="sm"
                   frame="card"
-                  stats={[
-                    {
-                      label: "Best est. 1RM",
-                      value: (
-                        <Numeral
-                          id="progress:best"
-                          text={num(pr.bestE1rm, 1)}
-                        />
-                      ),
-                    },
-                    {
-                      label: "Heaviest set",
-                      value: (
-                        <Numeral
-                          id="progress:heaviest"
-                          text={`${num(pr.heaviest)}×${pr.heaviestReps}`}
-                        />
-                      ),
-                    },
-                    {
-                      label: "Best session",
-                      value: (
-                        <Numeral
-                          id="progress:volume"
-                          text={num(pr.bestVolume, 0)}
-                        />
-                      ),
-                    },
-                  ]}
+                  stats={band.map((b) => ({
+                    label: b.label,
+                    value: (
+                      // Mid-drag these change with every point the finger
+                      // crosses, and a figure resolving out of noise cannot be
+                      // read at that speed — the same reason the big number
+                      // above stops scrambling while the curve is being swept.
+                      <Numeral id={b.id} text={b.value} animate={!sweeping} />
+                    ),
+                  }))}
                 />
               </div>
             )}
@@ -784,7 +849,16 @@ export function Progress() {
         </p>
       </Sheet>
 
-      {sharing && liftData && <ProgressSharePreview data={liftData} onClose={() => setSharing(false)} />}
+      {sharing && liftData && (
+        <ProgressSharePreview
+          data={liftData}
+          onClose={() => setSharing(false)}
+          onUnlock={() => {
+            setSharing(false);
+            onUnlock("premium-share");
+          }}
+        />
+      )}
     </div>
   );
 }

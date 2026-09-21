@@ -3,13 +3,37 @@ import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
 import { Button, Eyebrow, Segmented, Sheet, inputCls } from "../components/ui";
 import { exportBackup, importBackup, wipe } from "../lib/db";
-import { PRIVACY_URL, TERMS_URL } from "../lib/legal";
-import { fmtRelative, todayKey } from "../lib/util";
+import { CREDITS_URL, PRIVACY_URL, TERMS_URL } from "../lib/legal";
+import { manageUrl, storeName } from "../lib/billing";
+import { SUPPORT_CONFIGURED, SUPPORT_URL } from "../lib/support";
+import { hasRenewingSubscription, planLabel } from "../lib/entitlement";
+import { useEntitlement, useWriteGate } from "../lib/useEntitlement";
+import { fmtDate, fmtRelative, todayKey } from "../lib/util";
 import { useStore } from "../store";
 import { SignIn } from "./SignIn";
 import type { Gender, Unit } from "../types";
 
-export function Settings({ onBack }: { onBack: () => void }) {
+export function Settings({
+  onBack,
+  onUnlock,
+  onCreateAccount,
+  onSignIn,
+}: {
+  onBack: () => void;
+  /** Opens the subscription sheet, which lives above this screen in `App`. */
+  onUnlock: () => void;
+  onCreateAccount: () => void;
+  onSignIn: () => void;
+}) {
+  const pro = useEntitlement();
+  const [planOpen, setPlanOpen] = useState(false);
+  /*
+   * Editing the exercise library is an action and is gated. Export, restore,
+   * erase and delete are not: those are the user's rights over their own
+   * records rather than features, and putting a price on the exit would be both
+   * wrong and a quick way to fail a store review.
+   */
+  const { guard } = useWriteGate(onUnlock);
   const s = useStore();
   const auth = useAuth();
   const ask = useConfirm();
@@ -113,6 +137,28 @@ export function Settings({ onBack }: { onBack: () => void }) {
         </button>
       </div>
 
+      {/*
+        Subscription state lives with the account rather than on a screen of its
+        own: it is a fact about who you are signed in as, and it is checked far
+        less often than it would be worth a tab.
+      */}
+      {/*
+        Shown signed out as well, reading "Free". Somebody with no account has
+        no way of knowing the app gives a week of Pro away, and a Plan row that
+        only appears once you have an account can only ever tell people who
+        already know.
+      */}
+      {auth.cloud && (
+        <>
+          <Group title="Plan" />
+          <ActionRow
+            label="Plan"
+            value={auth.session ? planLabel(pro.ent) : "Free"}
+            onClick={() => setPlanOpen(true)}
+          />
+        </>
+      )}
+
       {auth.cloud && (
         <>
           <Group title="Account" />
@@ -206,7 +252,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
       <ActionRow
         label="Exercise library"
         value={`${s.exercises.length} →`}
-        onClick={() => setExOpen(true)}
+        onClick={guard(() => setExOpen(true))}
       />
 
       <Group title="Your data" />
@@ -291,7 +337,14 @@ export function Settings({ onBack }: { onBack: () => void }) {
           and so the address a store listing points at is the app's own. */}
       <Group title="Legal" />
       <LinkRow label="Privacy policy" href={PRIVACY_URL} rule="subrule" />
-      <LinkRow label="Terms and conditions" href={TERMS_URL} />
+      <LinkRow
+        label="Terms and conditions"
+        href={TERMS_URL}
+        rule="subrule"
+      />
+      {/* The exercise drawings are used under a licence that asks to be
+          credited, and this is where the credit lives. */}
+      <LinkRow label="Image credits" href={CREDITS_URL} />
 
       {msg && (
         <div className="fixed inset-x-0 bottom-28 z-50 mx-auto flex max-w-lg items-center justify-between gap-4 border-y border-rule bg-ink px-5 py-3.5 text-[0.875rem]">
@@ -306,6 +359,24 @@ export function Settings({ onBack }: { onBack: () => void }) {
       )}
 
       <ExerciseManager open={exOpen} onClose={() => setExOpen(false)} />
+
+      <PlanSheet
+        open={planOpen}
+        onClose={() => setPlanOpen(false)}
+        signedIn={!!auth.session}
+        onUnlock={() => {
+          setPlanOpen(false);
+          onUnlock();
+        }}
+        onCreateAccount={() => {
+          setPlanOpen(false);
+          onCreateAccount();
+        }}
+        onSignIn={() => {
+          setPlanOpen(false);
+          onSignIn();
+        }}
+      />
     </div>
   );
 }
@@ -396,6 +467,136 @@ function ActionRow({
       <span className="text-[0.9375rem]">{label}</span>
       <span className="font-mono text-[0.75rem] text-muted">{value}</span>
     </button>
+  );
+}
+
+/**
+ * The plan, and the two things you can do about it.
+ *
+ * Both of those things happen at the store, not here, and the rows say so
+ * rather than implying otherwise. Apple and Google each require a subscription
+ * to be cancelled and changed in the store that sold it, and a "Cancel" button
+ * in this app that only unset a local flag would leave somebody believing they
+ * had stopped a renewal that was still coming.
+ *
+ * What is offered depends on what is actually running, because the three kinds
+ * of Pro are not the same thing:
+ *
+ *   preview    ends by itself, has taken no card, and has nothing to cancel
+ *   lifetime   renews nothing, so a cancel row would be offering to take
+ *              something away for no reason
+ *   monthly
+ *   or yearly  the only one that will bill again, and the only one with a
+ *              cancel and a change of plan to offer
+ */
+function PlanSheet({
+  open,
+  onClose,
+  signedIn,
+  onUnlock,
+  onCreateAccount,
+  onSignIn,
+}: {
+  open: boolean;
+  onClose: () => void;
+  signedIn: boolean;
+  onUnlock: () => void;
+  onCreateAccount: () => void;
+  onSignIn: () => void;
+}) {
+  const { ent } = useEntitlement();
+  const store = storeName();
+  const renewing = hasRenewingSubscription(ent);
+  const day = (ms: number) => fmtDate(todayKey(new Date(ms)));
+  const cancelled = ent.subscriptionStatus === "cancelled";
+
+  /*
+   * Signed out there is no entitlement to describe, only an offer to make —
+   * and it is the same offer the locked controls make, so it is worded the
+   * same way. Creating the account does not start the week; the first logged
+   * workout does, and saying so here avoids a nasty surprise later.
+   */
+  if (!signedIn)
+    return (
+      <Sheet open={open} onClose={onClose} title="Plan">
+        <p className="text-[1.25rem] font-semibold tracking-[-0.02em]">Free</p>
+        <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted">
+          Create an account to save your workouts and unlock a 7-day Pro
+          preview after your first completed workout.
+        </p>
+        <p className="mt-3 font-mono text-label font-semibold uppercase tracking-[0.16em] text-dim">
+          No card · No automatic charge
+        </p>
+        <div className="-mx-5 mt-5 border-t border-rule">
+          <ActionRow label="Create account" value="→" onClick={onCreateAccount} />
+          <ActionRow label="Sign in" value="→" onClick={onSignIn} />
+        </div>
+      </Sheet>
+    );
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Plan">
+      <p className="text-[1.25rem] font-semibold tracking-[-0.02em]">
+        {planLabel(ent)}
+      </p>
+
+      {ent.state === "pro_preview" && ent.previewEndsAt && (
+        <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted">
+          Ends {day(ent.previewEndsAt)}. No card, and nothing will be charged
+          when it does.
+        </p>
+      )}
+      {ent.state === "subscribed" && renewing && ent.subscriptionExpiresAt && (
+        <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted">
+          {cancelled
+            ? `Cancelled. Pro stays on until ${day(ent.subscriptionExpiresAt)}, and nothing further will be charged.`
+            : `Renews ${day(ent.subscriptionExpiresAt)}.`}
+        </p>
+      )}
+      {ent.state === "subscribed" && !renewing && (
+        <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted">
+          A one-time unlock. Nothing renews and nothing will be charged.
+        </p>
+      )}
+      {(ent.state === "free" || ent.state === "expired") && (
+        <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted">
+          Reading everything you have logged stays free. Adding to it —
+          workouts, weigh-ins, routines — needs Pro.
+        </p>
+      )}
+
+      <div className="-mx-5 mt-5 border-t border-rule">
+        {/* Everything except a live subscription can still buy one — including
+            a preview, which somebody may want to convert before it ends. */}
+        {ent.state !== "subscribed" && (
+          <ActionRow label="Unlock Pro" value="→" onClick={onUnlock} />
+        )}
+        {renewing && (
+          <>
+            <LinkRow label="Change plan" href={manageUrl()} />
+            {/* Already cancelled: the only thing left is to turn it back on,
+                which is also the store's job. */}
+            {!cancelled && (
+              <LinkRow label="Cancel subscription" href={manageUrl()} />
+            )}
+          </>
+        )}
+      </div>
+
+      {SUPPORT_CONFIGURED && (
+        <div className="-mx-5 border-b border-rule">
+          <LinkRow label="Purchase help" href={SUPPORT_URL} />
+        </div>
+      )}
+
+      {renewing && (
+        <p className="mt-3 text-[0.75rem] leading-relaxed text-dim">
+          Both open {store}, which is where subscriptions are changed and
+          cancelled. Cancelling keeps Pro until {day(ent.subscriptionExpiresAt!)}
+          .
+        </p>
+      )}
+    </Sheet>
   );
 }
 

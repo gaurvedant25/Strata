@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { AuthProvider } from "./auth";
 import { ConfirmProvider } from "./components/confirm";
+import { EntitlementProvider } from "./lib/useEntitlement";
 import "./index.css";
 import { StoreProvider, useStore } from "./store";
 
@@ -18,7 +19,9 @@ function Shell() {
   return (
     <AuthProvider onSynced={onSynced}>
       <ConfirmProvider>
-        <App />
+        <EntitlementProvider>
+          <App />
+        </EntitlementProvider>
       </ConfirmProvider>
     </AuthProvider>
   );
@@ -28,7 +31,11 @@ const DesignPreview = import.meta.env.DEV && new URLSearchParams(location.search
   ? lazy(() => import("./dev/SharePreview")) : null;
 const StreakPreview = import.meta.env.DEV && new URLSearchParams(location.search).has("streak-preview")
   ? lazy(() => import("./dev/StreakPreview")) : null;
-const Preview = DesignPreview ?? StreakPreview;
+const WorkoutPreview = import.meta.env.DEV && new URLSearchParams(location.search).has("workout-share-preview")
+  ? lazy(() => import("./dev/WorkoutSharePreview")) : null;
+const RankingPreview = import.meta.env.DEV && new URLSearchParams(location.search).has("ranking-preview")
+  ? lazy(() => import("./dev/RankingGuidePreview")) : null;
+const Preview = WorkoutPreview ?? DesignPreview ?? StreakPreview ?? RankingPreview;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

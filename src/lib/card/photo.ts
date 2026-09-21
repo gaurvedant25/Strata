@@ -24,9 +24,8 @@ export function photoSize(image: PhotoSize, frame: PhotoSize, zoom: number): Pho
 /**
  * Move, scale, and rotate a photo while preserving the point under the fingers.
  *
- * x/y are alignment values: 0 pins the near edge, .5 centres the image, and 1
- * pins the far edge. The same representation works when an image is larger
- * than the frame and when it has been zoomed out to reveal black around it.
+ * x/y locate the image centre in canvas fractions. Translation is independent
+ * of zoom, so even an exact-fit photo can move all the way to or past an edge.
  */
 export function pinchPhoto(
   start: PhotoTransform,
@@ -41,9 +40,7 @@ export function pinchPhoto(
   const rotation = normalizePhotoRotation(start.rotation + rotationDelta);
   const before = photoSize(image, frame, start.zoom);
   const after = photoSize(image, frame, zoom);
-  const beforeLeft = -(before.width - frame.width) * start.x;
-  const beforeTop = -(before.height - frame.height) * start.y;
-  const beforeCenter = { x: beforeLeft + before.width / 2, y: beforeTop + before.height / 2 };
+  const beforeCenter = { x: frame.width * start.x, y: frame.height * start.y };
   const startRadians = (start.rotation * Math.PI) / 180;
   const nextRadians = (rotation * Math.PI) / 180;
   const worldX = origin.x - beforeCenter.x;
@@ -55,15 +52,10 @@ export function pinchPhoto(
   const nextY = (sourceX * Math.sin(nextRadians) + sourceY * Math.cos(nextRadians)) * appliedRatio;
   const nextCenter = { x: current.x - nextX, y: current.y - nextY };
 
-  function align(center: number, size: number, frameSize: number) {
-    const slack = size - frameSize;
-    return Math.abs(slack) > 0.5 ? clamp(-(center - size / 2) / slack, 0, 1) : 0.5;
-  }
-
   return {
     zoom,
     rotation,
-    x: align(nextCenter.x, after.width, frame.width),
-    y: align(nextCenter.y, after.height, frame.height),
+    x: nextCenter.x / frame.width,
+    y: nextCenter.y / frame.height,
   };
 }

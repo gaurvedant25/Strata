@@ -33,6 +33,7 @@ export default function SharePreview() {
       </select>
     </label>
     <button className="w-full rounded-full bg-fg py-4 text-black" onClick={() => setOpen(true)}>Preview cards</button>
+    <a className="block text-sm text-muted underline" href="/?workout-share-preview">Workout cards</a>
     <a className="block text-sm text-muted underline" href="/">Back to Gym Log</a>
     {open && <ProgressSharePreview data={data} onClose={() => setOpen(false)} />}
   </main>;

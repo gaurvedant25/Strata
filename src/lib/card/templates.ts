@@ -1,5 +1,6 @@
 import { TIER_COLOR, TIER_LEVEL, tierInk } from "../strength";
 import { liftMoment, liftPoster, liftJourney } from "./liftTemplates";
+import { WORKOUT_TEMPLATES } from "./workoutTemplates";
 import {
   MARGIN,
   header,
@@ -277,87 +278,6 @@ const bodyTier: CardTemplate<"body"> = {
   },
 };
 
-// ─── Workout ─────────────────────────────────────────────────────────────────
-
-const workoutFigures: CardTemplate<"workout"> = {
-  id: "workout/figures",
-  name: "The session",
-  subject: "workout",
-  draw(L, d) {
-    ground(L, INK);
-    header(L, d.dateLabel);
-    const space = room(statBand(L, d.stats));
-    stack(
-      L,
-      [
-        { text: d.name, size: HERO * 0.46, weight: 600, family: "sans", track: -0.03, color: FG },
-        { text: `${d.exercises.length} exercises`, size: 3.6, weight: 600, track: 0.28, caps: true, color: MUTED, gap: 6.4 },
-      ],
-      space,
-    );
-  },
-};
-
-const workoutReceipt: CardTemplate<"workout"> = {
-  id: "workout/receipt",
-  name: "The receipt",
-  subject: "workout",
-  fits: (d) => d.exercises.length > 0,
-  draw(L, d) {
-    ground(L, INK);
-    const top = header(L, d.dateLabel);
-    const bandTop = statBand(L, d.stats);
-
-    const t = text(L, d.name, MARGIN, top + 9, {
-      size: 7.4, weight: 600, family: "sans", track: -0.03, color: FG,
-      maxW: 100 - MARGIN * 2,
-    });
-
-    // Capped, with the remainder counted. A story is not a spreadsheet, and an
-    // uncapped list is both a layout risk and more than a share wants to say.
-    const room = bandTop - t.bottom - 18;
-    const fit = Math.max(3, Math.floor(room / 8.6));
-    const shown = d.exercises.slice(0, fit);
-    const end = ruledList(
-      L,
-      { x: MARGIN, y: t.bottom + 10, w: 100 - MARGIN * 2 },
-      shown.map((e) => ({
-        left: e.name,
-        right: e.detail,
-        mark: e.pr,
-        color: e.pr ? FG : MUTED,
-      })),
-      { size: 3.9, gap: 8.6 },
-    );
-    if (d.exercises.length > shown.length)
-      text(L, `+${d.exercises.length - shown.length} more`, MARGIN, end + 2, {
-        size: 3.3, weight: 600, track: 0.2, caps: true, color: FAINT,
-      });
-  },
-};
-
-const workoutTopSet: CardTemplate<"workout"> = {
-  id: "workout/topset",
-  name: "Top set",
-  subject: "workout",
-  fits: (d) => !!d.topSet,
-  draw(L, d) {
-    ground(L, INK);
-    header(L, d.dateLabel);
-    const space = room(statBand(L, d.stats));
-    const top = d.topSet!;
-    stack(
-      L,
-      [
-        { text: "Top set", size: 3.6, weight: 600, track: 0.3, caps: true, color: MUTED },
-        { text: top.value, size: HERO * 0.78, weight: 500, track: -0.05, color: FG, gap: 6 },
-        { text: top.lift, size: 5, weight: 600, family: "sans", track: -0.02, color: FG, gap: 6 },
-        { text: top.detail, size: 3.3, weight: 600, track: 0.22, caps: true, color: FAINT, gap: 4.4 },
-      ],
-      space,
-    );
-  },
-};
 
 /**
  * The whole set, in the order they are rotated through.
@@ -376,9 +296,7 @@ export const TEMPLATES: CardTemplate[] = [
   bodyLit,
   bodyRoster,
   bodyTier,
-  workoutFigures,
-  workoutReceipt,
-  workoutTopSet,
+  ...WORKOUT_TEMPLATES,
 ] as CardTemplate[];
 
 /**

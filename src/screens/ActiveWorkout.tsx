@@ -3,10 +3,12 @@ import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
 import { ExercisePicker } from "../components/ExercisePicker";
 import { Check, ChevronRight, Minus, Plus, Share } from "../components/icons";
+import { SwipeRow } from "../components/SwipeRow";
 import { Button, Empty, Eyebrow, Scrim, Sheet } from "../components/ui";
 import { useDialog, usePresence } from "../lib/useDialog";
-import { streakCard } from "../lib/card/select";
-import { useShareCard } from "../lib/card/useShareCard";
+import { workoutCard } from "../lib/card/select";
+import type { WorkoutData } from "../lib/card/types";
+import { WorkoutSharePreview } from "../components/WorkoutSharePreview";
 import {
   e1rm,
   lastPerformance,
@@ -17,9 +19,11 @@ import {
   streakSummary,
   qualifiesForStreak,
 } from "../lib/stats";
+import { similarExercises } from "../lib/similar";
 import { fmtClock, fmtDuration, num } from "../lib/util";
 import { useStore } from "../store";
-import type { Session, SetLog } from "../types";
+import type { GateSubject } from "../lib/entitlement";
+import type { Exercise, Session, SetLog } from "../types";
 
 /**
  * The tone a value settles to once its set is logged: still readable, but no
@@ -84,6 +88,25 @@ function streakFor(sessions: Session[], session: Session, now: number) {
 type Field = "weight" | "reps" | "seconds";
 type Pad = { entryId: string; setId: string; field: Field; buf: string | null };
 
+/**
+ * A replacement in progress: which exercise is going, and what to offer.
+ *
+ * A snapshot taken when the gesture finishes rather than something worked out
+ * again on every render. The suggestions and the exclusions are read off the
+ * workout as it stood the moment the row was swiped, so nothing in the sheet
+ * moves while a thumb is already travelling toward a row — and the sheet still
+ * has a name and a list to draw while it animates out, after the entry it was
+ * asking about has already become something else.
+ */
+type Swap = {
+  entryId: string;
+  /** The exercise being replaced, for the sheet's title and its question. */
+  name: string;
+  suggested: Exercise[];
+  /** Everything already in this workout, which is nothing worth offering. */
+  exclude: Set<string>;
+};
+
 /** A dial reads "—" rather than "0": an untouched number is not a logged zero. */
 const dial = (v: number) => (v ? num(v) : "—");
 /** The same rule for a held set: a clock, or a dash until it has been set. */
@@ -103,7 +126,14 @@ const HOLD_STEP = 5;
  * tap to switch. The pips under the header are the only thing that still shows
  * the whole session at once.
  */
-export function ActiveWorkout({ onBack }: { onBack: () => void }) {
+export function ActiveWorkout({
+  onBack,
+  onUnlock,
+}: {
+  onBack: () => void;
+  /** Opened only from a tap on a Pro template, never by the app itself. */
+  onUnlock: (f: GateSubject) => void;
+}) {
   const s = useStore();
   const auth = useAuth();
   const session = s.active!;
@@ -117,6 +147,12 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
     });
 
   const [picker, setPicker] = useState(false);
+  const [swap, setSwap] = useState<Swap | null>(null);
+  // Kept while the sheet closes, the same way the pad's title is: `swap` is
+  // cleared the instant a replacement is chosen, and the sheet would otherwise
+  // empty a frame before it went.
+  const [lastSwap, setLastSwap] = useState<Swap | null>(null);
+  const [workoutShare, setWorkoutShare] = useState<WorkoutData | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [confirmFinish, setConfirmFinish] = useState(false);
   // Which exercise has the screen. Held by id so it survives the list changing.
@@ -132,6 +168,8 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
   const [lastPad, setLastPad] = useState<Pad | null>(null);
   if (pad && pad !== lastPad) setLastPad(pad);
   const shownPad = pad ?? lastPad;
+  if (swap && swap !== lastSwap) setLastSwap(swap);
+  const shownSwap = swap ?? lastSwap;
 
   const unit = s.settings.unit === "lb" ? "lbs" : "kg";
   const step = s.settings.unit === "lb" ? 5 : 2.5;
@@ -196,28 +234,14 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
     workoutDone,
   ]);
 
-  // Only worth counting when the persisted celebration is up.
+  // Only worth counting when the persisted celebration is up. The pending id
+  // is the whole condition rather than "every set is settled": a workout you
+  // end early from the header is finished too, and it earns the same answer
+  // about where it left your streak.
   const streak =
-    workoutDone && pendingCompletion && !celebrationOff
+    pendingCompletion && !celebrationOff
       ? streakFor(s.sessions, session, s.now)
       : null;
-
-  /*
-   * The picture the share button hands over.
-   *
-   * Built here rather than inside the card so it is drawn the moment the card
-   * appears — seconds before anyone reaches the button — because the share
-   * sheet has to open on the tap itself and a PNG takes long enough to encode
-   * to lose the gesture. Null while there is no card, and the hook idles.
-   */
-  const shareData = streak
-    ? streakCard(s.sessions, session, s.now, unit)
-    : null;
-  const shareCard = useShareCard(
-    shareData && 'streak',
-    shareData,
-    'gym-log-streak-' + session.date + '.png',
-  );
 
   const entry =
     session.entries.find((e) => e.id === openId) ??
@@ -279,6 +303,28 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
     );
   }
 
+  /**
+   * Opens the Replace sheet for one entry.
+   *
+   * The suggestions are worked out here rather than in the sheet, because this
+   * is the only moment that knows what the workout looked like: everything
+   * already in the session is held out of the list, so the sheet cannot offer
+   * to put a second copy of a lift into a workout that has one, and it cannot
+   * offer the exercise you are trying to get rid of either.
+   */
+  function openSwap(entryId: string) {
+    const target = session.entries.find((e) => e.id === entryId);
+    const ex = target && s.exerciseById.get(target.exerciseId);
+    if (!ex) return;
+    const exclude = new Set(session.entries.map((e) => e.exerciseId));
+    setSwap({
+      entryId,
+      name: ex.name,
+      suggested: similarExercises(ex, s.exercises, exclude),
+      exclude,
+    });
+  }
+
   const header = (
     <Header
       onBack={onBack}
@@ -296,11 +342,16 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
       line={summary}
       saving={completionSaving}
       error={completionError}
+      // Ending early records the completion and hands over to the same card
+      // the last set of a full workout raises. Saving used to close the logger
+      // outright, which left the one thing you finish for — the streak — with
+      // nowhere to be read: you were returned to the routine list as though
+      // nothing had happened. The card closes the workout from here.
       onSave={() => {
         setCompletionSaving(true);
         setCompletionError(null);
         void s
-          .finishSession()
+          .markSessionComplete()
           .then((completed) => {
             if (completed) void auth.push();
             setConfirmFinish(false);
@@ -328,6 +379,45 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
       onPick={(x) => {
         s.addEntry(x.id);
         setPicker(false);
+      }}
+    />
+  );
+
+  const replacePicker = shownSwap && (
+    <ExercisePicker
+      open={!!swap}
+      onClose={() => setSwap(null)}
+      title={`Replace ${shownSwap.name}`}
+      suggested={shownSwap.suggested}
+      exclude={shownSwap.exclude}
+      onPick={async (x) => {
+        /*
+         * Swapping out a plan costs nothing and happens on the tap. Swapping
+         * out sets you have already logged is different: those minutes go with
+         * the exercise and nothing in the app can give them back, so that one
+         * case stops and asks — the same question, in the same words, that
+         * removing the row would have asked.
+         */
+        const logged =
+          session.entries
+            .find((e) => e.id === shownSwap.entryId)
+            ?.sets.filter((st) => st.done).length ?? 0;
+        if (
+          logged &&
+          !(await ask({
+            title: `Replace ${shownSwap.name}?`,
+            body: `${logged} logged ${
+              logged === 1 ? "set goes" : "sets go"
+            } with it, and cannot be recovered.`,
+            confirmLabel: "Replace",
+            danger: true,
+          }))
+        )
+          return;
+        s.replaceEntry(shownSwap.entryId, x.id);
+        setSwap(null);
+        // The sets under the cursor belong to the exercise that just left.
+        setCursor(null);
       }}
     />
   );
@@ -427,7 +517,9 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
               {session.entries.length}
             </span>
             <span className="flex items-center gap-3">
-              {idx >= 0 && `Set ${idx + 1} of ${entry.sets.length}`}
+              {entry.sets.length > 0 && (
+                <SetDots sets={entry.sets} at={idx} />
+              )}
               <button
                 onClick={() => setMenu(entry.id)}
                 aria-label={`Options for ${ex?.name ?? "exercise"}`}
@@ -639,34 +731,63 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
             .map((e) => {
               const done = e.sets.filter((x) => x.done).length;
               const complete = e.sets.every((x) => settled(x));
+              const name = s.exerciseById.get(e.exerciseId)?.name ?? "Exercise";
               return (
-                <button
+                <SwipeRow
                   key={e.id}
-                  onClick={() => {
-                    setOpenId(e.id);
-                    setCursor(null);
-                  }}
-                  className="press press-row flex w-full items-center gap-3.5 px-5 py-3.5 text-left"
+                  onRemove={() => s.removeEntry(e.id)}
+                  // Pulled the other way, the row asks what it should be
+                  // instead. Nothing is lost on the gesture alone: it opens the
+                  // sheet, and the sheet is where the decision is made.
+                  onReplace={() => openSwap(e.id)}
+                  /*
+                   * Trimming the plan is the ordinary case and happens on the
+                   * gesture alone. An exercise with sets already logged into it
+                   * is different: those are minutes of work that nothing in the
+                   * app can give back, so that one row — and only that row —
+                   * stops and asks.
+                   */
+                  confirm={
+                    done
+                      ? () =>
+                          ask({
+                            title: `Remove ${name}?`,
+                            body: `${done} logged ${
+                              done === 1 ? "set goes" : "sets go"
+                            } with it, and cannot be recovered.`,
+                            confirmLabel: "Remove",
+                            danger: true,
+                          })
+                      : undefined
+                  }
                 >
-                  <span
-                    className="min-w-0 flex-1 truncate text-[1rem] font-medium tracking-[-0.015em]"
-                    style={{
-                      color: complete ? DIM : undefined,
-                      textDecoration: complete ? "line-through" : undefined,
+                  <button
+                    onClick={() => {
+                      setOpenId(e.id);
+                      setCursor(null);
                     }}
+                    className="press press-row flex w-full items-center gap-3.5 px-5 py-3.5 text-left"
                   >
-                    {s.exerciseById.get(e.exerciseId)?.name ?? "Exercise"}
-                  </span>
-                  <span className="whitespace-nowrap font-mono text-label font-medium text-muted">
-                    {complete
-                      ? "Complete"
-                      : done
-                        ? `${done} of ${e.sets.length} sets`
-                        : `${e.sets.length} sets`}
-                  </span>
-                  {/* A mark, not a word: `faint` is the floor for one of those. */}
-                  <ChevronRight size={16} className="shrink-0 text-faint" />
-                </button>
+                    <span
+                      className="min-w-0 flex-1 truncate text-[1rem] font-medium tracking-[-0.015em]"
+                      style={{
+                        color: complete ? DIM : undefined,
+                        textDecoration: complete ? "line-through" : undefined,
+                      }}
+                    >
+                      {name}
+                    </span>
+                    <span className="whitespace-nowrap font-mono text-label font-medium text-muted">
+                      {complete
+                        ? "Complete"
+                        : done
+                          ? `${done} of ${e.sets.length} sets`
+                          : `${e.sets.length} sets`}
+                    </span>
+                    {/* A mark, not a word: `faint` is the floor for one of those. */}
+                    <ChevronRight size={16} className="shrink-0 text-faint" />
+                  </button>
+                </SwipeRow>
               );
             })}
 
@@ -695,13 +816,24 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
         </section>
       </div>
 
+      {workoutShare && (
+        <WorkoutSharePreview
+          data={workoutShare}
+          onClose={() => setWorkoutShare(null)}
+          onUnlock={() => {
+            setWorkoutShare(null);
+            onUnlock("premium-share");
+          }}
+        />
+      )}
       {streak && (
         <Celebration
           streak={streak}
           busy={completionSaving}
           error={completionError}
-          onShare={shareCard.share}
-          canShare={shareCard.ready}
+          onShare={() => setWorkoutShare(workoutCard(session, s.exerciseById, s.now,
+            unit, s.sessions, s.settings.gender))}
+          canShare={!!session.endedAt}
           stats={[
             { label: "Time", value: fmtDuration(elapsed) },
             { label: "Sets", value: String(setsDone) },
@@ -795,6 +927,7 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
       )}
 
       {exercisePicker}
+      {replacePicker}
 
       <Sheet open={!!menu} onClose={() => setMenu(null)} title="Exercise">
         <div className="space-y-2.5">
@@ -816,6 +949,21 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
           >
             Move down
           </Button>
+          {/*
+            The tap route to what a rightward swipe does. The gesture is faster
+            once you know it is there, and it is the only way to reach this from
+            a row in the list — but a swipe cannot be performed at all with
+            VoiceOver on, which claims that direction for its own navigation.
+          */}
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (menu) openSwap(menu);
+              setMenu(null);
+            }}
+          >
+            Replace with another exercise
+          </Button>
           <Button
             variant="danger"
             onClick={() => {
@@ -835,6 +983,55 @@ export function ActiveWorkout({ onBack }: { onBack: () => void }) {
 
       {finishSheet}
     </div>
+  );
+}
+
+/**
+ * How far into the exercise you are, drawn rather than spelled.
+ *
+ * The set list below already says which one is live — it lifts that row off the
+ * card and writes NOW against it — so "Set 2 of 4" in the header was the same
+ * fact a second time, in the one line on this screen with the least room for
+ * it. Four marks carry it at a glance and hand the header back to the exercise.
+ *
+ * A dot fills once its set is settled, and the one you are on is filled too:
+ * the mark means "reached", not "finished", which is what makes the row of them
+ * read the way the sentence did. Skipped counts as reached, because the sentence
+ * counted it too — the strikethrough in the list is where that distinction
+ * lives.
+ *
+ * `faint` is the unfilled tone. This is that token's whole purpose: a mark
+ * carrying no words, held to the 3:1 that non-text graphics need rather than to
+ * the text minimum. The sentence itself is kept as the label, because someone
+ * listening to this screen should not lose what the dots replaced.
+ */
+function SetDots({ sets, at }: { sets: SetLog[]; at: number }) {
+  return (
+    <span
+      role="img"
+      aria-label={
+        at >= 0 ? `Set ${at + 1} of ${sets.length}` : `${sets.length} sets`
+      }
+      className="flex items-center gap-[5px]"
+    >
+      {sets.map((x, i) => {
+        const filled = settled(x) || i === at;
+        return (
+          <span
+            key={x.id}
+            aria-hidden="true"
+            /* The fill is the only thing that moves when a set is logged, and
+               it is worth seeing happen — the same colour transition every
+               other control on this screen uses, at the same speed. */
+            className="size-1.5 shrink-0 rounded-full border transition-colors duration-[112ms]"
+            style={{
+              borderColor: filled ? "var(--color-fg)" : "var(--color-faint)",
+              background: filled ? "var(--color-fg)" : "transparent",
+            }}
+          />
+        );
+      })}
+    </span>
   );
 }
 
@@ -1152,7 +1349,7 @@ function Celebration({
             <button
               onClick={onShare}
               disabled={!canShare || busy}
-              aria-label="Share streak"
+              aria-label="Share workout"
               className="press animate-cb-stat grid size-13 shrink-0 place-items-center rounded-full border border-[#3a3a3a] text-fg transition-opacity disabled:opacity-40"
               style={{ animationDelay: "1.55s" }}
             >

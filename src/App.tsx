@@ -1,5 +1,16 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { CalendarIcon, ChartIcon } from "./components/icons";
+import { Paywall } from "./components/Paywall";
+import { ProExpired } from "./components/ProExpired";
+import { ProInvite } from "./components/ProInvite";
+import { ProFinalDay, ProUnlocked } from "./components/ProNotices";
+import { track } from "./lib/analytics";
+import {
+  gateDestination,
+  hasQualifyingWorkout,
+  type GateSubject,
+} from "./lib/entitlement";
+import { useEntitlement } from "./lib/useEntitlement";
 import { sessionElapsed } from "./lib/stats";
 import { fmtDuration } from "./lib/util";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
@@ -127,6 +138,84 @@ export default function App() {
   const [signInOpen, setSignInOpen] = useState(false);
 
   /*
+   * The Pro preview, and the one rule that starts it.
+   *
+   * Not "on install" and not "on sign-up": the seven days begin when there is a
+   * finished workout carrying at least one logged, unskipped set. Expressed as a
+   * standing condition rather than as something hung off the Finish button,
+   * which is what makes every awkward case fall out for free — a second
+   * completed workout, a reload a moment after the first, a completion that
+   * happened offline and syncs later, and the existing user who already has a
+   * history and meets the condition the first time this code ever runs.
+   *
+   * `start_pro_preview()` is idempotent on the server, so calling it again is
+   * cheap and calling it twice is harmless. Nothing is written locally on the
+   * way in, so a call that fails leaves the account still eligible and simply
+   * tries again — a preview is never consumed by a round trip that did not
+   * land.
+   */
+  const pro = useEntitlement();
+  const [paywall, setPaywall] = useState(false);
+  const [expiryOpen, setExpiryOpen] = useState(false);
+  /** Which shape of preview invitation is up, if any. */
+  const [invite, setInvite] = useState<"guest" | "workout" | null>(null);
+  /** Which tab the sign-in screen should open on, when it is up. */
+  const [signInAs, setSignInAs] = useState<"in" | "up" | null>(null);
+
+  /*
+   * Every locked control in the app comes through here.
+   *
+   * One router rather than a `setPaywall(true)` scattered through the screens,
+   * because what a locked control should *do* depends on who is tapping it and
+   * that decision should exist once. `gateDestination` makes the choice and is
+   * tested on its own; this only carries it out.
+   */
+  const openGate = (feature: GateSubject) => {
+    track("pro_feature_gate_viewed", {
+      // `start-workout` is a gate subject rather than a matrix key; reported as
+      // a plain string so the funnel can still see it.
+      feature: feature === "start-workout" ? undefined : feature,
+      reason: feature,
+      state: pro.ent.state,
+    });
+    const where = gateDestination({
+      ent: pro.ent,
+      signedIn: pro.signedIn,
+      hasQualifyingWorkout: hasQualifyingWorkout(s.sessions),
+    });
+    if (where === "none") return;
+    if (where === "paywall") setPaywall(true);
+    else setInvite(where === "invite-guest" ? "guest" : "workout");
+  };
+
+  const startPreview = pro.startPreview;
+  useEffect(() => {
+    if (!pro.signedIn || pro.loading || pro.ent.previewConsumed) return;
+    if (!hasQualifyingWorkout(s.sessions)) return;
+    void startPreview();
+    // Narrow on purpose: depending on the whole context would re-run this every
+    // time the countdown ticks, which is once a minute, forever.
+  }, [pro.signedIn, pro.loading, pro.ent.previewConsumed, s.sessions, startPreview]);
+
+  /*
+   * The expiry screen waits for a natural moment rather than taking one.
+   *
+   * It is armed once per launch when the preview has run out, and only
+   * rendered further down, where the logger is already known to be down — so a
+   * preview that ends mid-set is not something the person mid-set finds out
+   * about.
+   */
+  const expiryArmed = useRef(false);
+  useEffect(() => {
+    if (onboarding !== false || pro.loading) return;
+    if (pro.ent.state !== "expired" || pro.notices.expiryDismissed) return;
+    if (expiryArmed.current) return;
+    expiryArmed.current = true;
+    track("pro_preview_expired", { state: pro.ent.state });
+    setExpiryOpen(true);
+  }, [onboarding, pro.loading, pro.ent.state, pro.notices.expiryDismissed]);
+
+  /*
    * What signing in during first run means.
    *
    * A returning lifter has a bodyweight, a split and a history sitting on the
@@ -143,6 +232,7 @@ export default function App() {
    */
   useEffect(() => {
     if (!auth.session) return;
+    setSignInAs(null);
     setSignInOpen(false);
     if (!onboarding) return;
     if (s.bodyweight.length || s.splits.length || s.sessions.length) {
@@ -226,10 +316,29 @@ export default function App() {
     setSettingsOpen(false);
   }
 
+  /*
+   * Opened from the Pro invitation, and full-screen like the logger — a form
+   * with two fields does not belong in a sheet stacked over another sheet.
+   * `skipLabel` is "Not now" because this is an offer somebody can decline, not
+   * a gate they are stuck behind.
+   */
+  if (signInAs) {
+    return (
+      <div className="mx-auto flex min-h-full max-w-lg flex-col">
+        <SignIn
+          initialMode={signInAs}
+          onSkip={() => setSignInAs(null)}
+          skipLabel="Not now"
+          skipNote="Your workouts stay on this device. You can create an account later from Settings."
+        />
+      </div>
+    );
+  }
+
   if (showLogger) {
     return (
       <div className="mx-auto min-h-full max-w-lg">
-        <ActiveWorkout onBack={() => setViewLogger(false)} />
+        <ActiveWorkout onBack={() => setViewLogger(false)} onUnlock={openGate} />
       </div>
     );
   }
@@ -237,15 +346,25 @@ export default function App() {
   return (
     <div className="mx-auto min-h-full max-w-lg">
       {settingsOpen ? (
-        <Settings onBack={() => setSettingsOpen(false)} />
+        <Settings
+          onBack={() => setSettingsOpen(false)}
+          onUnlock={() => setPaywall(true)}
+          onCreateAccount={() => setSignInAs("up")}
+          onSignIn={() => setSignInAs("in")}
+        />
       ) : (
         <>
-          {tab === "home" && <Home onSettings={() => setSettingsOpen(true)} />}
-          {tab === "routines" && (
-            <Routines onOpenLogger={() => setViewLogger(true)} />
+          {tab === "home" && (
+            <Home onSettings={() => setSettingsOpen(true)} onUnlock={openGate} />
           )}
-          {tab === "history" && <History />}
-          {tab === "progress" && <Progress />}
+          {tab === "routines" && (
+            <Routines
+              onOpenLogger={() => setViewLogger(true)}
+              onLocked={() => setPaywall(true)}
+            />
+          )}
+          {tab === "history" && <History onUnlock={openGate} />}
+          {tab === "progress" && <Progress onUnlock={openGate} />}
         </>
       )}
 
@@ -286,6 +405,15 @@ export default function App() {
         ref={barRef}
         className="pointer-events-none fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-lg flex-col gap-2.5 px-3.5 pb-[max(calc(env(safe-area-inset-bottom)-12px),14px)] transition-transform duration-[260ms] ease-settle"
       >
+        {/*
+          The preview's two small messages, above the pill and the bar. They
+          render here and only here, which is inside the branch the logger has
+          already been ruled out of — so neither can land during a workout, on
+          the celebration card, or while a set is being entered.
+        */}
+        <ProUnlocked />
+        <ProFinalDay />
+
         {inWorkout && (
           <button
             onClick={() => setViewLogger(true)}
@@ -362,6 +490,46 @@ export default function App() {
           })}
         </nav>
       </div>
+
+      {/*
+        Above the tab bar and outside it, because it is the one thing on this
+        screen that is not navigation. It lives here rather than inside a tab so
+        that the gate in Routines and the once-a-launch prompt open the same
+        sheet rather than two that look alike.
+      */}
+      <Paywall open={paywall} onClose={() => setPaywall(false)} />
+
+      <ProInvite
+        open={!!invite}
+        variant={invite ?? "guest"}
+        onClose={() => setInvite(null)}
+        onCreateAccount={() => {
+          setInvite(null);
+          setSignInAs("up");
+        }}
+        onSignIn={() => {
+          setInvite(null);
+          setSignInAs("in");
+        }}
+        onStartWorkout={() => {
+          setInvite(null);
+          goTab("routines");
+        }}
+      />
+
+      <ProExpired
+        open={expiryOpen}
+        onClose={() => {
+          setExpiryOpen(false);
+          track("pro_continue_free", { state: pro.ent.state });
+          pro.markNotice("expiryDismissed");
+        }}
+        onUnlock={() => {
+          setExpiryOpen(false);
+          pro.markNotice("expiryDismissed");
+          setPaywall(true);
+        }}
+      />
     </div>
   );
 }

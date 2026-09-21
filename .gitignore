@@ -38,3 +38,12 @@ ds-bundle/
 
 # Supabase CLI scratch: the linked-project pointer and a version check.
 supabase/.temp/
+
+# Licensed exercise artwork, dropped in by hand and turned into thumbnails by
+# scripts/exercise-art.py. A bought licence covers the processed thumbnails
+# inside the app, not republishing the originals here.
+art-source/
+
+# Python bytecode cache from scripts/exercise-art.py
+__pycache__/
+*.pyc

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useDialog } from "../lib/useDialog";
+import { useEntitlement } from "../lib/useEntitlement";
 import type { DeckCard } from "../lib/card/useShareDeck";
 import { ASPECTS, DEFAULT_OVERLAY, type Aspect, type Layout, type OverlayTransform } from "../lib/card/draw";
 import { constrainOverlay, pinchOverlay } from "../lib/card/overlay";
@@ -20,16 +21,20 @@ type PhotoEditor = {
   onChange: (next: NonNullable<Layout["photo"]>) => void;
 };
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
 export function ShareSheet({
   open, onClose, cards, pending, onSend, subject, selectedId, onSelect,
-  controls, error, onRetry, feedback, sending, overlayEditor, photoEditor,
+  controls, error, onRetry, feedback, sending, overlayEditor, photoEditor, onUnlock,
 }: {
   open: boolean; onClose: () => void; cards: DeckCard[]; pending: boolean;
   onSend: (at: number) => void; subject: string;
   selectedId: string; onSelect: (id: string) => void; controls?: ReactNode;
   error?: string | null; onRetry?: () => void; feedback?: string; sending?: boolean;
+  /**
+   * Opens the Pro gate for a premium template. Absent where there is nowhere
+   * sensible to send somebody, in which case a locked card explains itself and
+   * stops there rather than offering a button that goes nowhere.
+   */
+  onUnlock?: () => void;
   overlayEditor?: OverlayEditor;
   photoEditor?: PhotoEditor;
 }) {
@@ -54,6 +59,14 @@ export function ShareSheet({
   } | null>(null);
   const at = Math.max(0, cards.findIndex(c => c.id === selectedId));
   const card = cards[at];
+  /*
+   * A premium template is visible, swipeable and fully rendered; only the
+   * export is held back. Putting the wall in front of the picture would hide
+   * the one thing that makes the case for paying, and a card somebody has
+   * already seen is a far easier thing to decide about.
+   */
+  const { can } = useEntitlement();
+  const locked = !!card?.pro && !can("premium-share");
   // A new image revision restores the same template, without a visual slide.
   useEffect(() => {
     if (view.current) view.current.scrollLeft = at * view.current.clientWidth;
@@ -234,10 +247,10 @@ export function ShareSheet({
   const previewWidth = Math.min(previewSpace.width, previewSpace.height * ratio);
   const previewHeight = previewWidth / ratio;
   const photoFrame = {
-    left: previewWidth * 0.04,
-    top: previewWidth * 0.04,
-    width: previewWidth * 0.92,
-    height: previewHeight - previewWidth * 0.08,
+    left: 0,
+    top: 0,
+    width: previewWidth,
+    height: previewHeight,
   };
   const previewPhoto = photoEditor?.photo;
   const previewPhotoSize = previewPhoto ? photoSize(
@@ -245,7 +258,7 @@ export function ShareSheet({
     { width: photoFrame.width, height: photoFrame.height }, previewPhoto.zoom,
   ) : { width: 0, height: 0 };
   if (!open) return null;
-  return <div className="fixed inset-0 z-50 bg-black/85">
+  return <div className="fixed inset-0 z-[80] bg-black/85">
     <div ref={panel} role="dialog" aria-modal="true" aria-label={`Share this ${subject}`} tabIndex={-1}
       onKeyDown={e => {
         if (e.target instanceof HTMLInputElement) return;
@@ -253,7 +266,7 @@ export function ShareSheet({
       }}
       className="relative mx-auto flex h-[100dvh] w-full max-w-lg flex-col bg-ink outline-none">
       <header className="flex shrink-0 items-center justify-between px-5 pt-[calc(env(safe-area-inset-top)+12px)]">
-        <div><Eyebrow>Make it yours</Eyebrow><p className="mt-1 text-xs text-muted">Your progress. Your way.</p></div>
+        <div><Eyebrow>Make it yours</Eyebrow><p className="mt-1 text-xs text-muted">{subject === "workout" ? "Your workout. Your way." : "Your progress. Your way."}</p></div>
         <button onClick={onClose} aria-label="Close share" className="grid size-11 place-items-center text-lg">✕</button>
       </header>
       <div ref={view} aria-label="Card previews"
@@ -286,16 +299,16 @@ export function ShareSheet({
         onPointerCancel={e => { drag.current = null; e.currentTarget.style.scrollSnapType = ""; e.currentTarget.scrollLeft = at * e.currentTarget.clientWidth; }}
         className="flex min-h-[160px] flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain py-3 [scrollbar-width:none]">
         {cards.map(c => <div key={c.id} className="flex h-full w-full shrink-0 snap-center items-center justify-center px-5">
-          {c.backgroundUrl && c.overlayUrl ? <div className="relative shrink-0 overflow-hidden rounded-lg bg-black"
+          {c.backgroundUrl && c.overlayUrl ? <div className="relative shrink-0 overflow-hidden bg-black"
             style={{ width: previewWidth, height: previewHeight }}>
-            {previewPhoto ? <div className="absolute overflow-hidden rounded-lg border border-[#262626]"
+            {previewPhoto ? <div className="absolute overflow-hidden"
               style={photoFrame}>
               <img src={previewPhoto.image.src} alt="" draggable={false} className="pointer-events-none absolute max-w-none select-none"
                 style={{
                   width: previewPhotoSize.width,
                   height: previewPhotoSize.height,
-                  left: -(previewPhotoSize.width - photoFrame.width) * previewPhoto.x,
-                  top: -(previewPhotoSize.height - photoFrame.height) * previewPhoto.y,
+                  left: photoFrame.width * previewPhoto.x - previewPhotoSize.width / 2,
+                  top: photoFrame.height * previewPhoto.y - previewPhotoSize.height / 2,
                   transform: `rotate(${previewPhoto.rotation}deg)`,
                 }} />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,.42),rgba(0,0,0,.04)_20%,rgba(0,0,0,.04)_62%,rgba(0,0,0,.68))]" />
@@ -319,10 +332,10 @@ export function ShareSheet({
                 e.preventDefault();
                 if (photoEditor?.active) {
                   const next = { ...photoEditor.photo };
-                  if (e.key === "ArrowLeft") next.x = clamp(next.x + step, 0, 1);
-                  if (e.key === "ArrowRight") next.x = clamp(next.x - step, 0, 1);
-                  if (e.key === "ArrowUp") next.y = clamp(next.y + step, 0, 1);
-                  if (e.key === "ArrowDown") next.y = clamp(next.y - step, 0, 1);
+                  if (e.key === "ArrowLeft") next.x -= step;
+                  if (e.key === "ArrowRight") next.x += step;
+                  if (e.key === "ArrowUp") next.y -= step;
+                  if (e.key === "ArrowDown") next.y += step;
                   if (e.key === "+" || e.key === "=") next.zoom = clampPhotoZoom(next.zoom + 0.05);
                   if (e.key === "-") next.zoom = clampPhotoZoom(next.zoom - 0.05);
                   if (e.key === "[") next.rotation -= e.shiftKey ? 5 : 2;
@@ -338,7 +351,7 @@ export function ShareSheet({
                   if (e.key === "-") next.scale -= 0.05;
                   if (e.key === "[") next.rotation -= e.shiftKey ? 5 : 2;
                   if (e.key === "]") next.rotation += e.shiftKey ? 5 : 2;
-                  liveTransform.current = constrainOverlay(next, overlayEditor.aspect);
+                  liveTransform.current = constrainOverlay(next);
                   overlayEditor.onChange(liveTransform.current);
                 }
                 e.stopPropagation();
@@ -383,8 +396,11 @@ export function ShareSheet({
         <div className="flex h-11 items-center justify-between">
           <button aria-label="Previous card" disabled={pending || at === 0 || sending} onClick={() => go(at - 1)} className="size-11 text-xl disabled:opacity-25">←</button>
           <div className="text-center"><span className="text-sm">{card?.name ?? "Preparing"}</span>
+            {card?.pro && !can("premium-share") && (
+              <span className="ml-1.5 align-[1px] font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-dim">Pro</span>
+            )}
             <div className="flex justify-center">
-              {cards.map((c, i) => <button key={c.id} aria-label={`Show ${c.name}`} aria-current={c.id === selectedId}
+              {cards.map((c, i) => <button key={c.id} aria-label={c.pro && !can("premium-share") ? `Show ${c.name} — Pro` : `Show ${c.name}`} aria-current={c.id === selectedId}
                 disabled={sending} onClick={() => go(i)} className="grid h-5 w-6 place-items-center">
                 <span className={`size-1 rounded-full ${c.id === selectedId ? "bg-fg" : "bg-faint"}`} />
               </button>)}
@@ -394,7 +410,16 @@ export function ShareSheet({
         </div>
         <div className="my-3">{controls}</div>
         {error && <button onClick={onRetry} className="mb-2 w-full py-2 text-sm underline">Try again</button>}
-        <Button onClick={() => onSend(at)} disabled={!card || pending || sending}>{sending ? "Sharing…" : pending ? "Preparing…" : "Share this card"}</Button>
+        {locked ? (
+          <div className="space-y-2">
+            <Button onClick={onUnlock} disabled={!onUnlock}>Unlock Pro to share</Button>
+            <p className="text-center text-[0.75rem] leading-relaxed text-dim" role="status">
+              {card?.name} is a Pro template. The basic template shares as normal.
+            </p>
+          </div>
+        ) : (
+          <Button onClick={() => onSend(at)} disabled={!card || pending || sending}>{sending ? "Sharing…" : pending ? "Preparing…" : "Share this card"}</Button>
+        )}
         {feedback && <p role="status" className="mt-2 text-center text-xs text-muted">{feedback}</p>}
       </div>
     </div>

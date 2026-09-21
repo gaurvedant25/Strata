@@ -12,9 +12,12 @@ import {
   working,
 } from "../lib/stats";
 import { fmtClock, fmtDuration, num, parseKey } from "../lib/util";
-import { prBests, workoutCard } from "../lib/card/select";
-import { useShareCard } from "../lib/card/useShareCard";
+import { workoutCard } from "../lib/card/select";
+import type { WorkoutData } from "../lib/card/types";
+import { WorkoutSharePreview } from "../components/WorkoutSharePreview";
 import { useStore } from "../store";
+import { useWriteGate } from "../lib/useEntitlement";
+import type { GateSubject } from "../lib/entitlement";
 import type { Session } from "../types";
 
 /** How far back the list reaches. "All" is the default. */
@@ -26,7 +29,7 @@ const FILTERS: { id: Filter; label: string; days: number }[] = [
   { id: "year", label: "1y", days: 365 },
 ];
 
-export function History() {
+export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
   const s = useStore();
   const [open, setOpen] = useState<Session | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -61,7 +64,7 @@ export function History() {
   // record, long enough to scroll, and a sheet over a list made it feel like a
   // peek at something rather than the thing itself.
   if (open) {
-    return <Detail session={open} onBack={() => setOpen(null)} />;
+    return <Detail session={open} onBack={() => setOpen(null)} onUnlock={onUnlock} />;
   }
 
   const shown = months.reduce((t, [, l]) => t + l.length, 0);
@@ -175,7 +178,16 @@ export function History() {
 }
 
 /** One logged workout, as a page. */
-function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
+function Detail({
+  session,
+  onBack,
+  onUnlock,
+}: {
+  session: Session;
+  onBack: () => void;
+  onUnlock: (f: GateSubject) => void;
+}) {
+  const { guard } = useWriteGate(() => onUnlock("start-workout"));
   const s = useStore();
   const ask = useConfirm();
   const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
@@ -188,27 +200,7 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
     [s.sessions],
   );
 
-  /*
-   * The session as a picture. Built from the same records this page flags its
-   * PRs against, so a card never claims one the page below it does not.
-   */
-  const shareData = useMemo(
-    () =>
-      workoutCard(
-        session,
-        s.exerciseById,
-        // A workout in the history has ended, so nothing here reads the clock.
-        session.endedAt ?? session.startedAt,
-        unitLabel,
-        prBests(s.sessions),
-      ),
-    [session, s.exerciseById, s.sessions, unitLabel],
-  );
-  const shareCard = useShareCard(
-    "workout",
-    shareData,
-    `gym-log-workout-${session.date}.png`,
-  );
+  const [shareData, setShareData] = useState<WorkoutData | null>(null);
 
   return (
     <div className="min-h-full pb-stack">
@@ -337,11 +329,25 @@ function Detail({ session, onBack }: { session: Session; onBack: () => void }) {
         </div>
       )}
 
+      {shareData && (
+        <WorkoutSharePreview
+          data={shareData}
+          onClose={() => setShareData(null)}
+          onUnlock={() => {
+            setShareData(null);
+            onUnlock("premium-share");
+          }}
+        />
+      )}
       <div className="flex flex-col gap-3.5 px-5 pt-6">
         <Button
           variant="quiet"
-          disabled={!shareCard.ready}
-          onClick={shareCard.share}
+          onClick={guard(() =>
+            setShareData(
+              workoutCard(session, s.exerciseById, s.now, unitLabel,
+                s.sessions, s.settings.gender),
+            ),
+          )}
         >
           Share workout
         </Button>
