@@ -13,23 +13,23 @@ Four sources, tried in this order
 1. `art-source/`, where licensed artwork goes. Drop a file named after the
    exercise's slug — `art-source/barbell-bench-press.png`, the same slug the
    built thumbnail carries — and it wins over everything below. This is the
-   path for a set bought directly from Gym visual, at whatever resolution the
-   purchase allows. Files here keep their colour, are composited onto the card
-   grey if they arrive transparent, and an animation is read at its halfway
-   frame. The folder is gitignored: a bought licence covers using the
-   processed thumbnails inside this app, not republishing the originals.
+   path for a set bought outright, such as ExerciseDB's commercial licence, at
+   whatever resolution the purchase allows. Files here keep their colour, are
+   composited onto the card grey if they arrive transparent, and an animation
+   is read at its halfway frame. The folder is gitignored: a bought licence
+   covers using the processed thumbnails inside this app, not republishing the
+   originals.
 
-2. `hasaneyldrm/exercises-dataset`, which carries 1,324 **Gym visual** renders
-   — the grey figure with the worked muscle in red — and states that they are
-   redistributed with the rights holder's separate written permission, on two
-   conditions: 180×180 maximum, and the copyright indication kept with every
-   use. Both are honoured here. The tile is 168px, under that cap, and the
-   credit is on the Image credits page, which ships inside the app and is
-   linked from Settings. This is where 96 of the 97 thumbnails come from. The
-   media is Gym visual's property, and its terms are at
-   https://gymvisual.com/content/3-terms-and-conditions-of-use — read them
-   before shipping this to a store, and buy the set through path 1 if that is
-   what they require of you.
+2. ExerciseDB (https://github.com/ExerciseDB/exercisedb-api), whose free
+   set is 1,500 exercises, each a 180×180 animated GIF of a grey figure with
+   the worked muscle in red. The picture is the GIF's halfway frame, saved as
+   a PNG exactly as it is delivered — same size, same white ground, same
+   colours — because that picture is the one that was asked for. This is
+   where 96 of the 97 thumbnails come from, and the credit is on the Image
+   credits page, which ships inside the app and is linked from Settings.
+   ExerciseDB's own terms put that free set under non-commercial use with
+   attribution; commercial use is its paid licence, which goes in through
+   path 1.
 
 3. `everkinetic/data` (CC BY-SA 4.0), which draws each lift as a figure with
    its equipment on nothing. Inverted to white line work, a drawing sits in
@@ -40,22 +40,23 @@ Four sources, tried in this order
    performing each one. It covers the rowing machine, which is the one lift in
    this library that none of the sets above draws.
 
-Whatever the source, every picture is downloaded once, cropped square, scaled
-to the tile, and committed as a file this app serves itself. Nothing is fetched
+Whatever the source, every picture is downloaded once, made square, and
+committed as a file this app serves itself. Nothing is fetched
 from a third party at runtime, and the whole set fits inside the offline
 bundle, which is the point: the one room this app is used in is the one with no
 signal.
 
 Colour
 ------
-The renders keep theirs, because the red over the working muscle is the reason
-that set was asked for. The drawings and the photographs do not: they are white
-line work and grey photography respectively, so that the two colours the app
-reserves — the danger red and the streak's ember — still mean something.
+ExerciseDB's pictures keep theirs, because the red over the working muscle is
+the reason that set was asked for. The drawings and the photographs do not:
+they are white line work and grey photography respectively, so that the two
+colours the app reserves — the danger red and the streak's ember — still mean
+something.
 
-The names on the left of each map are this library's; the names on the right
+The names on the left of each map are this library's; the ones on the right
 are the source's, chosen by hand. Automatic matching is not good enough here —
-that set calls a pec deck a "lever seated fly" and a bicycle crunch an "air
+ExerciseDB calls a pec deck a "lever seated fly" and a bicycle crunch an "air
 bike", and a thumbnail showing the wrong lift is worse than no thumbnail.
 """
 
@@ -74,18 +75,19 @@ OUT = ROOT / "public" / "exercise"
 LOCAL = ROOT / "art-source"
 LOCAL_EXTS = ("png", "webp", "jpg", "jpeg", "gif")
 
-MIRROR_RAW = "https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main"
-MIRROR_INDEX = f"{MIRROR_RAW}/data/exercises.json"
+# Where ExerciseDB serves each exercise's GIF, by its id. Its API pages the
+# index a hundred at a time and rate-limits hard, so the ids are written into
+# the map below rather than looked up on every run.
+EXERCISEDB_MEDIA = "https://static.exercisedb.dev/media"
 ART_RAW = "https://raw.githubusercontent.com/everkinetic/data/master"
 ART_INDEX = f"{ART_RAW}/exercises.json"
 PHOTO_RAW = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main"
 PHOTO_INDEX = f"{PHOTO_RAW}/dist/exercises.json"
 
 # The row shows a 56px thumbnail, and 168 is what that needs on a
-# three-times-density phone screen. It is also the largest this can be: the
-# renders are used under a permission that caps them at 180.
+# three-times-density phone screen. ExerciseDB's pictures are not scaled to
+# it: they arrive at 180, which is already enough, and are kept as they are.
 SIZE = 168
-QUALITY = 86
 
 # A photograph is a wide shot of a whole gym with a person somewhere in the
 # middle of it, and the whole frame leaves the person a few pixels tall. Keep
@@ -104,153 +106,127 @@ ART_FLOOR = 18
 # Below 1 brightens the midtones; the lines were the midtones.
 ART_GAMMA = 0.72
 
-# What the Gym visual renders stand on. They arrive on white, which as
-# ninety-odd bright squares would be the loudest thing on a black screen, so
-# the white is knocked back to the card grey and the figure keeps its own
-# shading and its red. Set this to "white" to leave them exactly as they came.
-MIRROR_GROUND = "card"
-# Anything at least this light counts as the white the render was put on.
-MIRROR_WHITE = 238
-# The permission this media is redistributed under caps it at 180×180, so the
-# tile cannot grow past that however big the row gets.
-MIRROR_MAX = 180
-# A render is read out of the animation rather than off the still, and the
-# still is why: it is an eight kilobyte JPEG of a line-drawn figure, which is
-# the worst thing that format can be asked to hold — every edge arrives already
-# softened and ringed. A GIF frame is palette-indexed and has none of that, so
-# what gets scaled to the tile is the drawing rather than a photograph of the
-# drawing. The halfway frame is the contracted half of the rep, which is the
-# half worth showing.
-#
-# Both are 180px, and that is the ceiling: the same renders are published at
-# 360 elsewhere, but only stamped with another site's logo across the corner of
-# every frame, which is worse in a 56px tile than the softness it would fix.
-# Sharp and bigger means buying the set — see path 1.
-MIRROR_FRAME = 0.5
-# A render is trimmed to its own edges, so it needs less breathing room than a
-# drawing with a margin built into it; the tighter square spends more of the
-# tile on the figure.
-RENDER_PAD = 0.03
+# Which moment of an ExerciseDB animation is the picture. Halfway is the
+# contracted half of the rep, which is the half worth showing.
+EXERCISEDB_FRAME = 0.5
 
-# This library's name -> the exercise in the Gym visual set.
-#
-# The renders that were asked for: a grey figure with the muscle it works
-# picked out in red. Chosen by hand, one at a time, against 1,324 entries —
-# the names in that set are equipment-first ("lever seated fly" is a pec deck,
-# "air bike" is a bicycle crunch), so nothing here could be matched
-# automatically without putting the wrong lift beside a name.
-MIRROR = {
+# This library's name -> the exercise's id in ExerciseDB, with that set's own
+# name for it alongside. Chosen by hand against its 1,500 entries: the names
+# there are equipment-first ("lever seated fly" is a pec deck, "air bike" is a
+# bicycle crunch), so nothing here could be matched automatically without
+# putting the wrong lift beside a name.
+EXERCISEDB = {
     # Chest
-    "Barbell Bench Press": "barbell bench press",
-    "Cable Fly": "cable standing fly",
-    "Dip": "chest dip",
-    "Dumbbell Bench Press": "dumbbell bench press",
-    "Dumbbell Fly": "dumbbell fly",
-    "Incline Barbell Bench Press": "barbell incline bench press",
-    "Incline Dumbbell Press": "dumbbell incline bench press",
-    "Machine Chest Press": "lever chest press",
-    "Pec Deck": "lever seated fly",
-    "Push-up": "push-up",
+    "Barbell Bench Press": "EIeI8Vf",  # barbell bench press
+    "Cable Fly": "Pr9Rhf4",  # cable standing fly
+    "Dip": "9WTm7dq",  # chest dip
+    "Dumbbell Bench Press": "SpYC0Kp",  # dumbbell bench press
+    "Dumbbell Fly": "yz9nUhF",  # dumbbell fly
+    "Incline Barbell Bench Press": "3TZduzM",  # barbell incline bench press
+    "Incline Dumbbell Press": "ns0SIbU",  # dumbbell incline bench press
+    "Machine Chest Press": "T0yTjgW",  # lever chest press
+    "Pec Deck": "v3xmPAR",  # lever seated fly
+    "Push-up": "I4hDWkc",  # push-up
     # Back
-    "Back Extension": "lever back extension",
-    "Barbell Row": "barbell bent over row",
-    "Barbell Shrug": "barbell shrug",
-    "Chin-up": "chin-up",
-    "Close-Grip Lat Pulldown": "twin handle parallel grip lat pulldown",
-    "Deadlift": "barbell deadlift",
-    "Dumbbell Shrug": "dumbbell shrug",
-    "Good Morning": "barbell good morning",
-    "Inverted Row": "inverted row",
-    "Lat Pulldown": "cable pulldown",
-    "One-Arm Dumbbell Row": "dumbbell bent over row",
-    "Pull-up": "pull-up",
-    "Seated Cable Row": "cable seated row",
-    "Straight-Arm Pulldown": "cable straight arm pulldown",
-    "Sumo Deadlift": "barbell sumo deadlift",
-    "T-Bar Row": "lever t bar row",
+    "Back Extension": "rUXfn3R",  # lever back extension
+    "Barbell Row": "eZyBC3j",  # barbell bent over row
+    "Barbell Shrug": "dG7tG5y",  # barbell shrug
+    "Chin-up": "T2mxWqc",  # chin-up
+    "Close-Grip Lat Pulldown": "rkg41Fb",  # twin handle parallel grip lat pulldown
+    "Deadlift": "ila4NZS",  # barbell deadlift
+    "Dumbbell Shrug": "NJzBsGJ",  # dumbbell shrug
+    "Good Morning": "XlZ4lAC",  # barbell good morning
+    "Inverted Row": "bZGHsAZ",  # inverted row
+    "Lat Pulldown": "RVwzP10",  # cable pulldown
+    "One-Arm Dumbbell Row": "BJ0Hz5L",  # dumbbell bent over row
+    "Pull-up": "lBDjFxJ",  # pull-up
+    "Seated Cable Row": "fUBheHs",  # cable seated row
+    "Straight-Arm Pulldown": "x69MAlq",  # cable straight arm pulldown
+    "Sumo Deadlift": "KgI0tqW",  # barbell sumo deadlift
+    "T-Bar Row": "aaXr7ld",  # lever t bar row
     # Shoulders
-    "Arnold Press": "dumbbell arnold press",
-    "Cable Lateral Raise": "cable lateral raise",
-    "Dumbbell Lateral Raise": "dumbbell lateral raise",
-    "Dumbbell Shoulder Press": "dumbbell seated shoulder press",
+    "Arnold Press": "Xy4jlWA",  # dumbbell arnold press
+    "Cable Lateral Raise": "goJ6ezq",  # cable lateral raise
+    "Dumbbell Lateral Raise": "DsgkuIt",  # dumbbell lateral raise
+    "Dumbbell Shoulder Press": "znQUdHY",  # dumbbell seated shoulder press
     # A rope pulled to the face, standing, for the rear delts: a face pull
     # under the name that set files it by.
-    "Face Pull": "cable standing rear delt row (with rope)",
-    "Front Raise": "dumbbell front raise",
-    "Machine Shoulder Press": "lever shoulder press",
-    "Overhead Press": "barbell seated overhead press",
-    "Push Press": "dumbbell push press",
-    "Rear Delt Fly": "dumbbell rear delt raise",
-    "Reverse Pec Deck": "lever seated reverse fly",
-    "Upright Row": "barbell upright row",
+    "Face Pull": "ZfyAGhK",  # cable standing rear delt row (with rope)
+    "Front Raise": "3eGE2JC",  # dumbbell front raise
+    "Machine Shoulder Press": "67n3r98",  # lever shoulder press
+    "Overhead Press": "kTbSH9h",  # barbell seated overhead press
+    "Push Press": "FS63wTN",  # dumbbell push press
+    "Rear Delt Fly": "mu5Guxt",  # dumbbell rear delt raise
+    "Reverse Pec Deck": "myfUsKf",  # lever seated reverse fly
+    "Upright Row": "UDlhcO8",  # barbell upright row
     # Arms
-    "Barbell Curl": "barbell curl",
-    "Bench Dip": "bench dip (knees bent)",
-    "Cable Curl": "cable curl",
-    "Close-Grip Bench Press": "barbell close-grip bench press",
-    "Concentration Curl": "dumbbell concentration curl",
-    "Dumbbell Curl": "dumbbell biceps curl",
-    "EZ-Bar Curl": "ez barbell curl",
-    "Hammer Curl": "dumbbell hammer curl",
-    "Overhead Triceps Extension": "barbell standing overhead triceps extension",
-    "Preacher Curl": "barbell preacher curl",
-    "Rope Pushdown": "cable pushdown (with rope attachment)",
-    "Skull Crusher": "barbell lying triceps extension skull crusher",
-    "Triceps Kickback": "dumbbell kickback",
-    "Triceps Pushdown": "cable pushdown",
-    "Wrist Curl": "barbell wrist curl",
+    "Barbell Curl": "25GPyDY",  # barbell curl
+    "Bench Dip": "RrLske5",  # bench dip (knees bent)
+    "Cable Curl": "G08RZcQ",  # cable curl
+    "Close-Grip Bench Press": "J6Dx1Mu",  # barbell close-grip bench press
+    "Concentration Curl": "gvsWLQw",  # dumbbell concentration curl
+    "Dumbbell Curl": "NbVPDMW",  # dumbbell biceps curl
+    "EZ-Bar Curl": "6TG6x2w",  # ez barbell curl
+    "Hammer Curl": "slDvUAU",  # dumbbell hammer curl
+    "Overhead Triceps Extension": "dZl9Q27",  # barbell standing overhead triceps extension
+    "Preacher Curl": "qOgPVf6",  # barbell preacher curl
+    "Rope Pushdown": "dU605di",  # cable pushdown (with rope attachment)
+    "Skull Crusher": "h8LFzo9",  # barbell lying triceps extension skull crusher
+    "Triceps Kickback": "W6PxUkg",  # dumbbell kickback
+    "Triceps Pushdown": "3ZflifB",  # cable pushdown
+    "Wrist Curl": "82LxxkW",  # barbell wrist curl
     # Legs
-    "Back Squat": "barbell full squat",
-    "Box Jump": "box jump down with one leg stabilization",
-    "Front Squat": "barbell front squat",
-    "Goblet Squat": "dumbbell goblet squat",
-    "Hack Squat": "sled hack squat",
-    "Leg Curl": "lever lying leg curl",
-    "Leg Extension": "lever leg extension",
-    # Not a typo to tidy: that set's own name for this one is double-encoded,
-    # and carries a stray Cyrillic в in front of the degree sign. Written as
-    # escapes so it survives an editor, and matched exactly as it is stored.
-    "Leg Press": "sled 45в° leg press",
-    "Reverse Lunge": "barbell rear lunge",
-    "Romanian Deadlift": "barbell romanian deadlift",
-    "Seated Calf Raise": "lever seated calf raise",
-    "Split Squat": "split squats",
-    "Standing Calf Raise": "lever standing calf raise",
-    "Step-up": "dumbbell step-up",
-    "Walking Lunge": "walking lunge",
+    "Back Squat": "qXTaZnJ",  # barbell full squat
+    "Box Jump": "iPm26QU",  # box jump down with one leg stabilization
+    "Front Squat": "zG0zs85",  # barbell front squat
+    "Goblet Squat": "yn8yg1r",  # dumbbell goblet squat
+    "Hack Squat": "Qa55kX1",  # sled hack squat
+    "Leg Curl": "17lJ1kr",  # lever lying leg curl
+    "Leg Extension": "my33uHU",  # lever leg extension
+    # The stray Cyrillic в is in ExerciseDB's own name for this one, which
+    # was double-encoded somewhere upstream; it is only a comment here.
+    "Leg Press": "10Z2DXU",  # sled 45в° leg press
+    "Reverse Lunge": "VaP75jl",  # barbell rear lunge
+    "Romanian Deadlift": "wQ2c4XD",  # barbell romanian deadlift
+    "Seated Calf Raise": "bOOdeyc",  # lever seated calf raise
+    "Split Squat": "9E25EOx",  # split squats
+    "Standing Calf Raise": "ykUOVze",  # lever standing calf raise
+    "Step-up": "aXtJhlg",  # dumbbell step-up
+    "Walking Lunge": "IZVHb27",  # walking lunge
     # Glutes
-    "Cable Glute Kickback": "cable kickback",
-    "Cable Pull-Through": "cable pull through (with rope)",
-    "Glute Bridge": "low glute bridge on floor",
-    "Hip Thrust": "barbell glute bridge",
+    "Cable Glute Kickback": "HEJ6DIX",  # cable kickback
+    "Cable Pull-Through": "OM46QHm",  # cable pull through (with rope)
+    "Glute Bridge": "u0cNiij",  # low glute bridge on floor
+    "Hip Thrust": "qKBpF7I",  # barbell glute bridge
     # Core
-    "Ab Wheel Rollout": "wheel rollerout",
-    "Bicycle Crunch": "air bike",
-    "Cable Crunch": "cable kneeling crunch",
-    "Cable Woodchop": "cable twist",
-    "Crunch": "crunch (hands overhead)",
-    "Dead Bug": "dead bug",
-    "Hanging Leg Raise": "hanging leg raise",
-    "Mountain Climber": "mountain climber",
-    "Plank": "weighted front plank",
-    "Russian Twist": "russian twist",
-    "Sit-up": "sit-up v. 2",
-    # Cardio. No rowing machine anywhere in the set, which is why the
-    # photograph below is still doing one job.
-    "Elliptical": "walk elliptical cross trainer",
-    "Jump Rope": "jump rope",
-    "Stair Climber": "walking on stepmill",
-    "Stationary Bike": "stationary bike walk",
-    "Treadmill Run": "run (equipment)",
-    "Walking": "walking on incline treadmill",
+    "Ab Wheel Rollout": "NAgVB3t",  # wheel rollerout
+    "Bicycle Crunch": "1ZFqTDN",  # air bike
+    "Cable Crunch": "WW95auq",  # cable kneeling crunch
+    "Cable Woodchop": "aVs3BR3",  # cable twist
+    "Crunch": "kjJ3VoQ",  # crunch (hands overhead)
+    "Dead Bug": "iny3m5y",  # dead bug
+    "Hanging Leg Raise": "I3tsCnC",  # hanging leg raise
+    "Mountain Climber": "RJgzwny",  # mountain climber
+    "Plank": "VBAWRPG",  # weighted front plank
+    "Russian Twist": "XVDdcoj",  # russian twist
+    "Sit-up": "Bn6TXyO",  # sit-up v. 2
+    # Cardio. No rowing machine anywhere in ExerciseDB's free set (the only
+    # erg in it is a ski erg), which is why the photograph below is still
+    # doing one job.
+    "Elliptical": "rjtuP6X",  # walk elliptical cross trainer
+    "Jump Rope": "e1e76I2",  # jump rope
+    "Stair Climber": "j9Q5crt",  # walking on stepmill
+    "Stationary Bike": "a8VDgLw",  # stationary bike walk
+    "Treadmill Run": "y5p0H8a",  # run (equipment)
+    "Walking": "rjiM4L3",  # walking on incline treadmill
     # Other
-    "Clean and Jerk": "barbell clean and press",
-    "Farmer's Carry": "farmers walk",
-    "Kettlebell Swing": "kettlebell swing",
-    "Power Clean": "power clean",
-    "Snatch": "barbell one arm snatch",
-    "Thruster": "barbell thruster",
-    "Turkish Get-up": "kettlebell turkish get up (squat style)",
+    "Clean and Jerk": "SGY8Zui",  # barbell clean and press
+    "Farmer's Carry": "qPEzJjA",  # farmers walk
+    "Kettlebell Swing": "UHJlbu3",  # kettlebell swing
+    "Power Clean": "SiWCcTN",  # power clean
+    "Snatch": "xHKN2s8",  # barbell one arm snatch
+    "Thruster": "f7Y9eDZ",  # barbell thruster
+    "Turkish Get-up": "Ha7SZ3y",  # kettlebell turkish get up (squat style)
 }
 
 # This library's name -> (the drawing in everkinetic/data, which half of the
@@ -443,9 +419,9 @@ def art_urls(entry: dict, half: str) -> list[str]:
     return urls
 
 
-def webp(image: Image.Image) -> bytes:
+def png(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
-    image.save(buffer, format="WEBP", quality=QUALITY, method=6)
+    image.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
 
 
@@ -478,60 +454,36 @@ def licensed(path: Path) -> bytes:
     side = int(max(image.size) * (1 + ART_PAD * 2))
     square = Image.new("RGB", (side, side), (ART_FLOOR, ART_FLOOR, ART_FLOOR))
     square.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
-    return webp(square.resize((SIZE, SIZE), Image.LANCZOS))
+    return png(square.resize((SIZE, SIZE), Image.LANCZOS))
 
 
-def render(image: Image.Image, cap: int | None = None) -> bytes:
+def exercisedb(raw: bytes) -> bytes:
     """
-    A Gym visual render: trimmed, squared, colour kept, white knocked back.
+    An ExerciseDB picture: the animation's halfway frame, untouched.
 
-    Colour survives here and nowhere else in this file, because the colour is
-    the point — the red over the muscle being worked is the whole reason this
-    set was asked for, and greyscaling it would throw away the only thing it
-    says that a line drawing does not.
-
-    The white it arrives on does not survive. A tile of white on a black screen
-    is brighter than anything else in the app including the numbers you are
-    supposed to be reading, and ninety-odd of them down a scrolling list is a
-    ladder of headlights. Knocking white back to the card grey leaves the
-    figure's own shading and its red untouched, and the tile matches every
-    other tile in the sheet.
+    No trim, no resize, no recolouring. The frame goes into the PNG exactly as
+    drawn — every edge as sharp as the GIF had it — and the white it stands on
+    stays white, because that is how ExerciseDB shows it and that is what was
+    asked for.
     """
-    image = image.convert("RGB")
-    flat = image.convert("L")
-    box = ImageChops.difference(flat, Image.new("L", flat.size, 255)).getbbox()
-    if box:
-        image = image.crop(box)
-        flat = flat.crop(box)
-
-    if MIRROR_GROUND == "card":
-        floor = (ART_FLOOR, ART_FLOOR, ART_FLOOR)
-        # A mask of everything that was the white ground, swapped for the card
-        # grey in one pass rather than pixel by pixel.
-        white = flat.point(lambda v: 255 if v >= MIRROR_WHITE else 0, mode="1")
-        image = Image.composite(Image.new("RGB", image.size, floor), image, white)
-    else:
-        floor = (255, 255, 255)
-
-    side = int(max(image.size) * (1 + RENDER_PAD * 2))
-    square = Image.new("RGB", (side, side), floor)
-    square.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
-    edge = min(SIZE, cap) if cap else SIZE
-    tile = square.resize((edge, edge), Image.LANCZOS)
-    # Line work loses its edges to any downscale, and gets them back from a
-    # light unsharp pass. Light: enough to redraw a cable, not enough to put a
-    # halo round the figure.
-    tile = tile.filter(ImageFilter.UnsharpMask(radius=0.7, percent=70, threshold=3))
-    return webp(tile)
-
-
-def mirror(raw: bytes) -> bytes:
-    """The render, read out of the animation at its halfway frame."""
     animation = Image.open(io.BytesIO(raw))
     frames = getattr(animation, "n_frames", 1)
     if frames > 1:
-        animation.seek(int(frames * MIRROR_FRAME))
-    return render(animation, MIRROR_MAX)
+        animation.seek(int(frames * EXERCISEDB_FRAME))
+    frame = animation.convert("RGB")
+    # A GIF frame has at most 256 colours, so a palette holds it exactly and
+    # the file is a fraction of the size. The whole folder is precached for
+    # offline use, which is what makes the size matter.
+    colors = frame.getcolors(256)
+    if colors is not None:
+        # Mapped by hand rather than through `quantize`, which matches colours
+        # approximately and shifts them by a few levels.
+        index = {rgb: i for i, (_, rgb) in enumerate(colors)}
+        indexed = Image.new("P", frame.size)
+        indexed.putpalette([channel for _, rgb in colors for channel in rgb])
+        indexed.putdata([index[rgb] for rgb in frame.getdata()])
+        frame = indexed
+    return png(frame)
 
 
 def photo(raw: bytes) -> bytes:
@@ -541,7 +493,7 @@ def photo(raw: bytes) -> bytes:
     left = (image.width - side) // 2
     top = int((image.height - side) * TOP_BIAS)
     square = image.crop((left, top, left + side, top + side))
-    return webp(square.resize((SIZE, SIZE), Image.LANCZOS).convert("L"))
+    return png(square.resize((SIZE, SIZE), Image.LANCZOS).convert("L"))
 
 
 def drawing(raw: bytes) -> bytes:
@@ -573,7 +525,7 @@ def drawing(raw: bytes) -> bytes:
     # reads as a line. The ground under the figure comes up off pure black to
     # the colour of a card, and nothing else about the tone is touched.
     square = square.point(lambda v: min(255, int(255 * (v / 255) ** ART_GAMMA)))
-    return webp(square.point(lambda v: max(v, ART_FLOOR)))
+    return png(square.point(lambda v: max(v, ART_FLOOR)))
 
 
 def main() -> int:
@@ -584,11 +536,6 @@ def main() -> int:
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
 
-    loaded = json.loads(fetch(MIRROR_INDEX).decode("utf8"))
-    mirror_index = {
-        e["name"]: e
-        for e in (loaded if isinstance(loaded, list) else loaded["exercises"])
-    }
     art_index = {e["title"]: e for e in json.loads(fetch(ART_INDEX).decode("utf8"))}
     photo_index = {
         e["name"]: e for e in json.loads(fetch(PHOTO_INDEX).decode("utf8"))
@@ -596,8 +543,7 @@ def main() -> int:
 
     # A name that has drifted out of its source would silently cost a lift its
     # picture, so every map is checked before anything is written.
-    unknown = [n for n in MIRROR.values() if n not in mirror_index]
-    unknown += [t for t, _ in ART.values() if t not in art_index]
+    unknown = [t for t, _ in ART.values() if t not in art_index]
     unknown += [n for n in PHOTO.values() if n not in photo_index]
     overlap = sorted(set(ART) & set(PHOTO))
     if unknown:
@@ -611,7 +557,7 @@ def main() -> int:
     total = 0
     given = 0
     failed = []
-    for name in sorted(set(MIRROR) | set(ART) | set(PHOTO)):
+    for name in sorted(set(EXERCISEDB) | set(ART) | set(PHOTO)):
         # Anything handed to the script wins, whatever the maps below say.
         mine = next(
             (
@@ -627,17 +573,16 @@ def main() -> int:
             except OSError as error:
                 failed.append(f"{name}: {mine.name}: {error}")
                 continue
-            written = OUT / f"{slug(name)}.webp"
+            written = OUT / f"{slug(name)}.png"
             written.write_bytes(data)
             total += len(data)
             given += 1
             print(f"  {written.name:32} {len(data) / 1024:5.1f} KB  yours  {mine.name}")
             continue
-        if name in MIRROR:
-            title = MIRROR[name]
-            entry = mirror_index[title]
-            urls = [f"{MIRROR_RAW}/{entry['gif_url']}", f"{MIRROR_RAW}/{entry['image']}"]
-            draw, source = mirror, f"render {title}"
+        if name in EXERCISEDB:
+            key = EXERCISEDB[name]
+            urls = [f"{EXERCISEDB_MEDIA}/{key}.gif"]
+            draw, source = exercisedb, f"edb    {key}"
         elif name in ART:
             title, half = ART[name]
             urls = art_urls(art_index[title], half)
@@ -655,12 +600,12 @@ def main() -> int:
         except (urllib.error.URLError, OSError) as error:
             failed.append(f"{name}: {error}")
             continue
-        path = OUT / f"{slug(name)}.webp"
+        path = OUT / f"{slug(name)}.png"
         path.write_bytes(data)
         total += len(data)
         print(f"  {path.name:32} {len(data) / 1024:5.1f} KB  {source}")
 
-    kept = len(set(MIRROR) | set(ART) | set(PHOTO)) - len(failed)
+    kept = len(set(EXERCISEDB) | set(ART) | set(PHOTO)) - len(failed)
     print(
         f"\n{kept} thumbnails, {total / 1024:.0f} KB total"
         + (f" — {given} from art-source/" if given else "")

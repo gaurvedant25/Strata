@@ -18,5 +18,5 @@ import type { Exercise } from "../types";
  */
 export function exerciseArt(exercise: Exercise): string | undefined {
   if (!isSeedId(exercise.id)) return undefined;
-  return `${import.meta.env.BASE_URL}exercise/${exercise.id.slice(3)}.webp`;
+  return `${import.meta.env.BASE_URL}exercise/${exercise.id.slice(3)}.png`;
 }

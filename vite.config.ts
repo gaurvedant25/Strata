@@ -26,8 +26,8 @@ export default defineConfig({
       injectRegister: "auto",
       includeAssets: ["icon.svg", "apple-touch-icon.png"],
       workbox: {
-        // webp is the exercise thumbnails. All ninety-seven of them come to
-        // 251 KB, which is worth precaching rather than fetching on demand:
+        // png includes the exercise thumbnails. All ninety-seven of them come
+        // to 591 KB, which is worth precaching rather than fetching on demand:
         // the one place this app is used is a gym, and a gym is where the
         // signal is worst.
         globPatterns: ["**/*.{js,css,html,svg,png,webp,woff2}"],

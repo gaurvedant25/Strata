@@ -31,13 +31,13 @@ const { seedExercises, seedId } = require("../src/lib/seed.ts");
 
 const DIR = path.join(__dirname, "..", "public", "exercise");
 const files = new Set(
-  fs.readdirSync(DIR).filter((f) => f.endsWith(".webp")),
+  fs.readdirSync(DIR).filter((f) => f.endsWith(".png")),
 );
 
-/* Every library lift has a photograph, under the slug of its own id. */
+/* Every library lift has a picture, under the slug of its own id. */
 const want = new Set();
 for (const e of seedExercises()) {
-  const file = `${e.id.replace(/^sx-/, "")}.webp`;
+  const file = `${e.id.replace(/^sx-/, "")}.png`;
   assert.equal(e.id, seedId(e.name), `${e.name} has an unexpected id`);
   assert.ok(files.has(file), `${e.name} has no thumbnail (${file})`);
   const size = fs.statSync(path.join(DIR, file)).size;
