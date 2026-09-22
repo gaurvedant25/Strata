@@ -15,10 +15,17 @@
  */
 
 /**
- * Replace with a real destination before release. `mailto:` and `https:` both
- * work; the row opens whatever this is.
+ * Where purchase problems go.
+ *
+ * The same address the privacy policy already gives for deletion requests, and
+ * the same one on the Play payments profile — which is the point. A buyer
+ * chasing a charge should not have to work out which of three contacts is the
+ * real one, and Play cross-references the support contact in the listing
+ * against the one on the merchant account.
+ *
+ * `mailto:` and `https:` both work; the row opens whatever this is.
  */
-export const SUPPORT_URL = "";
+export const SUPPORT_URL = "mailto:gaurvedant479@gmail.com";
 
 /** Whether there is somewhere for the help row to actually go. */
 export const SUPPORT_CONFIGURED = SUPPORT_URL.length > 0;

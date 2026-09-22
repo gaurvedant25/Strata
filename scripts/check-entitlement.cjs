@@ -548,8 +548,19 @@ const tracked = require("node:child_process")
   .split("\n")
   .map((f) => f.trim())
   .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"));
+/*
+ * Comments are stripped before the search.
+ *
+ * The guard is about what the app *says*, and a comment is not something a
+ * user can read. Leaving them in meant the note in `entitlement.ts` recording
+ * that a rest timer was removed tripped the very check that records it — a
+ * rule that fails on its own documentation, and which only surfaced once that
+ * file became tracked, because `git ls-files` cannot see what is not.
+ */
+const stripComments = (src) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
 const sourceTree = tracked
-  .map((f) => fs.readFileSync(f, "utf8"))
+  .map((f) => stripComments(fs.readFileSync(f, "utf8")))
   .join("\n")
   .toLowerCase();
 assert.equal(
