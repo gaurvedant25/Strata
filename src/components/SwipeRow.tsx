@@ -1,5 +1,6 @@
 import { animate } from "motion";
 import { useRef, type ReactNode } from "react";
+import { cls } from "../lib/util";
 import { FLICK, rubberband, velocityOf } from "../lib/gesture";
 import { Swap, Trash } from "./icons";
 
@@ -71,6 +72,10 @@ export function SwipeRow({
   confirm,
   onReplace,
   children,
+  grip = false,
+  top = false,
+  className,
+  surface = "bg-card",
 }: {
   /** Called once the row has left the screen and the gap has closed. */
   onRemove: () => void;
@@ -88,6 +93,22 @@ export function SwipeRow({
    */
   onReplace?: () => void;
   children: ReactNode;
+  /**
+   * Only a drag that starts on an element marked `data-swipe-grip` moves the
+   * row. For a row with controls of its own inside it — a card of set inputs —
+   * where a sideways brush across a number must not start taking the whole
+   * exercise off the screen.
+   */
+  grip?: boolean;
+  /**
+   * Hangs the Remove and Replace labels from the top edge rather than centring
+   * them, for a row tall enough that the middle is off the part being pulled.
+   */
+  top?: boolean;
+  /** Classes for the outer clip — a radius, for a row drawn as a card. */
+  className?: string;
+  /** The sliding surface's own classes, which is what hides the panels at rest. */
+  surface?: string;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const slider = useRef<HTMLDivElement>(null);
@@ -144,6 +165,7 @@ export function SwipeRow({
 
   function down(e: React.PointerEvent) {
     if (leaving.current || pointer.current !== null) return;
+    if (grip && !(e.target as Element).closest?.("[data-swipe-grip]")) return;
     // Grabbing a row still settling stops it where it is, so the drag picks up
     // from what the eye can see rather than from where it was headed.
     settling.current?.stop();
@@ -344,7 +366,7 @@ export function SwipeRow({
   return (
     <div
       ref={wrap}
-      className="relative overflow-hidden"
+      className={cls("relative overflow-hidden", className)}
       // Vertical belongs to the browser; horizontal is ours. Without this the
       // list cannot be scrolled with a thumb that lands on a row.
       style={{ touchAction: "pan-y" }}
@@ -371,7 +393,10 @@ export function SwipeRow({
           // Held against the edge the row uncovers, so the label appears out of
           // the side the finger is pulling from rather than sliding in to meet
           // it. The red panel does the same on its own side.
-          className="absolute inset-0 flex items-center gap-2 pl-5"
+          className={cls(
+            "absolute inset-0 flex gap-2 pl-5",
+            top ? "items-start pt-[17px]" : "items-center",
+          )}
           style={{ background: "var(--color-fg)", opacity: 0 }}
         >
           <span
@@ -392,7 +417,10 @@ export function SwipeRow({
       <div
         ref={panel}
         aria-hidden="true"
-        className="absolute inset-0 flex items-center justify-end gap-2 pr-5"
+        className={cls(
+          "absolute inset-0 flex justify-end gap-2 pr-5",
+          top ? "items-start pt-[17px]" : "items-center",
+        )}
         style={{ background: "var(--color-danger)", opacity: 0 }}
       >
         <span
@@ -413,7 +441,7 @@ export function SwipeRow({
         ref={slider}
         // Opaque, or the panels read through the row that is meant to be
         // covering them. The list's own surface, so nothing changes at rest.
-        className="relative bg-card"
+        className={cls("relative", surface)}
         style={{ transform: "translate3d(0,0,0)" }}
       >
         {children}

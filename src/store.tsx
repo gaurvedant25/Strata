@@ -10,7 +10,7 @@ import {
 import * as store from "./lib/db";
 import { buildPreset, type Preset } from "./lib/presets";
 import { seedExercises, seedId, seedNames } from "./lib/seed";
-import { lastBestSet } from "./lib/stats";
+import { lastBestSet, lastPerformance } from "./lib/stats";
 import { CANONICAL_LIFT } from "./lib/strength";
 import { todayKey, uid } from "./lib/util";
 import {
@@ -19,6 +19,7 @@ import {
   type Exercise,
   type Routine,
   type Session,
+  type SessionEntry,
   type SetLog,
   type Settings,
   type Split,
@@ -297,6 +298,33 @@ function blankSet(
 }
 
 /**
+ * What a lift is put into a workout with, when it is added or swapped in.
+ *
+ * The last session that trained it decides: as many sets as were done then,
+ * each opened on the best of them, so the table arrives looking like the work
+ * you are about to repeat. A lift with no history opens on three sets of ten
+ * and an empty bar — a plan to edit, not a claim about you.
+ */
+const FRESH_SETS = 3;
+const FRESH_REPS = 10;
+function setsFromLast(
+  sessions: Session[],
+  ex: Exercise | undefined,
+  exerciseId: string,
+  excludeSessionId: string,
+): SetLog[] {
+  const prev = lastPerformance(sessions, exerciseId, excludeSessionId);
+  const was = lastBestSet(sessions, exerciseId, excludeSessionId);
+  return Array.from({ length: prev?.sets.length || FRESH_SETS }, () =>
+    blankSet(ex, {
+      weight: was?.weight,
+      reps: was ? was.reps : FRESH_REPS,
+      seconds: was?.seconds,
+    }),
+  );
+}
+
+/**
  * Adds any library exercise the account has never seen.
  *
  * Distinct from seeding, which only fires into an empty library: this is what
@@ -448,6 +476,23 @@ function useProvideStore() {
     },
     [s.activeSplitId, splitRoutines, setNextUp],
   );
+
+  /** New exercises onto the end of the running workout. */
+  const addEntries = (exerciseIds: string[]) =>
+    patchActive((d) => {
+      for (const exerciseId of exerciseIds)
+        d.entries.push({
+          id: uid(),
+          exerciseId,
+          sets: setsFromLast(
+            s.sessions,
+            s.exercises.find((x) => x.id === exerciseId),
+            exerciseId,
+            d.id,
+          ),
+        });
+      return d;
+    });
 
   const api = {
     ...s,
@@ -618,24 +663,19 @@ function useProvideStore() {
     },
 
     addEntry(exerciseId: string) {
-      patchActive((d) => {
-        // Opened on the best set from the last time this lift was trained, so
-        // an exercise added mid-session starts where it left off rather than at
-        // zero. Reps come with it: nothing here planned a different number.
-        const was = lastBestSet(s.sessions, exerciseId, d.id);
-        d.entries.push({
-          id: uid(),
-          exerciseId,
-          sets: [
-            blankSet(s.exercises.find((x) => x.id === exerciseId), {
-              weight: was?.weight,
-              reps: was?.reps,
-              seconds: was?.seconds,
-            }),
-          ],
-        });
-        return d;
-      });
+      addEntries([exerciseId]);
+    },
+    /** Several at once, in the order they were picked, from the Add sheet. */
+    addEntries,
+    /**
+     * Puts the workout's exercises back exactly as they were, for Undo.
+     *
+     * A snapshot rather than an inverse of each action: remove, replace and add
+     * all hand one over before they act, and restoring it is the same one line
+     * whichever of them is being taken back.
+     */
+    restoreEntries(entries: SessionEntry[]) {
+      patchActive((d) => ({ ...d, entries: structuredClone(entries) }));
     },
     removeEntry(entryId: string) {
       patchActive((d) => ({
@@ -652,12 +692,10 @@ function useProvideStore() {
      * bottom, and anything on screen still pointing at that entry — an open
      * card, a menu — stays pointed at it.
      *
-     * The plan carries over and the numbers do not. How many sets you intended
-     * is a decision about the session; what to load them with is a fact about
-     * the lift, so the new sets open on the best set from the last time this
-     * lift was trained, exactly as an added exercise does. Only when the new
-     * lift has never been logged does the old plan's rep target stand in, which
-     * is a better guess than the default eight.
+     * The new lift starts fresh from its own last session — how many sets
+     * and what was on the bar — exactly as an added exercise does. Nothing of
+     * the old one's plan is carried: a set count chosen for a bench press says
+     * nothing about the fly replacing it.
      *
      * Anything already logged into the old exercise goes with it. That is real
      * work disappearing, so the caller is the one that has to ask first.
@@ -666,18 +704,14 @@ function useProvideStore() {
       patchActive((d) => {
         const i = d.entries.findIndex((e) => e.id === entryId);
         if (i < 0) return d;
-        const old = d.entries[i];
-        const was = lastBestSet(s.sessions, exerciseId, d.id);
-        const planned = old.sets[0];
         d.entries[i] = {
-          ...old,
+          ...d.entries[i],
           exerciseId,
-          sets: Array.from({ length: Math.max(1, old.sets.length) }, () =>
-            blankSet(s.exercises.find((x) => x.id === exerciseId), {
-              weight: was?.weight,
-              reps: was?.reps ?? planned?.reps,
-              seconds: was?.seconds ?? planned?.seconds,
-            }),
+          sets: setsFromLast(
+            s.sessions,
+            s.exercises.find((x) => x.id === exerciseId),
+            exerciseId,
+            d.id,
           ),
         };
         return d;

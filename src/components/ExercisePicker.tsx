@@ -14,13 +14,12 @@ import { Eyebrow, Sheet, inputCls } from "./ui";
  * scan than a column of similar names, and it is what separates one row from
  * the next now that the hairlines between them are gone.
  *
- * They are illustrations of the movement with the muscle it works picked out in
- * red — the one place in the app where a second colour is allowed, because that
- * red is what the picture is for. Each one is laid on the same card grey as the
- * tile, so the image has no edge of its own inside it, and nothing is done to
- * them here: `scripts/exercise-art.py` settles the ground and the tone, since a
- * filter applied at render would lift the image's grey off the tile's and draw
- * a square nobody asked for.
+ * They are ExerciseDB's illustrations of the movement, with the muscle it works
+ * picked out in red — the one place in the app where a second colour is
+ * allowed, because that red is what the picture is for. They stand on white, as
+ * ExerciseDB draws them, so the tile under them is a light grey rather than the
+ * card's: an image that has not loaded yet leaves a pale square where the
+ * picture will be, not a dark one that flashes white.
  *
  * `loading="lazy"` matters more here than it usually does: the library is
  * ninety-seven rows, and fetching every thumbnail to fill a sheet that opens
@@ -29,12 +28,16 @@ import { Eyebrow, Sheet, inputCls } from "./ui";
  * A row whose picture is missing or fails to load falls back to a mark rather
  * than a gap, so the column of images stays a column.
  */
-function Thumb({ exercise }: { exercise: Exercise }) {
+export function Thumb({ exercise }: { exercise: Exercise }) {
   const src = exerciseArt(exercise);
   const [failed, setFailed] = useState(false);
+  const pictured = !!src && !failed;
   return (
-    <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-[10px] border border-cardrule bg-card">
-      {src && !failed ? (
+    <span
+      className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-[10px] border border-cardrule"
+      style={{ background: pictured ? "#f2f2f2" : "var(--color-card)" }}
+    >
+      {pictured ? (
         <img
           src={src}
           alt=""

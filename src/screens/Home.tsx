@@ -790,7 +790,22 @@ export function Home({
               the number clears a callout on the calves at any size the card is
               drawn.
             */}
-            <div className="-mt-[8%] flex justify-end">
+            {/*
+              Front and back share that band, on the left, so the figure's own
+              controls sit in one row under its feet rather than the toggle
+              taking a line of its own below the number.
+            */}
+            <div className="relative z-[5] -mt-[8%] flex items-end justify-between">
+              <TextTabs
+                className="pl-3.5"
+                gap="gap-6"
+                options={[
+                  { id: "front", label: "front" },
+                  { id: "back", label: "back" },
+                ]}
+                value={view}
+                onChange={setView}
+              />
               <button
                 onClick={guard(() => setBwOpen(true))}
                 aria-label={`Body weight ${num(latestBw.weight)} ${unitLabel}, tap to update`}
@@ -819,17 +834,6 @@ export function Home({
                 </span>
               </button>
             </div>
-
-            <TextTabs
-              className="justify-center pb-2.5"
-              gap="gap-6"
-              options={[
-                { id: "front", label: "front" },
-                { id: "back", label: "back" },
-              ]}
-              value={view}
-              onChange={setView}
-            />
           </section>
 
           {/* Card two: the selected region, and the list you select from. */}

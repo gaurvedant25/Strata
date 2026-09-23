@@ -11,7 +11,7 @@ import {
   streakSummary,
   working,
 } from "../lib/stats";
-import { fmtClock, fmtDuration, num, parseKey } from "../lib/util";
+import { fmtClock, fmtDuration, num, parseKey, todayKey } from "../lib/util";
 import { workoutCard } from "../lib/card/select";
 import type { WorkoutData } from "../lib/card/types";
 import { WorkoutSharePreview } from "../components/WorkoutSharePreview";
@@ -28,6 +28,56 @@ const FILTERS: { id: Filter; label: string; days: number }[] = [
   { id: "90d", label: "90d", days: 90 },
   { id: "year", label: "1y", days: 365 },
 ];
+
+/**
+ * The last four weeks, a row per week, Monday first.
+ *
+ * A glance at rhythm rather than a record: which days you trained, whether the
+ * weeks look alike, and how much of this one is still to come. A day with a
+ * finished workout is lit; a day not yet reached is drawn darker than a day
+ * that passed without one, so an empty Sunday ahead is not read as a miss.
+ */
+function FourWeeks({ sessions, now }: { sessions: Session[]; now: number }) {
+  const trained = new Set(sessions.filter((x) => x.endedAt).map((x) => x.date));
+  const today = todayKey(new Date(now));
+  const start = parseKey(today);
+  // Back to this week's Monday, then three weeks further.
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - 21);
+  const days = Array.from({ length: 28 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = todayKey(d);
+    return { key, on: trained.has(key), future: key > today };
+  });
+  const count = days.filter((d) => d.on).length;
+  return (
+    <div
+      role="img"
+      aria-label={`${count} training day${count === 1 ? "" : "s"} in the last four weeks`}
+      className="grid grid-cols-7 gap-1 pb-1 pt-4"
+    >
+      {["M", "T", "W", "T", "F", "S", "S"].map((l, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          className="pb-0.5 text-center font-mono text-[0.625rem] font-medium text-dim"
+        >
+          {l}
+        </span>
+      ))}
+      {days.map((d) => (
+        <span
+          key={d.key}
+          aria-hidden="true"
+          className="h-3 rounded-[3px]"
+          style={{
+            background: d.on ? "var(--color-fg)" : d.future ? "#0c0c0c" : "var(--color-rule)",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
   const s = useStore();
@@ -88,8 +138,9 @@ export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
             </button>
           </div>
         </div>
+        <FourWeeks sessions={s.sessions} now={s.now} />
         <TextTabs
-          className="py-4"
+          className="pb-3"
           options={FILTERS.map((f) => ({ id: f.id, label: f.label }))}
           value={filter}
           onChange={setFilter}

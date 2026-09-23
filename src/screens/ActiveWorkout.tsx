@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
-import { ExercisePicker } from "../components/ExercisePicker";
-import { Check, ChevronRight, Minus, Plus, Share } from "../components/icons";
+import { AddExerciseSheet } from "../components/AddExerciseSheet";
+import { Check, Plus, Share, Swap, Trash } from "../components/icons";
 import { SwipeRow } from "../components/SwipeRow";
-import { Button, Empty, Eyebrow, Scrim, Sheet } from "../components/ui";
+import { Button, Empty, Scrim, Sheet } from "../components/ui";
 import { useDialog, usePresence } from "../lib/useDialog";
 import { workoutCard } from "../lib/card/select";
 import type { WorkoutData } from "../lib/card/types";
@@ -19,8 +19,7 @@ import {
   streakSummary,
   qualifiesForStreak,
 } from "../lib/stats";
-import { similarExercises } from "../lib/similar";
-import { fmtClock, fmtDuration, num } from "../lib/util";
+import { fmtClock, fmtDuration, num, uid } from "../lib/util";
 import { useStore } from "../store";
 import type { GateSubject } from "../lib/entitlement";
 import type { Exercise, Session, SetLog } from "../types";
@@ -31,17 +30,7 @@ import type { Exercise, Session, SetLog } from "../types";
  */
 const DIM = "#a5a5aa";
 /**
- * The tone a set drops to once it is settled, or a number the cursor is not on.
- *
- * This used to be #666, which is 3.7:1 on black and under the 4.5:1 that text
- * this size needs — so the set list, which is the record of what you have
- * actually done this session, was the least readable thing on the screen. It
- * is a de-emphasis, not a disappearance.
- */
-const DIMMED = "var(--color-dim)";
-
-/**
- * The set row the dials are pointed at.
+ * The set row the dock is pointed at.
  *
  * Lifted off the card rather than tinted or ruled: on a raised surface a wash
  * of light is the quietest way to say "this one", and it leaves the tone of the
@@ -84,47 +73,72 @@ function streakFor(sessions: Session[], session: Session, now: number) {
   };
 }
 
-/** Which number the pad and the steppers are editing. */
+/** Which number the pad and the dock are editing. */
 type Field = "weight" | "reps" | "seconds";
 type Pad = { entryId: string; setId: string; field: Field; buf: string | null };
+/** The set the dock is pointed at. */
+type Focus = { entryId: string; setId: string };
+type SheetState = { kind: "add" } | { kind: "replace"; entryId: string };
+type Toast = { text: string; undo: () => void };
 
+/** How long the rest between sets runs, in seconds. */
+const REST = 90;
+/** How long an Undo stays on offer. */
+const TOAST_MS = 4000;
 /**
- * A replacement in progress: which exercise is going, and what to offer.
- *
- * A snapshot taken when the gesture finishes rather than something worked out
- * again on every render. The suggestions and the exclusions are read off the
- * workout as it stood the moment the row was swiped, so nothing in the sheet
- * moves while a thumb is already travelling toward a row — and the sheet still
- * has a name and a list to draw while it animates out, after the entry it was
- * asking about has already become something else.
+ * When each workout's rest ends. Module-level for the same reason `celebrated`
+ * is: stepping out of the logger unmounts it, and the rest you were in the
+ * middle of should still be running when you come back.
  */
-type Swap = {
-  entryId: string;
-  /** The exercise being replaced, for the sheet's title and its question. */
-  name: string;
-  suggested: Exercise[];
-  /** Everything already in this workout, which is nothing worth offering. */
-  exclude: Set<string>;
-};
+const restUntil = new Map<string, number>();
+/** Set once the swipe has been used, which is when its explanation can go. */
+const HINT_KEY = "gym:swipe-hint-seen";
+function hintSeen() {
+  try {
+    return localStorage.getItem(HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markHintSeen() {
+  try {
+    localStorage.setItem(HINT_KEY, "1");
+  } catch {
+    /* The hint just shows again next time. */
+  }
+}
 
-/** A dial reads "—" rather than "0": an untouched number is not a logged zero. */
-const dial = (v: number) => (v ? num(v) : "—");
-/** The same rule for a held set: a clock, or a dash until it has been set. */
-const clock = (v: number | undefined) => (v ? fmtClock(v) : "—");
+/** A set is either an empty-handed plan or a settled fact. */
 const settled = (x: SetLog) => !!(x.done || x.skipped);
 /** How much a press of the time stepper moves, in seconds. */
 const HOLD_STEP = 5;
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /**
- * The logger, rebuilt around one set at a time.
+ * The step a weight chip moves by, in kilograms.
  *
- * It used to be a spreadsheet: every exercise, every set and every field on
- * screen at once, all of them the same size. Mid-set that is the wrong shape —
- * you are holding a bar and looking for one number. So the workout now has a
- * focus: the exercise you are on gets the top of the screen and two dials big
- * enough to hit without looking, and everything else collapses to a list you
- * tap to switch. The pips under the header are the only thing that still shows
- * the whole session at once.
+ * Scaled to the load rather than fixed, because the plates are: a bar moves in
+ * 2.5s, dumbbells in 2s, and the light end of a rack in ones. A pound bar moves
+ * in fives throughout.
+ */
+function weightStep(unit: "kg" | "lb", w: number) {
+  if (unit === "lb") return 5;
+  return w >= 40 ? 2.5 : w >= 10 ? 2 : 1;
+}
+
+/**
+ * The logger: the whole session as one sheet, with a dock for the set in hand.
+ *
+ * Every exercise is a card with its sets as a table — Prev, weight, reps, and a
+ * check — and one card is open at a time. The number being changed is not
+ * edited in the table: the table points at it, and the dock at the foot of the
+ * screen carries it large, with steps either side and the button that logs it.
+ * That keeps the whole workout in view while leaving the one thing you touch
+ * mid-set big enough to hit without looking.
+ *
+ * A card's header can be swiped: left takes the exercise out, right asks what
+ * to put in its place. Both are undoable for a few seconds, and both are also in
+ * the card's ⋯ menu, since a swipe is an enhancement and never the only route.
  */
 export function ActiveWorkout({
   onBack,
@@ -146,33 +160,50 @@ export function ActiveWorkout({
       danger: true,
     });
 
-  const [picker, setPicker] = useState(false);
-  const [swap, setSwap] = useState<Swap | null>(null);
-  // Kept while the sheet closes, the same way the pad's title is: `swap` is
-  // cleared the instant a replacement is chosen, and the sheet would otherwise
-  // empty a frame before it went.
-  const [lastSwap, setLastSwap] = useState<Swap | null>(null);
+  const [sheet, setSheet] = useState<SheetState | null>(null);
+  // Kept while the sheet closes, so its title does not blank a frame before it
+  // goes.
+  const [lastSheet, setLastSheet] = useState<SheetState | null>(null);
+  if (sheet && sheet !== lastSheet) setLastSheet(sheet);
+  const shownSheet = sheet ?? lastSheet;
   const [workoutShare, setWorkoutShare] = useState<WorkoutData | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [confirmFinish, setConfirmFinish] = useState(false);
-  // Which exercise has the screen. Held by id so it survives the list changing.
-  const [openId, setOpenId] = useState<string | null>(
-    () => session.entries.find((e) => e.sets.some((x) => !x.done))?.id ?? null,
+  // Which card is open. Held by id so it survives the list changing; "" means
+  // every card has been folded, and an id that is gone falls back to the next
+  // exercise with work left in it.
+  const [openId, setOpenId] = useState<string>(
+    () => session.entries.find((e) => e.sets.some((x) => !settled(x)))?.id ?? "",
   );
+  // After an add, the first new card opens — but its id is minted by the store,
+  // so it is found by position on the render after.
+  const [openAt, setOpenAt] = useState<number | null>(null);
+  if (openAt != null && session.entries[openAt]) {
+    setOpenId(session.entries[openAt].id);
+    setOpenAt(null);
+  }
   // An explicitly tapped set. Null means "whichever one is up next".
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [focus, setFocus] = useState<Focus | null>(null);
+  const [field, setField] = useState<"value" | "reps">("value");
   const [pad, setPad] = useState<Pad | null>(null);
-  // The pad's title and value are read out of `pad`, which is cleared the
-  // instant it closes. Holding the last one keeps the panel populated while it
-  // animates out instead of blanking a frame before it goes.
   const [lastPad, setLastPad] = useState<Pad | null>(null);
   if (pad && pad !== lastPad) setLastPad(pad);
   const shownPad = pad ?? lastPad;
-  if (swap && swap !== lastSwap) setLastSwap(swap);
-  const shownSwap = swap ?? lastSwap;
+  const [toast, setToast] = useState<Toast | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+  const [hint, setHint] = useState(() => !hintSeen());
+  /** The swipe has been used, so the line explaining it can go. */
+  function retireHint() {
+    if (!hint) return;
+    markHintSeen();
+    setHint(false);
+  }
+  const [, rerender] = useState(0);
 
-  const unit = s.settings.unit === "lb" ? "lbs" : "kg";
-  const step = s.settings.unit === "lb" ? 5 : 2.5;
+  useEffect(() => () => window.clearTimeout(toastTimer.current), []);
+
+  const unitKey = s.settings.unit === "lb" ? "lb" : "kg";
+  const unit = unitKey === "lb" ? "lbs" : "kg";
   const elapsed = sessionElapsed(session, s.now);
   const volume = sessionVolume(session);
   const setsDone = sessionSetCount(session);
@@ -243,38 +274,91 @@ export function ActiveWorkout({
       ? streakFor(s.sessions, session, s.now)
       : null;
 
-  const entry =
-    session.entries.find((e) => e.id === openId) ??
-    session.entries.find((e) => e.sets.some((x) => !settled(x))) ??
-    session.entries[0];
+  // The best estimated 1RM each lift had before today, for counting PRs.
+  const priorBest = useMemo(
+    () => personalRecords(s.sessions.filter((x) => x.id !== session.id)),
+    [s.sessions, session.id],
+  );
+  const isPR = (exerciseId: string, x: SetLog) => {
+    const best = priorBest.get(exerciseId)?.bestE1rm ?? 0;
+    return x.done && x.reps > 0 && best > 0 && e1rm(x.weight, x.reps) > best;
+  };
+  const prCount = session.entries.reduce(
+    (t, e) => t + e.sets.filter((x) => isPR(e.exerciseId, x)).length,
+    0,
+  );
 
-  const summary = `${setsDone} sets · ${num(volume, 0)} ${unit} · ${fmtDuration(elapsed)}`;
+  const restLeft = Math.max(
+    0,
+    Math.ceil(((restUntil.get(session.id) ?? 0) - s.now) / 1000),
+  );
+  const resting = restLeft > 0 && !workoutDone;
+  function startRest() {
+    restUntil.set(session.id, Date.now() + REST * 1000);
+    rerender((n) => n + 1);
+  }
+  function skipRest() {
+    restUntil.delete(session.id);
+    rerender((n) => n + 1);
+  }
 
-  /** Writes one dial. Kept explicit so the patch stays a typed `Partial<SetLog>`. */
-  const write = (entryId: string, setId: string, field: Field, v: number) =>
+  function showToast(text: string, undo: () => void) {
+    window.clearTimeout(toastTimer.current);
+    setToast({ text, undo });
+    toastTimer.current = window.setTimeout(() => setToast(null), TOAST_MS);
+  }
+
+  const nameOf = (exerciseId: string) =>
+    s.exerciseById.get(exerciseId)?.name ?? "Exercise";
+
+  // The card that is open, and the set the dock is pointed at.
+  const openEntry = openId
+    ? session.entries.find((e) => e.id === openId) ??
+      session.entries.find((e) => e.sets.some((x) => !settled(x)))
+    : undefined;
+  let f: Focus | null = null;
+  if (openEntry) {
+    const tapped =
+      focus?.entryId === openEntry.id &&
+      openEntry.sets.some((x) => x.id === focus.setId)
+        ? focus
+        : null;
+    const next = openEntry.sets.find((x) => !settled(x));
+    f = tapped ?? (next ? { entryId: openEntry.id, setId: next.id } : null);
+  }
+  if (!f) {
+    const e = session.entries.find((x) => x.sets.some((y) => !settled(y)));
+    const x = e?.sets.find((y) => !settled(y));
+    if (e && x) f = { entryId: e.id, setId: x.id };
+  }
+  const fEntry = f ? session.entries.find((e) => e.id === f.entryId) : undefined;
+  const fSet = fEntry?.sets.find((x) => x.id === f?.setId);
+  const fEx = fEntry ? s.exerciseById.get(fEntry.exerciseId) : undefined;
+  const fTimed = fEx?.tracks === "time";
+  /** The second number the dock can hold for this lift: reps, or a hold. */
+  const second: Field = fTimed ? "seconds" : "reps";
+  const dockField: Field = field === "value" ? "weight" : second;
+
+  /** Writes one number. Kept explicit so the patch stays a typed `Partial<SetLog>`. */
+  const write = (entryId: string, setId: string, which: Field, v: number) =>
     s.updateSet(
       entryId,
       setId,
-      field === "reps"
+      which === "reps"
         ? { reps: v }
-        : field === "seconds"
+        : which === "seconds"
           ? { seconds: v }
           : { weight: v },
     );
 
-  function bump(entryId: string, setId: string, field: Field, d: number) {
-    const st = session.entries
-      .find((e) => e.id === entryId)
-      ?.sets.find((x) => x.id === setId);
-    if (!st) return;
+  function bump(which: Field, d: number) {
+    if (!f || !fSet) return;
     write(
-      entryId,
-      setId,
-      field,
-      Math.max(0, Math.round(((st[field] || 0) + d) * 100) / 100),
+      f.entryId,
+      f.setId,
+      which,
+      Math.max(0, Math.round(((fSet[which] || 0) + d) * 100) / 100),
     );
-    // A stepper press supersedes anything half-typed on the pad.
-    setPad((p) => (p ? { ...p, buf: null } : p));
   }
 
   function press(k: string) {
@@ -303,26 +387,100 @@ export function ActiveWorkout({
     );
   }
 
-  /**
-   * Opens the Replace sheet for one entry.
-   *
-   * The suggestions are worked out here rather than in the sheet, because this
-   * is the only moment that knows what the workout looked like: everything
-   * already in the session is held out of the list, so the sheet cannot offer
-   * to put a second copy of a lift into a workout that has one, and it cannot
-   * offer the exercise you are trying to get rid of either.
-   */
-  function openSwap(entryId: string) {
-    const target = session.entries.find((e) => e.id === entryId);
-    const ex = target && s.exerciseById.get(target.exerciseId);
-    if (!ex) return;
-    const exclude = new Set(session.entries.map((e) => e.exerciseId));
-    setSwap({
-      entryId,
-      name: ex.name,
-      suggested: similarExercises(ex, s.exercises, exclude),
-      exclude,
+  /** Logs the set the dock is on and moves the dock to the next one. */
+  function logFocused() {
+    if (!f || !fEntry || !fSet || fSet.done) return;
+    s.updateSet(f.entryId, f.setId, { done: true, skipped: false });
+    startRest();
+    const i = fEntry.sets.indexOf(fSet);
+    const nx = fEntry.sets.find((y, k) => k > i && !settled(y));
+    if (nx) {
+      setOpenId(fEntry.id);
+      setFocus({ entryId: fEntry.id, setId: nx.id });
+    } else {
+      // That was the last of this exercise: open the next one with work left.
+      const ne = session.entries.find(
+        (e) => e.id !== fEntry.id && e.sets.some((y) => !settled(y)),
+      );
+      setOpenId(ne ? ne.id : fEntry.id);
+      setFocus(null);
+    }
+  }
+
+  /** Takes an exercise out, with Undo. The caller has already asked, if it should. */
+  function remove(entryId: string) {
+    const snap = session.entries;
+    const name = nameOf(snap.find((e) => e.id === entryId)?.exerciseId ?? "");
+    s.removeEntry(entryId);
+    if (entryId === openId) setOpenId(session.entries.find((e) => e.id !== entryId && e.sets.some((x) => !settled(x)))?.id ?? "");
+    setFocus(null);
+    showToast(`${name} removed`, () => {
+      s.restoreEntries(snap);
+      setToast(null);
     });
+  }
+
+  /** Logged sets are the one thing here nothing can give back, so they ask. */
+  function askRemove(entryId: string) {
+    const e = session.entries.find((x) => x.id === entryId);
+    const d = e?.sets.filter((x) => x.done).length ?? 0;
+    if (!e || !d) return Promise.resolve(true);
+    return ask({
+      title: `Remove ${nameOf(e.exerciseId)}?`,
+      body: `${d} logged ${plural(d, "set goes", "sets go")} with it, and cannot be recovered.`,
+      confirmLabel: "Remove",
+      cancelLabel: "Keep it",
+      danger: true,
+    });
+  }
+
+  async function replace(entryId: string, x: Exercise) {
+    const e = session.entries.find((y) => y.id === entryId);
+    if (!e) return;
+    const old = nameOf(e.exerciseId);
+    const d = e.sets.filter((y) => y.done).length;
+    if (
+      d &&
+      !(await ask({
+        title: `Replace ${old}?`,
+        body: `${d} logged ${plural(d, "set goes", "sets go")} with it. ${x.name} starts fresh from your last session.`,
+        confirmLabel: "Replace",
+        cancelLabel: "Keep it",
+        danger: true,
+      }))
+    )
+      return;
+    const snap = session.entries;
+    s.replaceEntry(entryId, x.id);
+    setSheet(null);
+    setOpenId(entryId);
+    setFocus(null);
+    showToast(`${old} → ${x.name}`, () => {
+      s.restoreEntries(snap);
+      setToast(null);
+    });
+  }
+
+  function add(ids: string[]) {
+    if (!ids.length) return;
+    const snap = session.entries;
+    s.addEntries(ids);
+    setSheet(null);
+    setOpenAt(snap.length);
+    setFocus(null);
+    showToast(`${ids.length} added to ${session.name}`, () => {
+      s.restoreEntries(snap);
+      setToast(null);
+    });
+  }
+
+  /** Nothing matched, so the search becomes a new exercise of your own. */
+  async function create(raw: string) {
+    const name = raw.replace(/^./, (c) => c.toUpperCase());
+    const ex: Exercise = { id: uid(), name, muscle: "Other", createdAt: Date.now() };
+    await s.saveExercise(ex);
+    if (shownSheet?.kind === "replace") await replace(shownSheet.entryId, ex);
+    else add([ex.id]);
   }
 
   const header = (
@@ -335,6 +493,7 @@ export function ActiveWorkout({
     />
   );
 
+  const summary = `${setsDone} sets · ${num(volume, 0)} ${unit} · ${fmtDuration(elapsed)}`;
   const finishSheet = (
     <FinishSheet
       open={confirmFinish}
@@ -372,57 +531,28 @@ export function ActiveWorkout({
     />
   );
 
-  const exercisePicker = (
-    <ExercisePicker
-      open={picker}
-      onClose={() => setPicker(false)}
-      onPick={(x) => {
-        s.addEntry(x.id);
-        setPicker(false);
+  const replacingEntry =
+    shownSheet?.kind === "replace"
+      ? session.entries.find((e) => e.id === shownSheet.entryId)
+      : undefined;
+  const replacingEx = replacingEntry
+    ? s.exerciseById.get(replacingEntry.exerciseId)
+    : undefined;
+  const addSheet = (
+    <AddExerciseSheet
+      open={!!sheet}
+      mode={replacingEx ? { kind: "replace", exercise: replacingEx } : { kind: "add" }}
+      inSession={new Set(session.entries.map((e) => e.exerciseId))}
+      onClose={() => setSheet(null)}
+      onAdd={add}
+      onReplace={(x) => {
+        if (shownSheet?.kind === "replace") void replace(shownSheet.entryId, x);
       }}
+      onCreate={(name) => void create(name)}
     />
   );
 
-  const replacePicker = shownSwap && (
-    <ExercisePicker
-      open={!!swap}
-      onClose={() => setSwap(null)}
-      title={`Replace ${shownSwap.name}`}
-      suggested={shownSwap.suggested}
-      exclude={shownSwap.exclude}
-      onPick={async (x) => {
-        /*
-         * Swapping out a plan costs nothing and happens on the tap. Swapping
-         * out sets you have already logged is different: those minutes go with
-         * the exercise and nothing in the app can give them back, so that one
-         * case stops and asks — the same question, in the same words, that
-         * removing the row would have asked.
-         */
-        const logged =
-          session.entries
-            .find((e) => e.id === shownSwap.entryId)
-            ?.sets.filter((st) => st.done).length ?? 0;
-        if (
-          logged &&
-          !(await ask({
-            title: `Replace ${shownSwap.name}?`,
-            body: `${logged} logged ${
-              logged === 1 ? "set goes" : "sets go"
-            } with it, and cannot be recovered.`,
-            confirmLabel: "Replace",
-            danger: true,
-          }))
-        )
-          return;
-        s.replaceEntry(shownSwap.entryId, x.id);
-        setSwap(null);
-        // The sets under the cursor belong to the exercise that just left.
-        setCursor(null);
-      }}
-    />
-  );
-
-  if (!entry) {
+  if (!session.entries.length) {
     return (
       <div className="min-h-full bg-ink">
         {header}
@@ -432,7 +562,7 @@ export function ActiveWorkout({
             title="The clock is running. Add your first exercise."
             action={
               <div className="flex flex-col gap-3.5">
-                <Button onClick={() => setPicker(true)}>Add exercise</Button>
+                <Button onClick={() => setSheet({ kind: "add" })}>Add exercise</Button>
                 <Button
                   variant="quiet"
                   onClick={async () => {
@@ -445,376 +575,337 @@ export function ActiveWorkout({
             }
           />
         </div>
-        {exercisePicker}
+        {toast && <UndoToast toast={toast} />}
+        {addSheet}
         {finishSheet}
       </div>
     );
   }
 
-  const ex = s.exerciseById.get(entry.exerciseId);
-  /** Held for a duration rather than counted out — a plank, a treadmill run. */
-  const timed = ex?.tracks === "time";
-  const last = lastPerformance(
-    s.sessions,
-    entry.exerciseId,
-    s.activeSessionId ?? undefined,
-  );
-  const priorBest =
-    personalRecords(s.sessions.filter((x) => x.id !== session.id)).get(
-      entry.exerciseId,
-    )?.bestE1rm ?? 0;
-
-  const cur =
-    entry.sets.find((x) => x.id === cursor) ??
-    entry.sets.find((x) => !settled(x)) ??
-    entry.sets[entry.sets.length - 1];
-  const idx = cur ? entry.sets.indexOf(cur) : -1;
-  const prev = idx >= 0 ? last?.sets[idx] : undefined;
-  // Added weight, for a movement that is mostly your own bodyweight.
-  const weightLabel = ex?.bodyweight ? `+${unit}` : unit;
-
-  function logSet() {
-    if (!cur) return;
-    s.updateSet(entry.id, cur.id, { done: true, skipped: false });
-    setCursor(null);
-    // Last one of this exercise: move on rather than leaving a finished block up.
-    if (entry.sets.every((x) => x.id === cur.id || settled(x))) {
-      const next = session.entries.find(
-        (e) => e.id !== entry.id && e.sets.some((x) => !settled(x)),
-      );
-      if (next) setOpenId(next.id);
-    }
-  }
-
-  /** A logged set that beats every session before this one. */
-  const isPR = (x: SetLog) =>
-    x.done && x.reps > 0 && priorBest > 0 && e1rm(x.weight, x.reps) > priorBest;
-
-  // Which of the other exercises still has work in it decides what the second
-  // card calls itself: a queue, or a list of what else is here.
-  const upNext = session.entries.some(
-    (e) => e.id !== entry.id && e.sets.some((x) => !settled(x)),
-  );
+  const menuEntry = menu ? session.entries.find((e) => e.id === menu) : undefined;
+  const bwLabel = (exerciseId: string) =>
+    s.exerciseById.get(exerciseId)?.bodyweight ? `+${unit}` : unit;
+  const step =
+    dockField === "weight"
+      ? weightStep(unitKey, fSet?.weight ?? 0)
+      : dockField === "seconds"
+        ? HOLD_STEP
+        : 1;
+  // One back, one on, two on: the usual correction is a step, and the usual
+  // progression is one or two.
+  const dockSteps = [-step, step, step * 2];
+  const dockLabel = fEntry
+    ? `${dockField === "weight" ? bwLabel(fEntry.exerciseId) : dockField === "seconds" ? "time" : "reps"} · set ${fEntry.sets.findIndex((x) => x.id === f?.setId) + 1}`
+    : "";
+  const dockValue = fSet
+    ? dockField === "weight"
+      ? num(fSet.weight)
+      : dockField === "seconds"
+        ? fmtClock(fSet.seconds ?? 0)
+        : String(fSet.reps)
+    : "";
+  const openPad = (entryId: string, setId: string, which: Field) =>
+    setPad({ entryId, setId, field: which, buf: null });
 
   return (
     <div className="flex min-h-full flex-col bg-ink">
-      {header}
-
-      {/*
-        Two cards on the black ground, in a gutter narrower than the rest of the
-        app's. This is the one screen read at arm's length with a bar in your
-        hands, so the panel carrying the numbers takes all the width it can and
-        the ground is left showing as a seam rather than as a margin.
-      */}
-      <div className="flex flex-1 flex-col gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
-        <section
-          key={entry.id}
-          className="animate-exswap rounded-2xl border border-cardrule bg-card px-5 pb-2 pt-[22px]"
-        >
-          <div className="flex justify-between font-mono text-label font-semibold uppercase tracking-[0.2em] text-muted">
-            <span>
-              Exercise {session.entries.indexOf(entry) + 1} of{" "}
-              {session.entries.length}
-            </span>
-            <span className="flex items-center gap-3">
-              {entry.sets.length > 0 && (
-                <SetDots sets={entry.sets} at={idx} />
-              )}
-              <button
-                onClick={() => setMenu(entry.id)}
-                aria-label={`Options for ${ex?.name ?? "exercise"}`}
-                /* Hit area padded to 44px and pulled back out with negative
-                   margins, so the target grows without the header row moving. */
-                className="-my-3 -mr-3 grid size-11 place-items-center text-[0.75rem] leading-none tracking-normal text-dim active:text-fg"
-              >
-                ⋯
-              </button>
-            </span>
-          </div>
-
-          <p className="mt-3 text-pretty text-[1.75rem] font-semibold leading-[1.1] tracking-[-0.03em]">
-            {ex?.name ?? "Exercise"}
-          </p>
-          <p className="mt-2 font-mono text-label font-medium uppercase tracking-[0.12em] text-muted">
-            {prev
-              ? timed
-                ? `Last time · ${clock(prev.seconds)}`
-                : `Last time · ${dial(prev.weight)} × ${prev.reps}`
-              : "First time logging this"}
-          </p>
-
-          {cur && (
-            <>
-              {/*
-                The two dials side by side rather than stacked. Weight and reps
-                are read as one figure — "forty by six" — and a set is logged by
-                adjusting one of them and hitting the button, so they belong on
-                one line with the button under both.
-              */}
-              <div className="mt-5 grid grid-cols-2 items-center gap-2.5">
-                <Dial
-                  label={weightLabel}
-                  value={dial(cur.weight)}
-                  dim={settled(cur)}
-                  onLess={() => bump(entry.id, cur.id, "weight", -step)}
-                  onMore={() => bump(entry.id, cur.id, "weight", step)}
-                  onEdit={() =>
-                    setPad({
-                      entryId: entry.id,
-                      setId: cur.id,
-                      field: "weight",
-                      buf: null,
-                    })
-                  }
-                />
-                {timed ? (
-                  <Dial
-                    label="Time"
-                    value={clock(cur.seconds)}
-                    dim={settled(cur)}
-                    onLess={() =>
-                      bump(entry.id, cur.id, "seconds", -HOLD_STEP)
-                    }
-                    onMore={() => bump(entry.id, cur.id, "seconds", HOLD_STEP)}
-                    onEdit={() =>
-                      setPad({
-                        entryId: entry.id,
-                        setId: cur.id,
-                        field: "seconds",
-                        buf: null,
-                      })
-                    }
-                  />
-                ) : (
-                  <Dial
-                    label="Reps"
-                    value={dial(cur.reps)}
-                    dim={settled(cur)}
-                    onLess={() => bump(entry.id, cur.id, "reps", -1)}
-                    onMore={() => bump(entry.id, cur.id, "reps", 1)}
-                    onEdit={() =>
-                      setPad({
-                        entryId: entry.id,
-                        setId: cur.id,
-                        field: "reps",
-                        buf: null,
-                      })
-                    }
-                  />
-                )}
-              </div>
-
-              {/*
-                Logging the set is the whole point of the screen, so it gets the
-                full width and the only filled button on it. Skip and undo sit
-                under it as words: they are the exception, and setting them side
-                by side made them look like the same kind of choice.
-              */}
-              <div className="mt-4 flex flex-col items-center gap-3">
-                <button
-                  onClick={() => {
-                    if (!cur.done) logSet();
-                  }}
-                  className="press h-13 w-full rounded-full bg-fg font-mono text-[0.8125rem] font-semibold uppercase tracking-[0.14em] text-black"
-                >
-                  {cur.done ? "Logged" : "Log set"}
-                </button>
-                <button
-                  onClick={() =>
-                    settled(cur)
-                      ? s.updateSet(entry.id, cur.id, {
-                          done: false,
-                          skipped: false,
-                        })
-                      : s.updateSet(entry.id, cur.id, { skipped: true })
-                  }
-                  className="press flex h-11 items-center px-5 font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted active:text-fg"
-                >
-                  {settled(cur) ? "Undo" : "Skip"}
-                </button>
-              </div>
-            </>
-          )}
-
-          {/*
-            The record of the exercise, inside the card that is working on it.
-            The rule runs the full width of the card, so the list reads as the
-            underside of the panel rather than as a separate thing below it.
-          */}
-          <div className="-mx-5 mt-3.5 border-t border-cardrule px-5 pb-4 pt-2">
-            {entry.sets.map((x, i) => {
-              const now = i === idx;
-              const pr = isPR(x);
-              return (
-                <button
-                  key={x.id}
-                  onClick={() => setCursor(x.id)}
-                  style={{ background: now ? ROW_ON : undefined }}
-                  className="press press-row flex w-full items-center gap-3.5 rounded-[10px] p-3 text-left"
-                >
-                  {/*
-                    The mark carries the state, which is what lets every row
-                    keep the same tone: a check for a set that happened, its own
-                    number for one that has not.
-                  */}
-                  <span
-                    className="grid size-5 shrink-0 place-items-center rounded-full border font-mono text-label font-medium leading-none"
-                    style={{
-                      borderColor:
-                        x.done || now ? "var(--color-fg)" : "var(--color-rule)",
-                      background: x.done ? "var(--color-fg)" : undefined,
-                      color: x.done ? "#000" : now ? undefined : DIM,
-                    }}
-                  >
-                    {x.done ? <Check size={11} /> : i + 1}
-                  </span>
-                  <span
-                    className="min-w-0 flex-1 font-mono text-[1rem] font-medium tracking-[-0.01em]"
-                    style={{
-                      color: x.skipped ? DIMMED : undefined,
-                      textDecoration: x.skipped ? "line-through" : undefined,
-                    }}
-                  >
-                    {timed
-                      ? x.weight
-                        ? `+${dial(x.weight)} ${unit} · ${clock(x.seconds)}`
-                        : clock(x.seconds)
-                      : `${dial(x.weight)} ${unit} × ${dial(x.reps)}`}
-                  </span>
-                  {(pr || (now && !x.done)) && (
-                    <span className="font-mono text-label font-semibold uppercase tracking-[0.18em] text-fg">
-                      {pr ? "PR" : "Now"}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            <div className="flex items-center gap-2 pt-1.5">
-              <button
-                onClick={() => s.addSet(entry.id)}
-                className="press flex h-11 items-center gap-1.5 font-mono text-label font-medium text-muted active:text-fg"
-              >
-                <Plus size={14} />
-                Add set
-              </button>
-              <span className="flex-1" />
-              <button
-                onClick={() => {
-                  const lastSet = entry.sets[entry.sets.length - 1];
-                  if (lastSet && entry.sets.length > 1)
-                    s.removeSet(entry.id, lastSet.id);
-                }}
-                disabled={entry.sets.length < 2}
-                className="press flex h-11 items-center px-2 font-mono text-label font-medium text-dim active:text-muted disabled:opacity-40"
-              >
-                Remove last
-              </button>
+      <div className="sticky top-0 z-20 bg-ink/95 backdrop-blur-xl">
+        {header}
+        {/* The session in three figures. */}
+        <div className="grid grid-cols-3 border-y border-rule">
+          {[
+            { v: `${setsDone}/${allSets.length}`, l: "Sets", pad: "px-5" },
+            { v: num(volume, 0), l: `${unit} moved`, pad: "px-3.5" },
+            { v: String(prCount), l: prCount === 1 ? "PR" : "PRs", pad: "px-3.5" },
+          ].map((c, i) => (
+            <div
+              key={c.l}
+              className={`flex flex-col gap-1 py-2.5 ${c.pad} ${i < 2 ? "border-r border-rule" : ""}`}
+            >
+              <span className="whitespace-nowrap font-mono text-[0.9375rem] font-medium">
+                {c.v}
+              </span>
+              <span className="whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.18em] text-muted">
+                {c.l}
+              </span>
             </div>
-          </div>
-        </section>
+          ))}
+        </div>
+      </div>
 
-        {/*
-          Everything that is not the set in front of you: the rest of the
-          workout, a way to add to it, and the note. `mt-auto` holds it against
-          the bottom edge when the exercise above it is short.
-        */}
-        <section className="mt-auto overflow-hidden rounded-2xl border border-cardrule bg-card">
-          <div className="px-5 pb-1 pt-4">
-            <Eyebrow className="tracking-[0.2em]">
-              {upNext ? "Up next" : "Other exercises"}
-            </Eyebrow>
-          </div>
-
-          {session.entries
-            .filter((e) => e.id !== entry.id)
-            .map((e) => {
-              const done = e.sets.filter((x) => x.done).length;
-              const complete = e.sets.every((x) => settled(x));
-              const name = s.exerciseById.get(e.exerciseId)?.name ?? "Exercise";
-              return (
-                <SwipeRow
-                  key={e.id}
-                  onRemove={() => s.removeEntry(e.id)}
-                  // Pulled the other way, the row asks what it should be
-                  // instead. Nothing is lost on the gesture alone: it opens the
-                  // sheet, and the sheet is where the decision is made.
-                  onReplace={() => openSwap(e.id)}
-                  /*
-                   * Trimming the plan is the ordinary case and happens on the
-                   * gesture alone. An exercise with sets already logged into it
-                   * is different: those are minutes of work that nothing in the
-                   * app can give back, so that one row — and only that row —
-                   * stops and asks.
-                   */
-                  confirm={
-                    done
-                      ? () =>
-                          ask({
-                            title: `Remove ${name}?`,
-                            body: `${done} logged ${
-                              done === 1 ? "set goes" : "sets go"
-                            } with it, and cannot be recovered.`,
-                            confirmLabel: "Remove",
-                            danger: true,
-                          })
-                      : undefined
-                  }
-                >
+      <div className="flex flex-1 flex-col gap-2 px-3 pb-4 pt-3">
+        {session.entries.map((e, i) => {
+          const ex = s.exerciseById.get(e.exerciseId);
+          const name = ex?.name ?? "Exercise";
+          const timed = ex?.tracks === "time";
+          const d = e.sets.filter((x) => x.done).length;
+          const all = e.sets.length > 0 && e.sets.every(settled);
+          const exp = e.id === openEntry?.id;
+          const prev = lastPerformance(s.sessions, e.exerciseId, session.id);
+          const first = e.sets[0];
+          const status = all
+            ? "Complete"
+            : d
+              ? `${d} of ${e.sets.length} sets`
+              : `${e.sets.length} × ${first ? (timed ? fmtClock(first.seconds ?? 0) : first.reps) : 0}${first?.weight ? ` · ${num(first.weight)} ${unit}` : ""}`;
+          return (
+            <SwipeRow
+              key={e.id}
+              grip
+              top
+              className="shrink-0 rounded-2xl"
+              surface=""
+              onRemove={() => {
+                retireHint();
+                remove(e.id);
+              }}
+              confirm={d ? () => askRemove(e.id) : undefined}
+              onReplace={() => {
+                retireHint();
+                setSheet({ kind: "replace", entryId: e.id });
+              }}
+            >
+              <section
+                className="rounded-2xl border bg-card"
+                style={{ borderColor: exp ? "#3a3a3a" : "var(--color-cardrule)" }}
+              >
+                <div data-swipe-grip className="flex select-none items-center">
                   <button
                     onClick={() => {
-                      setOpenId(e.id);
-                      setCursor(null);
+                      setOpenId(exp ? "" : e.id);
+                      setFocus(null);
                     }}
-                    className="press press-row flex w-full items-center gap-3.5 px-5 py-3.5 text-left"
+                    aria-expanded={exp}
+                    className="press flex min-w-0 flex-1 items-center gap-3 py-3.5 pl-4 pr-1 text-left"
                   >
                     <span
-                      className="min-w-0 flex-1 truncate text-[1rem] font-medium tracking-[-0.015em]"
+                      className="grid size-5 shrink-0 place-items-center rounded-full border font-mono text-label font-medium leading-none"
                       style={{
-                        color: complete ? DIM : undefined,
-                        textDecoration: complete ? "line-through" : undefined,
+                        borderColor: all || exp ? "var(--color-fg)" : "var(--color-cardrule)",
+                        background: all ? "var(--color-fg)" : "transparent",
+                        color: all ? "#000" : exp ? "var(--color-fg)" : DIM,
                       }}
+                    >
+                      {all ? <Check size={11} /> : i + 1}
+                    </span>
+                    <span
+                      className="min-w-0 flex-1 truncate text-[1rem] font-medium tracking-[-0.015em]"
+                      style={{ color: all && !exp ? DIM : undefined }}
                     >
                       {name}
                     </span>
                     <span className="whitespace-nowrap font-mono text-label font-medium text-muted">
-                      {complete
-                        ? "Complete"
-                        : done
-                          ? `${done} of ${e.sets.length} sets`
-                          : `${e.sets.length} sets`}
+                      {status}
                     </span>
-                    {/* A mark, not a word: `faint` is the floor for one of those. */}
-                    <ChevronRight size={16} className="shrink-0 text-faint" />
                   </button>
-                </SwipeRow>
-              );
-            })}
+                  <button
+                    onClick={() => setMenu(e.id)}
+                    aria-label={`Options for ${name}`}
+                    className="grid h-12 w-11 shrink-0 place-items-center text-[0.8125rem] text-dim active:text-fg"
+                  >
+                    ⋯
+                  </button>
+                </div>
 
+                {exp && (
+                  <div className="px-2 pb-2">
+                    <div className="grid grid-cols-[32px_1fr_64px_52px_44px] items-center gap-1.5 whitespace-nowrap px-2 pb-1.5 pt-1 font-mono text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-dim">
+                      <span>Set</span>
+                      <span>Prev</span>
+                      <span className="text-center">{bwLabel(e.exerciseId)}</span>
+                      <span className="text-center">{timed ? "Time" : "Reps"}</span>
+                      <span />
+                    </div>
+                    {e.sets.map((x, j) => {
+                      const on = f?.entryId === e.id && f.setId === x.id;
+                      const p = prev?.sets[j];
+                      const tone = settled(x) ? DIM : "var(--color-fg)";
+                      const strike = x.skipped ? "line-through" : undefined;
+                      const cell = (which: Field, text: string) => {
+                        const lit = on && dockField === which;
+                        return (
+                          <button
+                            onClick={() => {
+                              // A second tap on the number already in the dock
+                              // opens the keypad, for typing it outright.
+                              if (lit) openPad(e.id, x.id, which);
+                              setFocus({ entryId: e.id, setId: x.id });
+                              setField(which === "weight" ? "value" : "reps");
+                            }}
+                            aria-label={`Set ${j + 1} ${which === "weight" ? bwLabel(e.exerciseId) : which}`}
+                            className="press h-10 whitespace-nowrap rounded-[10px] border bg-ink font-mono text-[1.0625rem] font-medium"
+                            style={{
+                              borderColor: lit ? "var(--color-fg)" : "var(--color-cardrule)",
+                              color: tone,
+                              textDecoration: strike,
+                            }}
+                          >
+                            {text}
+                          </button>
+                        );
+                      };
+                      return (
+                        <div
+                          key={x.id}
+                          className="grid grid-cols-[32px_1fr_64px_52px_44px] items-center gap-1.5 rounded-[10px] px-2 py-1"
+                          style={{ background: on ? ROW_ON : "transparent" }}
+                        >
+                          <span className="whitespace-nowrap font-mono text-[0.8125rem] font-medium text-muted">
+                            {j + 1}
+                          </span>
+                          <span className="truncate whitespace-nowrap font-mono text-[0.8125rem] text-dim">
+                            {p
+                              ? timed
+                                ? fmtClock(p.seconds ?? 0)
+                                : `${num(p.weight)} × ${p.reps}`
+                              : "—"}
+                          </span>
+                          {cell("weight", num(x.weight))}
+                          {timed
+                            ? cell("seconds", fmtClock(x.seconds ?? 0))
+                            : cell("reps", String(x.reps))}
+                          <button
+                            onClick={() => {
+                              if (x.done) {
+                                s.updateSet(e.id, x.id, { done: false, skipped: false });
+                                return;
+                              }
+                              s.updateSet(e.id, x.id, { done: true, skipped: false });
+                              startRest();
+                              const nx = e.sets.find((y, k) => k > j && !settled(y));
+                              setFocus(nx ? { entryId: e.id, setId: nx.id } : null);
+                            }}
+                            aria-label={x.done ? `Unlog set ${j + 1}` : `Log set ${j + 1}`}
+                            aria-pressed={x.done}
+                            className="press grid size-10 place-items-center justify-self-end rounded-full border"
+                            style={{
+                              borderColor: x.done ? "var(--color-fg)" : "var(--color-faint)",
+                              background: x.done ? "var(--color-fg)" : "transparent",
+                              color: x.done ? "#000" : "var(--color-faint)",
+                            }}
+                          >
+                            <Check size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <div className="flex justify-between px-2 pt-1">
+                      <button
+                        onClick={() => s.addSet(e.id)}
+                        className="press flex h-10 items-center gap-1.5 whitespace-nowrap font-mono text-label font-medium text-muted active:text-fg"
+                      >
+                        <Plus size={14} />
+                        Add set
+                      </button>
+                      <button
+                        onClick={() => {
+                          const lastSet = e.sets[e.sets.length - 1];
+                          if (lastSet && e.sets.length > 1) s.removeSet(e.id, lastSet.id);
+                        }}
+                        disabled={e.sets.length < 2}
+                        className="press flex h-10 items-center whitespace-nowrap font-mono text-label font-medium text-dim active:text-muted disabled:opacity-40"
+                      >
+                        Remove last
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            </SwipeRow>
+          );
+        })}
+
+        {hint && (
+          <p className="mx-2 mt-0.5 shrink-0 text-[0.75rem] leading-normal text-dim">
+            Swipe an exercise left to remove it, right to replace it.
+          </p>
+        )}
+
+        <button
+          onClick={() => setSheet({ kind: "add" })}
+          className="press group mt-1 flex shrink-0 items-center gap-2.5 rounded-2xl border border-dashed border-faint px-4 py-[18px] text-left"
+        >
+          <span className="grid size-6 shrink-0 place-items-center rounded-full border border-faint text-fg transition-colors group-active:border-fg">
+            <Plus size={13} />
+          </span>
+          <span className="whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-fg">
+            Add exercise
+          </span>
+        </button>
+      </div>
+
+      {/*
+        The dock. The set in hand, large, with its steps and the button that
+        logs it; the rest between sets when there is one; and the way out once
+        everything is done.
+      */}
+      <div className="sticky bottom-0 z-20 shrink-0 border-t border-rule bg-[#0a0a0a] px-4 pb-[max(16px,calc(env(safe-area-inset-bottom)-4px))] pt-3">
+        {resting ? (
           <button
-            onClick={() => setPicker(true)}
-            className="press press-row group flex w-full items-center gap-2.5 px-5 pb-5 pt-4 text-left"
+            onClick={skipRest}
+            aria-label={`Resting, ${fmtClock(restLeft)} left. Skip rest`}
+            className="press relative flex h-14 w-full items-center justify-between overflow-hidden rounded-full border border-cardrule bg-card px-[22px]"
           >
-            <span className="grid size-6 shrink-0 place-items-center rounded-full border border-faint text-fg transition-colors group-active:border-fg">
-              <Plus size={13} />
+            <span
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 bg-[#242424] transition-[width] duration-1000 ease-linear"
+              style={{ width: `${Math.min(100, (restLeft / REST) * 100)}%` }}
+            />
+            <span className="relative whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted">
+              Rest
             </span>
-            <span className="whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-fg">
-              Add exercise
+            <span className="relative whitespace-nowrap font-mono text-[1.375rem] font-medium">
+              {fmtClock(restLeft)}
+            </span>
+            <span className="relative whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted">
+              Skip
             </span>
           </button>
-
-          <div className="border-t border-cardrule px-5 pb-5 pt-4">
-            <Eyebrow className="tracking-[0.18em]">Workout notes</Eyebrow>
-            <textarea
-              className="mt-2 w-full resize-none bg-transparent text-[0.9375rem] leading-relaxed outline-none placeholder:text-dim"
-              rows={2}
-              placeholder="How the session felt, what to change next time…"
-              value={session.note ?? ""}
-              onChange={(e) => s.setSessionNote(e.target.value)}
-            />
+        ) : fSet && f ? (
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5">
+            <button
+              onClick={() => openPad(f.entryId, f.setId, dockField)}
+              aria-label={`${dockLabel}, ${dockValue}. Tap to type`}
+              className="press flex min-w-24 flex-col gap-1 whitespace-nowrap text-left"
+            >
+              <span className="whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted">
+                {dockLabel}
+              </span>
+              <span className="whitespace-nowrap font-mono text-[1.625rem] font-medium leading-none tracking-[-0.03em]">
+                {dockValue}
+              </span>
+            </button>
+            <div className="flex justify-end gap-1.5">
+              {dockSteps.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => bump(dockField, d)}
+                  className="press h-11 min-w-12 whitespace-nowrap rounded-xl border border-cardrule bg-card px-2 font-mono text-[0.8125rem] font-medium"
+                >
+                  {(d > 0 ? "+" : "−") + num(Math.abs(d))}
+                  {dockField === "seconds" ? "s" : ""}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={logFocused}
+              aria-label="Log set"
+              className="press grid size-14 place-items-center rounded-full bg-fg text-black"
+            >
+              <Check size={22} />
+            </button>
           </div>
-        </section>
+        ) : workoutDone ? (
+          <button
+            onClick={() => setConfirmFinish(true)}
+            className="press h-14 w-full whitespace-nowrap rounded-full bg-fg font-mono text-[0.8125rem] font-semibold uppercase tracking-[0.14em] text-black"
+          >
+            Finish workout
+          </button>
+        ) : null}
       </div>
+
+      {toast && <UndoToast toast={toast} />}
 
       {workoutShare && (
         <WorkoutSharePreview
@@ -908,7 +999,11 @@ export function ActiveWorkout({
         <NumberPad
           open={!!pad}
           title={
-            shownPad.field === "weight" ? `Weight · ${weightLabel}` : "Reps"
+            shownPad.field === "weight"
+              ? `Weight · ${unit}`
+              : shownPad.field === "seconds"
+                ? "Seconds"
+                : "Reps"
           }
           value={
             (shownPad.buf ??
@@ -926,58 +1021,40 @@ export function ActiveWorkout({
         />
       )}
 
-      {exercisePicker}
-      {replacePicker}
+      {addSheet}
 
-      <Sheet open={!!menu} onClose={() => setMenu(null)} title="Exercise">
-        <div className="space-y-2.5">
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (menu) s.moveEntry(menu, -1);
-              setMenu(null);
-            }}
-          >
-            Move up
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (menu) s.moveEntry(menu, 1);
-              setMenu(null);
-            }}
-          >
-            Move down
-          </Button>
+      <Sheet
+        open={!!menu}
+        onClose={() => setMenu(null)}
+        title={menuEntry ? nameOf(menuEntry.exerciseId) : "Exercise"}
+      >
+        <div className="-mt-2 pb-[calc(env(safe-area-inset-bottom)+22px)]">
           {/*
-            The tap route to what a rightward swipe does. The gesture is faster
-            once you know it is there, and it is the only way to reach this from
-            a row in the list — but a swipe cannot be performed at all with
-            VoiceOver on, which claims that direction for its own navigation.
+            The tap route to what the two swipes do. The gestures are faster
+            once you know they are there — but a swipe cannot be performed at
+            all with VoiceOver on, which claims that direction for itself.
           */}
-          <Button
-            variant="outline"
+          <button
             onClick={() => {
-              if (menu) openSwap(menu);
+              if (menu) setSheet({ kind: "replace", entryId: menu });
               setMenu(null);
             }}
+            className="press flex h-14 w-full items-center gap-3.5 border-b border-subrule text-left text-[1rem]"
           >
-            Replace with another exercise
-          </Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (menu) {
-                s.removeEntry(menu);
-                // The focused exercise just left; fall back to whatever is next.
-                if (menu === openId) setOpenId(null);
-                setCursor(null);
-              }
+            <Swap size={18} />
+            Replace exercise
+          </button>
+          <button
+            onClick={async () => {
+              const id = menu;
               setMenu(null);
+              if (id && (await askRemove(id))) remove(id);
             }}
+            className="press flex h-14 w-full items-center gap-3.5 text-left text-[1rem] text-danger"
           >
-            Remove from workout
-          </Button>
+            <Trash size={18} />
+            Remove exercise
+          </button>
         </div>
       </Sheet>
 
@@ -986,52 +1063,21 @@ export function ActiveWorkout({
   );
 }
 
-/**
- * How far into the exercise you are, drawn rather than spelled.
- *
- * The set list below already says which one is live — it lifts that row off the
- * card and writes NOW against it — so "Set 2 of 4" in the header was the same
- * fact a second time, in the one line on this screen with the least room for
- * it. Four marks carry it at a glance and hand the header back to the exercise.
- *
- * A dot fills once its set is settled, and the one you are on is filled too:
- * the mark means "reached", not "finished", which is what makes the row of them
- * read the way the sentence did. Skipped counts as reached, because the sentence
- * counted it too — the strikethrough in the list is where that distinction
- * lives.
- *
- * `faint` is the unfilled tone. This is that token's whole purpose: a mark
- * carrying no words, held to the 3:1 that non-text graphics need rather than to
- * the text minimum. The sentence itself is kept as the label, because someone
- * listening to this screen should not lose what the dots replaced.
- */
-function SetDots({ sets, at }: { sets: SetLog[]; at: number }) {
+/** What was just done, and the one tap that takes it back. */
+function UndoToast({ toast }: { toast: Toast }) {
   return (
-    <span
-      role="img"
-      aria-label={
-        at >= 0 ? `Set ${at + 1} of ${sets.length}` : `${sets.length} sets`
-      }
-      className="flex items-center gap-[5px]"
+    <div
+      role="status"
+      className="animate-rise fixed inset-x-4 bottom-[calc(max(16px,calc(env(safe-area-inset-bottom)-4px))+100px)] z-30 mx-auto flex h-13 max-w-md items-center justify-between gap-3 rounded-[14px] border border-cardrule bg-rule pl-4 pr-2"
     >
-      {sets.map((x, i) => {
-        const filled = settled(x) || i === at;
-        return (
-          <span
-            key={x.id}
-            aria-hidden="true"
-            /* The fill is the only thing that moves when a set is logged, and
-               it is worth seeing happen — the same colour transition every
-               other control on this screen uses, at the same speed. */
-            className="size-1.5 shrink-0 rounded-full border transition-colors duration-[112ms]"
-            style={{
-              borderColor: filled ? "var(--color-fg)" : "var(--color-faint)",
-              background: filled ? "var(--color-fg)" : "transparent",
-            }}
-          />
-        );
-      })}
-    </span>
+      <span className="min-w-0 truncate text-[0.875rem]">{toast.text}</span>
+      <button
+        onClick={toast.undo}
+        className="press h-11 whitespace-nowrap px-3 font-mono text-label font-semibold uppercase tracking-[0.16em] underline underline-offset-[5px]"
+      >
+        Undo
+      </button>
+    </div>
   );
 }
 
@@ -1088,57 +1134,6 @@ function Header({
     </header>
   );
 }
-
-/**
- * One number, sized to be hit without looking, flanked by a step either way.
- * The number itself is the button that opens the pad, so a coarse adjustment
- * and an exact one are the same control.
- *
- * Boxed in the ground colour on a raised card: two of these sit side by side,
- * and without a box of their own the pair read as four loose buttons in a row
- * rather than as two dials. Black rather than a lighter grey because these are
- * wells you set a number into, not more panels stacked on the panel.
- */
-function Dial({
-  label,
-  value,
-  dim,
-  onLess,
-  onMore,
-  onEdit,
-}: {
-  label: string;
-  value: string;
-  dim: boolean;
-  onLess: () => void;
-  onMore: () => void;
-  onEdit: () => void;
-}) {
-  const step =
-    "press grid size-11 shrink-0 place-items-center text-muted active:text-fg";
-  return (
-    <div className="flex min-w-0 items-center justify-center gap-0.5 rounded-2xl border border-cardrule bg-ink py-2.5">
-      <button onClick={onLess} aria-label={`Less ${label}`} className={step}>
-        <Minus size={18} />
-      </button>
-      <button onClick={onEdit} className="press min-w-0 flex-1 text-center">
-        <span
-          className="block font-mono text-[2.125rem] font-medium leading-none tracking-[-0.035em]"
-          style={{ color: dim ? DIM : undefined }}
-        >
-          {value}
-        </span>
-        <span className="mt-1.5 block font-mono text-label font-semibold uppercase tracking-[0.2em] text-muted">
-          {label}
-        </span>
-      </button>
-      <button onClick={onMore} aria-label={`More ${label}`} className={step}>
-        <Plus size={18} />
-      </button>
-    </div>
-  );
-}
-
 /**
  * The card that says the workout is over.
  *
