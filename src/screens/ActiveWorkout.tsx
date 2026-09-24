@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
 import { AddExerciseSheet } from "../components/AddExerciseSheet";
@@ -618,12 +618,10 @@ export function ActiveWorkout({
           const all = e.sets.length > 0 && e.sets.every(settled);
           const exp = e.id === openEntry?.id;
           const prev = lastPerformance(s.sessions, e.exerciseId, session.id);
-          const first = e.sets[0];
-          const status = all
-            ? "Complete"
-            : d
-              ? `${d} of ${e.sets.length} sets`
-              : `${e.sets.length} × ${first ? (timed ? fmtClock(first.seconds ?? 0) : first.reps) : 0}${first?.weight ? ` · ${num(first.weight)} ${unit}` : ""}`;
+          // The header says one thing beside the name: that this exercise
+          // has beaten your best today. Progress is already in the table and
+          // in the mark on the left.
+          const pr = e.sets.some((x) => isPR(e.exerciseId, x));
           return (
             <SwipeRow
               key={e.id}
@@ -670,9 +668,11 @@ export function ActiveWorkout({
                     >
                       {name}
                     </span>
-                    <span className="whitespace-nowrap font-mono text-label font-medium text-muted">
-                      {status}
-                    </span>
+                    {pr && (
+                      <span className="whitespace-nowrap rounded-full border border-faint px-1.5 py-0.5 font-mono text-[0.5625rem] font-semibold tracking-[0.14em] text-fg">
+                        PR
+                      </span>
+                    )}
                   </button>
                   <button
                     onClick={() => setMenu(e.id)}
@@ -699,25 +699,35 @@ export function ActiveWorkout({
                       const strike = x.skipped ? "line-through" : undefined;
                       const cell = (which: Field, text: string) => {
                         const lit = on && dockField === which;
+                        const focus = () => {
+                          setFocus({ entryId: e.id, setId: x.id });
+                          setField(which === "weight" ? "value" : "reps");
+                        };
                         return (
-                          <button
-                            onClick={() => {
+                          <ScrubCell
+                            value={x[which] ?? 0}
+                            step={
+                              which === "weight"
+                                ? unitKey === "lb" ? 1 : 0.5
+                                : which === "seconds"
+                                  ? HOLD_STEP
+                                  : 1
+                            }
+                            onScrub={(v) => write(e.id, x.id, which, v)}
+                            onScrubStart={focus}
+                            onTap={() => {
                               // A second tap on the number already in the dock
                               // opens the keypad, for typing it outright.
                               if (lit) openPad(e.id, x.id, which);
-                              setFocus({ entryId: e.id, setId: x.id });
-                              setField(which === "weight" ? "value" : "reps");
+                              focus();
                             }}
-                            aria-label={`Set ${j + 1} ${which === "weight" ? bwLabel(e.exerciseId) : which}`}
-                            className="press h-10 whitespace-nowrap rounded-[10px] border bg-ink font-mono text-[1.0625rem] font-medium"
-                            style={{
-                              borderColor: lit ? "var(--color-fg)" : "var(--color-cardrule)",
-                              color: tone,
-                              textDecoration: strike,
-                            }}
+                            label={`Set ${j + 1} ${which === "weight" ? bwLabel(e.exerciseId) : which}`}
+                            lit={lit}
+                            color={tone}
+                            strike={strike}
                           >
                             {text}
-                          </button>
+                          </ScrubCell>
                         );
                       };
                       return (
@@ -729,13 +739,30 @@ export function ActiveWorkout({
                           <span className="whitespace-nowrap font-mono text-[0.8125rem] font-medium text-muted">
                             {j + 1}
                           </span>
-                          <span className="truncate whitespace-nowrap font-mono text-[0.8125rem] text-dim">
-                            {p
-                              ? timed
-                                ? fmtClock(p.seconds ?? 0)
-                                : `${num(p.weight)} × ${p.reps}`
-                              : "—"}
-                          </span>
+                          {p ? (
+                            // Last time's set, and a tap copies it into this
+                            // one — the quickest way to repeat what you did.
+                            <button
+                              onClick={() => {
+                                s.updateSet(
+                                  e.id,
+                                  x.id,
+                                  timed
+                                    ? { weight: p.weight, seconds: p.seconds ?? 0 }
+                                    : { weight: p.weight, reps: p.reps },
+                                );
+                                setFocus({ entryId: e.id, setId: x.id });
+                              }}
+                              aria-label={`Copy last time's ${
+                                timed ? fmtClock(p.seconds ?? 0) : `${num(p.weight)} × ${p.reps}`
+                              } into set ${j + 1}`}
+                              className="press -my-2 h-10 truncate whitespace-nowrap text-left font-mono text-[0.8125rem] text-dim active:text-fg"
+                            >
+                              {timed ? fmtClock(p.seconds ?? 0) : `${num(p.weight)} × ${p.reps}`}
+                            </button>
+                          ) : (
+                            <span className="font-mono text-[0.8125rem] text-dim">—</span>
+                          )}
                           {cell("weight", num(x.weight))}
                           {timed
                             ? cell("seconds", fmtClock(x.seconds ?? 0))
@@ -1013,6 +1040,131 @@ export function ActiveWorkout({
 
       {finishSheet}
     </div>
+  );
+}
+
+/** Sideways travel, in pixels, for each step a dragged number moves. */
+const SCRUB_PX = 10;
+/** Movement before a press declares itself a drag, or a scroll. */
+const SCRUB_SLOP = 6;
+
+/**
+ * A number in the set table that can be tapped or dragged.
+ *
+ * A tap points the dock at it, as before. Held and pulled sideways it counts —
+ * right for more, left for less, one step per ten pixels — so the small
+ * corrections mid-set are a flick of the thumb rather than a trip to the dock.
+ * Vertical movement is left to the page: whichever way the finger first goes
+ * decides, and a scroll that starts on a cell is still a scroll.
+ */
+function ScrubCell({
+  value,
+  step,
+  onScrub,
+  onScrubStart,
+  onTap,
+  label,
+  lit,
+  color,
+  strike,
+  children,
+}: {
+  value: number;
+  step: number;
+  onScrub: (v: number) => void;
+  onScrubStart: () => void;
+  onTap: () => void;
+  label: string;
+  lit: boolean;
+  color: string;
+  strike?: string;
+  children: ReactNode;
+}) {
+  const drag = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    from: number;
+    last: number;
+    live: boolean | null;
+  } | null>(null);
+  // The browser raises a click at the end of a drag; this is what drops it.
+  const scrubbed = useRef(false);
+  const [active, setActive] = useState(false);
+
+  function end(e: React.PointerEvent<HTMLButtonElement>) {
+    if (drag.current?.id !== e.pointerId) return;
+    drag.current = null;
+    setActive(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+  }
+
+  return (
+    <button
+      onPointerDown={(e) => {
+        drag.current = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          from: value,
+          last: value,
+          live: null,
+        };
+        scrubbed.current = false;
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId || d.live === false) return;
+        const dx = e.clientX - d.x;
+        const dy = e.clientY - d.y;
+        if (d.live === null) {
+          if (Math.abs(dx) < SCRUB_SLOP && Math.abs(dy) < SCRUB_SLOP) return;
+          if (Math.abs(dy) > Math.abs(dx)) {
+            d.live = false;
+            return;
+          }
+          d.live = true;
+          scrubbed.current = true;
+          setActive(true);
+          onScrubStart();
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* the pointer is already gone */
+          }
+        }
+        const steps = Math.trunc(dx / SCRUB_PX);
+        const next = Math.max(0, Math.round((d.from + steps * step) * 100) / 100);
+        if (next !== d.last) {
+          d.last = next;
+          onScrub(next);
+        }
+      }}
+      onPointerUp={end}
+      onPointerCancel={end}
+      onClick={() => {
+        if (scrubbed.current) {
+          scrubbed.current = false;
+          return;
+        }
+        onTap();
+      }}
+      aria-label={label}
+      className="press h-10 cursor-ew-resize select-none whitespace-nowrap rounded-[10px] border bg-ink font-mono text-[1.0625rem] font-medium"
+      style={{
+        // Sideways is ours, up and down still scrolls the workout.
+        touchAction: "pan-y",
+        borderColor: lit || active ? "var(--color-fg)" : "var(--color-cardrule)",
+        color,
+        textDecoration: strike,
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
