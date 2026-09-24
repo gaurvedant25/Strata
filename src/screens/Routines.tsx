@@ -23,7 +23,7 @@ export function Routines({
   onLocked,
 }: {
   onOpenLogger: () => void;
-  /** Opens the subscription sheet when the preview has been spent. */
+  /** Says the preview has ended, when it has been spent and there is no plan. */
   onLocked: () => void;
 }) {
   const s = useStore();
@@ -134,8 +134,10 @@ export function Routines({
                     return;
                   }
                   if (!canStart) {
+                    // Refused: the thumb springs home and the preview's own
+                    // ending notice says why.
                     onLocked();
-                    return;
+                    return false;
                   }
                   void s.startSession(hero);
                 }}

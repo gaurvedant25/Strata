@@ -19,19 +19,18 @@ export const PREVIEW_DAYS = 7;
 /**
  * Whether the free tier's write lockout is armed.
  *
- * False until a store can actually take a payment. Everything else about the
- * subscription ships — the preview, its notices, the paywall, the plan screen,
- * the Pro feature gates — but nobody is ever stopped from logging, because the
- * end of a lockout has to be a checkout and there is not one yet. Arming it
- * without billing would give every existing user a week and then a wall they
- * could not pay through, and `pro_preview_consumed` is written once per account
- * forever, so rolling a deploy back would not give that week back.
+ * Armed: once the preview week is spent and there is no subscription, a new
+ * workout cannot be started. Everything already recorded stays open to read.
  *
- * Flip to `true` in the same change that makes `billing.ready` true. It drives
- * the gate, the paywall's benefit list and the free-features list together, so
- * one edit keeps all three honest at once.
+ * Only the Android build can take a payment today (Play Billing); the web and
+ * iOS builds run `Unconfigured`, so a lapsed preview there meets the wall
+ * without a checkout behind it until those stores are wired. The owner chose
+ * the lockout knowing that.
+ *
+ * It drives the gate, the paywall's benefit list and the free-features list
+ * together, so this one switch keeps all three honest at once.
  */
-export const LOCKOUT_ARMED = false;
+export const LOCKOUT_ARMED = true;
 export const DAY_MS = 86_400_000;
 
 export type EntitlementState = "free" | "pro_preview" | "subscribed" | "expired";

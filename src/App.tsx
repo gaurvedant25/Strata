@@ -360,7 +360,9 @@ export default function App() {
           {tab === "routines" && (
             <Routines
               onOpenLogger={() => setViewLogger(true)}
-              onLocked={() => setPaywall(true)}
+              // The same notice the app raises when the preview runs out, so a
+              // refused start reads as that ending rather than as a price list.
+              onLocked={() => setExpiryOpen(true)}
             />
           )}
           {tab === "history" && <History onUnlock={openGate} />}

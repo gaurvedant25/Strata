@@ -54,7 +54,11 @@ export function SlideToStart({
 }: {
   /** Names what is being started or resumed, for the accessible name. */
   label: string;
-  onStart: () => void;
+  /**
+   * Returning `false` refuses the slide — the thumb springs home rather than
+   * staying thrown at the end, since nothing is about to take over the screen.
+   */
+  onStart: () => void | false;
   disabled?: boolean;
   /**
    * What the slide will actually do. A workout already running is not started
@@ -176,25 +180,32 @@ export function SlideToStart({
       // thrown when the screen it opens takes over.
       paint(max, max);
       armed.current = false;
-      onStart();
+      if (onStart() !== false) return;
+      settle(max, max);
       return;
     }
 
     const rect = track.current?.getBoundingClientRect();
-    const from = rect
-      ? Math.max(
-          0,
-          Math.min(
-            max,
-            (trail.current[trail.current.length - 1]?.x ?? rect.left) -
-              rect.left -
-              BORDER -
-              INSET -
-              THUMB / 2,
-          ),
-        )
-      : 0;
+    settle(
+      rect
+        ? Math.max(
+            0,
+            Math.min(
+              max,
+              (trail.current[trail.current.length - 1]?.x ?? rect.left) -
+                rect.left -
+                BORDER -
+                INSET -
+                THUMB / 2,
+            ),
+          )
+        : 0,
+      max,
+    );
+  }
 
+  /** Home from wherever the thumb was let go. */
+  function settle(from: number, max: number) {
     if (reduced()) {
       paint(0, max);
       return;
