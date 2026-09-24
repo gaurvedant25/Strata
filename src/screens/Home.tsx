@@ -646,6 +646,10 @@ export function Home({
    * It fails towards saving: an unreachable server, a refusal or a rate limit
    * all come back false, and a real weigh-in is never lost to a network
    * problem.
+    *
+   * Which is why opening this box is never behind the write gate. Someone
+   * whose preview has ended has to be able to reach it to unlock Pro at all,
+   * and a weigh-in is a reading, not a workout.
    */
   async function saveBw() {
     const raw = bw.replace(",", ".").trim();
@@ -706,8 +710,10 @@ export function Home({
             eyebrow="Nothing scored yet"
             title="Every score here is a lift measured against your bodyweight."
             body="Nothing shows up until we know what you weigh."
+            // Never gated — see `saveBw`: this box is also where the unlock
+            // code is entered, so it has to open after the preview ends.
             action={
-              <Button onClick={guard(() => setBwOpen(true))}>Log body weight</Button>
+              <Button onClick={() => setBwOpen(true)}>Log body weight</Button>
             }
           />
           {/* The empty state is exactly where the explanation is most worth
@@ -801,7 +807,9 @@ export function Home({
                 onChange={setView}
               />
               <button
-                onClick={guard(() => setBwOpen(true))}
+                // Not gated, like the button above: logging a weigh-in stays
+                // open after the preview, and it is how the unlock code is entered.
+                onClick={() => setBwOpen(true)}
                 aria-label={`Body weight ${num(latestBw.weight)} ${unitLabel}, tap to update`}
                 // No box, so the figure aligns to the content edge like everything
                 // else on the screen. `min-w-11` keeps the target at 44px now that
