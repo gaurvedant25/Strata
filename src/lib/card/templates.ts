@@ -1,33 +1,29 @@
-import { TIER_COLOR, TIER_LEVEL, tierInk } from "../strength";
 import { liftMoment, liftPoster, liftJourney } from "./liftTemplates";
 import { WORKOUT_TEMPLATES } from "./workoutTemplates";
+import { BODY_TEMPLATES } from "./bodyTemplates";
 import {
   MARGIN,
   header,
   room,
-  ruledList,
   stack,
   statBand,
 } from "./chrome";
 import {
   glow,
   ground,
-  measure,
   pill,
   rule,
   text,
 } from "./draw";
-import { drawFigure } from "./figure";
 import {
   CARDRULE,
   EMBER,
   EMBER_RGB,
-  FAINT,
   FG,
   INK,
   MUTED,
 } from "./tokens";
-import type { BodyData, CardSubject, CardTemplate } from "./types";
+import type { CardSubject, CardTemplate } from "./types";
 
 /**
  * Every card the app can send.
@@ -164,121 +160,6 @@ const streakGrid: CardTemplate<"streak"> = {
 };
 
 
-// ─── Body ────────────────────────────────────────────────────────────────────
-
-/** The three strongest regions, as a band. */
-const regionBand = (d: BodyData) =>
-  d.top.slice(0, 3).map((t) => ({ label: t.label, value: t.value }));
-
-const bodyLit: CardTemplate<"body"> = {
-  id: "body/lit",
-  name: "Lit",
-  subject: "body",
-  fits: (d) => Object.keys(d.scores).length > 0,
-  draw(L, d) {
-    ground(L, INK);
-    const top = header(L, d.dateLabel);
-    const bandTop = statBand(L, regionBand(d));
-
-    const capH = 13;
-    drawFigure(
-      L,
-      { x: MARGIN, y: top + 5, w: 100 - MARGIN * 2, h: bandTop - top - capH - 10 },
-      d,
-    );
-
-    const label = d.headline.tier
-      ? `${d.headline.label} · ${d.headline.tier}`
-      : d.headline.label;
-    text(L, label, 50, bandTop - capH + 2, {
-      size: 3.6, weight: 600, track: 0.24, caps: true, align: "center",
-      color: d.headline.tier ? TIER_COLOR[d.headline.tier] : MUTED,
-      maxW: 100 - MARGIN * 2,
-    });
-  },
-};
-
-const bodyRoster: CardTemplate<"body"> = {
-  id: "body/roster",
-  name: "The roster",
-  subject: "body",
-  fits: (d) => d.top.length >= 3,
-  draw(L, d) {
-    ground(L, INK);
-    const top = header(L, d.dateLabel);
-
-    // Figure down the left, the ladder down the right. The one card that reads
-    // as a document rather than a poster, and the only one that says how the
-    // whole body is doing rather than picking a winner.
-    const figW = 38;
-    drawFigure(
-      L,
-      { x: MARGIN, y: top + 6, w: figW, h: L.H - top - 20 },
-      d,
-    );
-
-    const x = MARGIN + figW + 5;
-    const w = 100 - x - MARGIN;
-    const rows = d.top.slice(0, 6);
-    const listH = rows.length * 8.2 + 4;
-    let y = Math.max(top + 12, L.H * 0.5 - listH / 2);
-    text(L, "Strongest", x, y, {
-      size: 3.3, weight: 600, track: 0.2, caps: true, color: FAINT,
-    });
-    y += 7;
-    ruledList(
-      L,
-      { x, y, w },
-      rows.map((t) => ({ left: t.label, right: t.value, color: t.color })),
-      { size: 4.2, gap: 8.6 },
-    );
-  },
-};
-
-const bodyTier: CardTemplate<"body"> = {
-  id: "body/tier",
-  name: "The tier",
-  subject: "body",
-  fits: (d) => !!d.headline.tier,
-  draw(L, d) {
-    ground(L, INK);
-    const top = header(L, d.dateLabel);
-    const bandTop = statBand(L, regionBand(d));
-    const tier = d.headline.tier!;
-    const colour = TIER_COLOR[tier];
-
-    // A solid patch of the rung's own colour, with the ink picked off it by
-    // luminance the same way the app does — so a relit palette stays readable
-    // here without anything in this file changing.
-    const size = 7.6;
-    const w = measure(L, tier, { size, weight: 600, track: 0.2, caps: true }).width;
-    const padX = 6;
-    const patchH = 15;
-    const patchY = top + (bandTop - top) * 0.3;
-    pill(L, 50 - (w + padX * 2) / 2, patchY, w + padX * 2, patchH, colour);
-    text(L, tier, 50, patchY + 4.6, {
-      size, weight: 600, track: 0.2, caps: true, color: tierInk(colour), align: "center",
-    });
-
-    text(L, TIER_LEVEL[tier], 50, patchY + patchH + 6, {
-      size: 4, weight: 600, track: 0.26, caps: true, color: MUTED, align: "center",
-      maxW: 100 - MARGIN * 2,
-    });
-    text(L, `${d.headline.label} · ${d.headline.value} ${d.headline.unit}`, 50, patchY + patchH + 13, {
-      size: 3.3, weight: 600, track: 0.2, caps: true, color: FAINT, align: "center",
-      maxW: 100 - MARGIN * 2,
-    });
-
-    const figTop = patchY + patchH + 22;
-    drawFigure(
-      L,
-      { x: 25, y: figTop, w: 50, h: bandTop - figTop - 5 },
-      d,
-    );
-  },
-};
-
-
 /**
  * The whole set, in the order they are rotated through.
  *
@@ -293,9 +174,7 @@ export const TEMPLATES: CardTemplate[] = [
   liftMoment,
   liftPoster,
   liftJourney,
-  bodyLit,
-  bodyRoster,
-  bodyTier,
+  ...BODY_TEMPLATES,
   ...WORKOUT_TEMPLATES,
 ] as CardTemplate[];
 

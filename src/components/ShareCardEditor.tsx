@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { LiftData, WorkoutData } from "../lib/card/types";
+import type { BodyData, LiftData, WorkoutData } from "../lib/card/types";
 import { DEFAULT_OVERLAY, type Layout, type OverlayTransform } from "../lib/card/draw";
 import { useShareDeck } from "../lib/card/useShareDeck";
 import { ShareSheet } from "./ShareSheet";
@@ -7,7 +7,9 @@ import { SharePhotoPrompt } from "./SharePhotoPrompt";
 
 /** Mounted only while open: photos and the frozen payload belong to this preview. */
 export function ShareCardEditor({ data, subject, onClose, onUnlock }: (
-  { subject: "lift"; data: LiftData } | { subject: "workout"; data: WorkoutData }
+  | { subject: "lift"; data: LiftData }
+  | { subject: "workout"; data: WorkoutData }
+  | { subject: "body"; data: BodyData }
 ) & { onClose: () => void; onUnlock?: () => void }) {
   const [frozen] = useState(data);
   // Share opens on the photo question. Nothing is rendered until it is answered.
@@ -16,7 +18,9 @@ export function ShareCardEditor({ data, subject, onClose, onUnlock }: (
   const [photo, setPhoto] = useState<Layout["photo"]>();
   const [photoError, setPhotoError] = useState("");
   const [loadingPhoto, setLoadingPhoto] = useState(false);
-  const [selected, setSelected] = useState(subject === "lift" ? "lift/moment" : "workout/streak");
+  const [selected, setSelected] = useState(
+    subject === "lift" ? "lift/moment" : subject === "body" ? "body/poster" : "workout/streak",
+  );
   const [editTarget, setEditTarget] = useState<"photo" | "stats">("stats");
   const [overlayColor, setOverlayColor] = useState("#ffffff");
   const [overlaySettings, setOverlaySettings] = useState<Record<string, OverlayTransform>>({});

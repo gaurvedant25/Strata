@@ -10,7 +10,7 @@ import { Button, Eyebrow } from "./ui";
  * the photo lands centred in the frame and is adjusted in the editor itself.
  */
 export function SharePhotoPrompt({ subject, busy, error, onChoose, onSkip, onClose }: {
-  subject: "lift" | "workout";
+  subject: "lift" | "workout" | "body";
   busy: boolean;
   error?: string;
   onChoose: (file?: File) => void;

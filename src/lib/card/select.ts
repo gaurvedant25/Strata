@@ -184,6 +184,7 @@ export function bodyCard(
   // Strongest first, by the score the body chart lights each region with.
   const ranked = [...entries].sort((a, b) => b[1].score - a[1].score);
   const top = ranked.map(([group, sc]) => ({
+    group,
     label: MUSCLE_LABEL[group] ?? group,
     tier: sc.tier as Tier,
     color: sc.color,

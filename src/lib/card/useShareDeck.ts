@@ -51,7 +51,7 @@ export function useShareDeck(
   const [outcome, setOutcome] = useState<ShareOutcome | null>(null);
   const [sending, setSending] = useState(false);
   const [retry, setRetry] = useState(0);
-  const layered = (subject === "lift" || subject === "workout") && overlays != null;
+  const layered = (subject === "lift" || subject === "workout" || subject === "body") && overlays != null;
   const photoPresent = !!photo;
   const photoImage = photo?.image;
   const layerPhoto = useMemo<Layout["photo"]>(() => photoImage

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { bodyCard } from "../lib/card/select";
-import { useShareCard } from "../lib/card/useShareCard";
 import { BodyMap, type BodyView, type Callouts } from "../components/BodyMap";
 import { drawnInView, groupsInView } from "../lib/anatomy/anchors";
 import { LogBestSet } from "../components/LogBestSet";
+import { ShareCardEditor } from "../components/ShareCardEditor";
 import { RankIntroCard, useRankIntro } from "../components/RankIntroCard";
 import { RankingGuide } from "../components/RankingGuide";
 import { Numeral, resetNumerals } from "../components/Numeral";
@@ -439,11 +439,9 @@ export function Home({
   );
 
   /*
-   * The body chart as a picture, drawn before the button is pressed.
-   *
-   * `scores` is already memoised above, so building this costs a few strings
-   * rather than a second pass over every session — and the drawing itself
-   * happens off in the hook, once, when the numbers change.
+   * The body chart as share data. `scores` is already memoised above, so this
+   * costs a few strings rather than a second pass over every session; the
+   * cards themselves are drawn by the share editor once it is opened.
    */
   const bodyData = useMemo(
     () =>
@@ -452,11 +450,7 @@ export function Home({
         : null,
     [scores, s.settings.gender, view, unitLabel],
   );
-  const shareCard = useShareCard(
-    bodyData && "body",
-    bodyData,
-    `gym-log-body-${todayKey()}.png`,
-  );
+  const [sharing, setSharing] = useState(false);
 
   // Leaving the tab unmounts this screen; forgetting its figures means coming
   // back scrambles rather than rolling from the region shown last time.
@@ -674,9 +668,9 @@ export function Home({
         <div className="-my-3 -mr-3 flex items-center">
           {/* Only offered once there is something lit to send. An unscored
               figure is a picture of nothing. */}
-          {shareCard.ready && (
+          {bodyData && (
             <button
-              onClick={guard(shareCard.share)}
+              onClick={guard(() => setSharing(true))}
               aria-label="Share body chart"
               className="grid size-11 place-items-center text-muted active:text-fg"
             >
@@ -1048,6 +1042,18 @@ export function Home({
         benchmark={benchmarkLift(active, s.settings.benchmarks)}
         unitLabel={unitLabel}
       />
+
+      {sharing && bodyData && (
+        <ShareCardEditor
+          subject="body"
+          data={bodyData}
+          onClose={() => setSharing(false)}
+          onUnlock={() => {
+            setSharing(false);
+            onUnlock("premium-share");
+          }}
+        />
+      )}
     </div>
   );
 }

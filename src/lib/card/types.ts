@@ -53,7 +53,7 @@ export type BodyData = {
   scores: Partial<Record<MuscleGroup, MuscleScore>>;
   dateLabel: string;
   /** Strongest first. */
-  top: { label: string; tier: Tier; color: string; value: string }[];
+  top: { group: MuscleGroup; label: string; tier: Tier; color: string; value: string }[];
   /**
    * The one region the card leads with.
    *

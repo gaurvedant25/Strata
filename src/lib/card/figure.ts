@@ -16,9 +16,8 @@ import type { Layout } from "./draw";
  *
  * Two things are deliberately not carried over. The ten-layer depth laminate
  * exists to give a figure you can *turn* some volume, and a still card is at
- * rest, where it only smears. And the two stacked CSS drop-shadows become two
- * canvas shadow passes — which is where the one real trap in this file lives,
- * below.
+ * rest, where it only smears. And the glow is left off: a shared card draws
+ * the figure flat, with each muscle in its tier's colour and nothing around it.
  */
 
 /** Parsed once per path string and kept for the life of the app. */
@@ -94,45 +93,13 @@ export function drawFigure(
   const originY = (box.y + (box.h - drawnH) / 2) * u;
 
   ctx.save();
-  ctx.setTransform(scale, 0, 0, scale, originX - vx * scale, originY - vy * scale);
+  // Built on whatever transform is already in force rather than replacing it,
+  // so a figure drawn inside a card's moveable layer moves with that layer.
+  ctx.translate(originX - vx * scale, originY - vy * scale);
+  ctx.scale(scale, scale);
 
-  // Everything lit, grouped by muscle. One glow per group rather than per
-  // path: the paths of a group touch, so the halo is the same picture, and it
-  // is a third of the fills.
-  const lit = new Map<MuscleGroup, Path2D>();
-  for (const part of parts) {
-    const group = groupForSlug(part.slug);
-    if (!group || !scores[group]) continue;
-    let p = lit.get(group);
-    if (!p) {
-      p = new Path2D();
-      lit.set(group, p);
-    }
-    for (const d of partPaths(part)) p.addPath(pathOf(d).path);
-  }
-
-  /*
-   * The trap.
-   *
-   * `shadowBlur` is measured in the canvas' own pixels and is NOT scaled by
-   * the transform, unlike every other length here. The figure on a card is
-   * drawn some three times the size it appears on screen, so the component's
-   * radii have to be multiplied by the scale by hand. Left alone, the glow
-   * comes out as a hairline rim and the whole card looks dead.
-   */
-  for (const [group, path] of lit) {
-    const sc = scores[group]!;
-    ctx.save();
-    ctx.fillStyle = sc.color;
-    ctx.shadowColor = sc.color;
-    ctx.shadowBlur = (3 + sc.score * 7) * scale;
-    ctx.fill(path);
-    ctx.shadowBlur = (9 + sc.score * 20) * scale;
-    ctx.fill(path);
-    ctx.restore();
-  }
-
-  // Then the bodies of the muscles themselves, each with its own sheen.
+  // The muscles, each with its own sheen. No glow: on a card the figure is
+  // drawn flat, so the tier colours read as colours rather than as light.
   for (const part of parts) {
     const group = groupForSlug(part.slug);
     const sc = group ? scores[group] : undefined;
@@ -163,7 +130,6 @@ export function drawFigure(
   }
 
   ctx.restore();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
   return {
     x: originX / u,
     y: originY / u,
