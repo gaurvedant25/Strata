@@ -81,16 +81,8 @@ type Focus = { entryId: string; setId: string };
 type SheetState = { kind: "add" } | { kind: "replace"; entryId: string };
 type Toast = { text: string; undo: () => void };
 
-/** How long the rest between sets runs, in seconds. */
-const REST = 90;
 /** How long an Undo stays on offer. */
 const TOAST_MS = 4000;
-/**
- * When each workout's rest ends. Module-level for the same reason `celebrated`
- * is: stepping out of the logger unmounts it, and the rest you were in the
- * middle of should still be running when you come back.
- */
-const restUntil = new Map<string, number>();
 /** Set once the swipe has been used, which is when its explanation can go. */
 const HINT_KEY = "gym:swipe-hint-seen";
 function hintSeen() {
@@ -198,7 +190,6 @@ export function ActiveWorkout({
     markHintSeen();
     setHint(false);
   }
-  const [, rerender] = useState(0);
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
@@ -287,20 +278,6 @@ export function ActiveWorkout({
     (t, e) => t + e.sets.filter((x) => isPR(e.exerciseId, x)).length,
     0,
   );
-
-  const restLeft = Math.max(
-    0,
-    Math.ceil(((restUntil.get(session.id) ?? 0) - s.now) / 1000),
-  );
-  const resting = restLeft > 0 && !workoutDone;
-  function startRest() {
-    restUntil.set(session.id, Date.now() + REST * 1000);
-    rerender((n) => n + 1);
-  }
-  function skipRest() {
-    restUntil.delete(session.id);
-    rerender((n) => n + 1);
-  }
 
   function showToast(text: string, undo: () => void) {
     window.clearTimeout(toastTimer.current);
@@ -391,7 +368,6 @@ export function ActiveWorkout({
   function logFocused() {
     if (!f || !fEntry || !fSet || fSet.done) return;
     s.updateSet(f.entryId, f.setId, { done: true, skipped: false });
-    startRest();
     const i = fEntry.sets.indexOf(fSet);
     const nx = fEntry.sets.find((y, k) => k > i && !settled(y));
     if (nx) {
@@ -771,7 +747,6 @@ export function ActiveWorkout({
                                 return;
                               }
                               s.updateSet(e.id, x.id, { done: true, skipped: false });
-                              startRest();
                               const nx = e.sets.find((y, k) => k > j && !settled(y));
                               setFocus(nx ? { entryId: e.id, setId: nx.id } : null);
                             }}
@@ -836,32 +811,10 @@ export function ActiveWorkout({
 
       {/*
         The dock. The set in hand, large, with its steps and the button that
-        logs it; the rest between sets when there is one; and the way out once
-        everything is done.
+        logs it, and the way out once everything is done.
       */}
       <div className="sticky bottom-0 z-20 shrink-0 border-t border-rule bg-[#0a0a0a] px-4 pb-[max(16px,calc(env(safe-area-inset-bottom)-4px))] pt-3">
-        {resting ? (
-          <button
-            onClick={skipRest}
-            aria-label={`Resting, ${fmtClock(restLeft)} left. Skip rest`}
-            className="press relative flex h-14 w-full items-center justify-between overflow-hidden rounded-full border border-cardrule bg-card px-[22px]"
-          >
-            <span
-              aria-hidden="true"
-              className="absolute inset-y-0 left-0 bg-[#242424] transition-[width] duration-1000 ease-linear"
-              style={{ width: `${Math.min(100, (restLeft / REST) * 100)}%` }}
-            />
-            <span className="relative whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted">
-              Rest
-            </span>
-            <span className="relative whitespace-nowrap font-mono text-[1.375rem] font-medium">
-              {fmtClock(restLeft)}
-            </span>
-            <span className="relative whitespace-nowrap font-mono text-label font-semibold uppercase tracking-[0.16em] text-muted">
-              Skip
-            </span>
-          </button>
-        ) : fSet && f ? (
+        {fSet && f ? (
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2.5">
             <button
               onClick={() => openPad(f.entryId, f.setId, dockField)}

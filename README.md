@@ -10,7 +10,6 @@ no developer fee, no account, no server. Every workout is stored in IndexedDB **
 - **Routines** — save your split (Push/Pull/Legs seeded by default), start a session pre-filled.
 - **Progress** — per-exercise charts of estimated 1RM, top set and volume, plus PR badges (🏆 appears
   live when a set beats your best) and a body-weight trend.
-- **Rest timer** — auto-starts when you tick a working set; vibrates and beeps when it ends.
 - **Backup** — export/import a JSON file from Settings. This is your only backup, so use it.
 
 ## Develop
