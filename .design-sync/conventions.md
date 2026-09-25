@@ -1,6 +1,6 @@
-# Gym Log UI kit — how to build with it
+# Strata UI kit — how to build with it
 
-A monochrome, phone-first component kit extracted from the Gym Log PWA. Pure
+A monochrome, phone-first component kit extracted from the Strata PWA. Pure
 black ground, near-black panels, white as the only accent. No color beyond
 greyscale except two semantic reds/ambers used sparingly for destructive and
 warning states.

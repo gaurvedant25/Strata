@@ -1,4 +1,4 @@
--- Gym Log — subscription tables and functions.
+-- Strata — subscription tables and functions.
 --
 -- Run this once in the Supabase SQL editor, on a project that already has
 -- `schema.sql`. It is deliberately a second file rather than more of the first:

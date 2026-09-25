@@ -70,7 +70,7 @@ workflows:
   #
   # Before it will run you need, in Codemagic → Teams → Integrations:
   #   · an App Store Connect API key (Issuer ID, Key ID, .p8 private key)
-  #   · the bundle id com.vedant.gymlog registered in your Apple developer
+  #   · the bundle id com.vedant.strata registered in your Apple developer
   #     account, with the App Store Connect app record created
   #
   # `xcode-project use-profiles` fetches and installs the signing certificate
@@ -83,13 +83,13 @@ workflows:
   #   instance_type: mac_mini_m2
   #   max_build_duration: 60
   #   integrations:
-  #     app_store_connect: gym-log-asc-key
+  #     app_store_connect: strata-asc-key
   #   environment:
   #     node: 22.22.0
   #     xcode: latest
   #     ios_signing:
   #       distribution_type: app_store
-  #       bundle_identifier: com.vedant.gymlog
+  #       bundle_identifier: com.vedant.strata
   #   triggering:
   #     events:
   #       - tag

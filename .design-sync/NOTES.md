@@ -1,4 +1,4 @@
-# design-sync notes — Gym Log
+# design-sync notes — Strata
 
 ## What this repo is (and isn't)
 

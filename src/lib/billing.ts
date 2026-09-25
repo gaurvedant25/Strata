@@ -22,7 +22,7 @@ import { PLANS, type PlanId, type StorePrice } from "./plans";
  * instead; `scripts/check-entitlement.cjs` covers the rules.
  */
 
-export const PACKAGE_NAME = "com.vedant.gymlog";
+export const PACKAGE_NAME = "com.vedant.strata";
 
 /**
  * What a completed store purchase looks like on the way back in.

@@ -66,7 +66,7 @@ type Loaded = Awaited<ReturnType<typeof store.loadAll>>;
  * a fact about the split, so it stays on the device rather than going through
  * sync. Keyed by split, because the answer is different for each.
  */
-const NEXT_UP_PREFIX = "gymlog.nextUp.";
+const NEXT_UP_PREFIX = "strata.nextUp.";
 
 function readNextUp(): Record<string, string> {
   const out: Record<string, string> = {};
@@ -91,7 +91,7 @@ function readNextUp(): Record<string, string> {
  * on the device rather than going through sync. Unset, the screen opens on
  * whichever lift moved most recently.
  */
-const PINNED_LIFT_KEY = "gymlog.pinnedLift";
+const PINNED_LIFT_KEY = "strata.pinnedLift";
 
 function readPinnedLift(): string | null {
   try {

@@ -1,5 +1,5 @@
 {
-  "name": "gym",
+  "name": "strata",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,9 +17,10 @@
     "check:art": "node scripts/check-art.cjs",
     "check:trend": "node scripts/check-trend.cjs",
     "check:entitlement": "node scripts/check-entitlement.cjs",
+    "check:brand": "node scripts/check-brand.cjs",
     "apk": "node scripts/build-android.mjs",
     "aab": "node scripts/build-android.mjs --release",
-    "deploy": "npm run build && npx vercel link --yes --project gym-log --cwd dist && npx vercel deploy --prod --yes --cwd dist"
+    "deploy": "npm run build && npx vercel link --yes --project strata --cwd dist && npx vercel deploy --prod --yes --cwd dist"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

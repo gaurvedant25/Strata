@@ -1,4 +1,10 @@
-import { openDB, type DBSchema, type IDBPDatabase } from "idb";
+import {
+  deleteDB,
+  openDB,
+  type DBSchema,
+  type IDBPDatabase,
+  type OpenDBCallbacks,
+} from "idb";
 import type {
   BodyWeight,
   Exercise,
@@ -9,7 +15,7 @@ import type {
 } from "../types";
 import { DEFAULT_SETTINGS } from "../types";
 
-interface GymDB extends DBSchema {
+interface StrataDB extends DBSchema {
   exercises: { key: string; value: Exercise };
   routines: { key: string; value: Routine };
   splits: { key: string; value: Split };
@@ -18,65 +24,147 @@ interface GymDB extends DBSchema {
   meta: { key: string; value: unknown };
 }
 
-let dbp: Promise<IDBPDatabase<GymDB>> | null = null;
+let dbp: Promise<IDBPDatabase<StrataDB>> | null = null;
+
+/** The database this app keeps everything in, and its schema version. */
+const NAME = "strata";
+const VERSION = 3;
+/**
+ * What the database was called before the app was renamed Strata. An install
+ * that still has one is copied across the first time the new name is opened,
+ * and the old one is deleted once the copy has landed — see `adoptOld`.
+ */
+const OLD_NAME = "gymlog";
+
+const schema: Pick<OpenDBCallbacks<StrataDB>, "upgrade"> = {
+  // Each step is guarded by oldVersion so an existing database only runs
+  // the steps it has not seen. Routines created before v2 have no splitId;
+  // they are adopted into a split on load rather than here, since that
+  // needs to look at them as a set.
+  upgrade(d, oldVersion, _newVersion, tx) {
+    if (oldVersion < 1) {
+      d.createObjectStore("exercises", { keyPath: "id" });
+      d.createObjectStore("routines", { keyPath: "id" });
+      const s = d.createObjectStore("sessions", { keyPath: "id" });
+      s.createIndex("by_date", "date");
+      d.createObjectStore("bodyweight", { keyPath: "date" });
+      d.createObjectStore("meta");
+    }
+    if (oldVersion < 2) {
+      d.createObjectStore("splits", { keyPath: "id" });
+    }
+    if (oldVersion < 3) {
+      // Records written before accounts existed carry no updatedAt, and
+      // sync only pushes rows newer than the last mark — which for a first
+      // sync is zero. Left alone, everything logged before signing in would
+      // be judged "not newer than nothing" and silently never upload.
+      // Backfilling from whatever timestamp each record already has keeps
+      // their relative order rather than flattening them all to now.
+      for (const name of [
+        "exercises",
+        "routines",
+        "splits",
+        "sessions",
+        "bodyweight",
+      ] as const) {
+        const store = tx.objectStore(name) as unknown as {
+          openCursor(): Promise<{
+            value: Record<string, unknown>;
+            update(v: unknown): Promise<unknown>;
+            continue(): Promise<unknown>;
+          } | null>;
+        };
+        void store.openCursor().then(function walk(cursor): unknown {
+          if (!cursor) return;
+          const v = cursor.value;
+          if (v.updatedAt == null) {
+            const born = v.startedAt ?? v.createdAt ?? v.at ?? Date.now();
+            void cursor.update({ ...v, updatedAt: Number(born) });
+          }
+          return (cursor.continue() as Promise<unknown>).then(
+            walk as never,
+          );
+        });
+      }
+    }
+  }
+};
 
 export function db() {
-  if (!dbp) {
-    dbp = openDB<GymDB>("gymlog", 3, {
-      // Each step is guarded by oldVersion so an existing database only runs
-      // the steps it has not seen. Routines created before v2 have no splitId;
-      // they are adopted into a split on load rather than here, since that
-      // needs to look at them as a set.
-      upgrade(d, oldVersion, _newVersion, tx) {
-        if (oldVersion < 1) {
-          d.createObjectStore("exercises", { keyPath: "id" });
-          d.createObjectStore("routines", { keyPath: "id" });
-          const s = d.createObjectStore("sessions", { keyPath: "id" });
-          s.createIndex("by_date", "date");
-          d.createObjectStore("bodyweight", { keyPath: "date" });
-          d.createObjectStore("meta");
-        }
-        if (oldVersion < 2) {
-          d.createObjectStore("splits", { keyPath: "id" });
-        }
-        if (oldVersion < 3) {
-          // Records written before accounts existed carry no updatedAt, and
-          // sync only pushes rows newer than the last mark — which for a first
-          // sync is zero. Left alone, everything logged before signing in would
-          // be judged "not newer than nothing" and silently never upload.
-          // Backfilling from whatever timestamp each record already has keeps
-          // their relative order rather than flattening them all to now.
-          for (const name of [
-            "exercises",
-            "routines",
-            "splits",
-            "sessions",
-            "bodyweight",
-          ] as const) {
-            const store = tx.objectStore(name) as unknown as {
-              openCursor(): Promise<{
-                value: Record<string, unknown>;
-                update(v: unknown): Promise<unknown>;
-                continue(): Promise<unknown>;
-              } | null>;
-            };
-            void store.openCursor().then(function walk(cursor): unknown {
-              if (!cursor) return;
-              const v = cursor.value;
-              if (v.updatedAt == null) {
-                const born = v.startedAt ?? v.createdAt ?? v.at ?? Date.now();
-                void cursor.update({ ...v, updatedAt: Number(born) });
-              }
-              return (cursor.continue() as Promise<unknown>).then(
-                walk as never,
-              );
-            });
-          }
-        }
-      },
-    });
-  }
+  if (!dbp) dbp = open();
   return dbp;
+}
+
+/**
+ * Opens the database, moving an install's data across from the old name the
+ * first time.
+ *
+ * `created` is only true when the new database did not exist before this
+ * call, so the copy runs once per install and never again. If it fails, the
+ * half-made new database is thrown away — so the next launch tries the whole
+ * move again from scratch — and this session carries on with the old one,
+ * which still has everything in it.
+ */
+async function open() {
+  let created = false;
+  const d = await openDB<StrataDB>(NAME, VERSION, {
+    upgrade(database, oldVersion, newVersion, tx, event) {
+      if (oldVersion === 0) created = true;
+      schema.upgrade!(database, oldVersion, newVersion, tx, event);
+    },
+  });
+  if (!created) return d;
+  try {
+    await adoptOld(d);
+    return d;
+  } catch {
+    d.close();
+    await deleteDB(NAME).catch(() => {});
+    return openDB<StrataDB>(OLD_NAME, VERSION, schema);
+  }
+}
+
+/**
+ * Copies everything from the database's old name into the new one.
+ *
+ * Read first, then written in one transaction: an IndexedDB transaction closes
+ * itself the moment the code waits on anything else, so reading the old
+ * database from inside the new one's transaction would drop the writes. The
+ * old database is only deleted after that transaction has committed, and the
+ * deletion is not waited on — another tab still holding it open would
+ * otherwise stall this app's start until that tab closed.
+ */
+async function adoptOld(d: IDBPDatabase<StrataDB>) {
+  // Where the browser can say which databases exist, a fresh install with
+  // nothing to move skips creating the old name only to delete it again.
+  if (typeof indexedDB.databases === "function") {
+    const all = await indexedDB.databases().catch(() => null);
+    if (all && !all.some((x) => x.name === OLD_NAME)) return;
+  }
+  const old = await openDB<StrataDB>(OLD_NAME, VERSION, schema);
+  const [exercises, routines, splits, sessions, bodyweight, metaKeys, metaValues] =
+    await Promise.all([
+      old.getAll("exercises"),
+      old.getAll("routines"),
+      old.getAll("splits"),
+      old.getAll("sessions"),
+      old.getAll("bodyweight"),
+      old.getAllKeys("meta"),
+      old.getAll("meta"),
+    ]);
+  old.close();
+  const tx = d.transaction(
+    ["exercises", "routines", "splits", "sessions", "bodyweight", "meta"],
+    "readwrite",
+  );
+  for (const r of exercises) void tx.objectStore("exercises").put(r);
+  for (const r of routines) void tx.objectStore("routines").put(r);
+  for (const r of splits) void tx.objectStore("splits").put(r);
+  for (const r of sessions) void tx.objectStore("sessions").put(r);
+  for (const r of bodyweight) void tx.objectStore("bodyweight").put(r);
+  metaKeys.forEach((k, i) => void tx.objectStore("meta").put(metaValues[i], k));
+  await tx.done;
+  void deleteDB(OLD_NAME).catch(() => {});
 }
 
 export async function loadAll() {
@@ -244,8 +332,13 @@ export const del = {
 const live = <T extends { deleted?: boolean }>(rows: T[]) =>
   rows.filter((r) => !r.deleted);
 
+/** What a backup file says it is. */
+const FORMAT = "strata";
+/** What backups made before the app was renamed say instead. Still read. */
+const OLD_FORMAT = "gymlog";
+
 export type Backup = {
-  format: "gymlog";
+  format: typeof FORMAT | typeof OLD_FORMAT;
   version: 2;
   exportedAt: string;
   exercises: Exercise[];
@@ -259,7 +352,7 @@ export type Backup = {
 export async function exportBackup(): Promise<Backup> {
   const all = await loadAll();
   return {
-    format: "gymlog",
+    format: FORMAT,
     version: 2,
     exportedAt: new Date().toISOString(),
     exercises: all.exercises,
@@ -274,7 +367,7 @@ export async function exportBackup(): Promise<Backup> {
 /** Merge-import: existing ids are overwritten, unknown ids added. Nothing is deleted. */
 export async function importBackup(raw: unknown) {
   const b = raw as Partial<Backup>;
-  if (!b || b.format !== "gymlog")
+  if (!b || (b.format !== FORMAT && b.format !== OLD_FORMAT))
     throw new Error("Not a Strata backup file.");
   const d = await db();
   const tx = d.transaction(

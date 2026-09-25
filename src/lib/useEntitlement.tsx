@@ -37,10 +37,10 @@ import {
  * device clock in either direction changes what the app shows by nothing.
  */
 
-const CACHE = (uid: string) => `gymlog.pro.${uid}`;
-const NOTICE = (uid: string) => `gymlog.pro.notice.${uid}`;
+const CACHE = (uid: string) => `strata.pro.${uid}`;
+const NOTICE = (uid: string) => `strata.pro.notice.${uid}`;
 /** Shared with nothing else: the furthest forward this app has ever seen time. */
-const CLOCK_SEEN = "gymlog.clockSeen";
+const CLOCK_SEEN = "strata.clockSeen";
 
 /**
  * How long to wait before retrying a preview start that did not land, and how

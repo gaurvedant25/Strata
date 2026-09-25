@@ -17,7 +17,7 @@ import type { CardSubject, CardTemplate } from "./types";
  * Kept in `localStorage`, like the app's other view preferences — this is not
  * training data and has no business being synced between devices.
  */
-const KEY = (subject: CardSubject) => `gymlog.card.last.${subject}`;
+const KEY = (subject: CardSubject) => `strata.card.last.${subject}`;
 
 /** The card last sent for this subject, if the device still remembers one. */
 export function lastCardId(subject: CardSubject): string | null {

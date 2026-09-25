@@ -17,10 +17,10 @@ if (keystorePropsFile.exists()) {
 }
 
 android {
-    namespace = "com.vedant.gymlog"
+    namespace = "com.vedant.strata"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.vedant.gymlog"
+        applicationId "com.vedant.strata"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 6

@@ -1,5 +1,5 @@
 {
-  "pkg": "gym",
+  "pkg": "strata",
   "globalName": "GymUI",
   "shape": "package",
   "srcDir": "src",

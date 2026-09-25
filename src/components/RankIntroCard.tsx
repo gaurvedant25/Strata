@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Eyebrow } from "./ui";
 import { TIERS, TIER_COLOR } from "../lib/strength";
 
-const SEEN = "gymlog.rankIntroSeen";
+const SEEN = "strata.rankIntroSeen";
 
 /**
  * Whether the one-time card still has anything to say.

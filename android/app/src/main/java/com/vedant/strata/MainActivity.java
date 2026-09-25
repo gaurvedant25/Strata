@@ -1,4 +1,4 @@
-package com.vedant.gymlog;
+package com.vedant.strata;
 
 import com.getcapacitor.BridgeActivity;
 

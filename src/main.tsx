@@ -1,3 +1,5 @@
+// First: moves anything this device saved under the app's old name.
+import "./lib/legacyStorage";
 import { StrictMode, Suspense, lazy, useCallback, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";

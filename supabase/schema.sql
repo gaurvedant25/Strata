@@ -1,4 +1,4 @@
--- Gym Log — run this once in the Supabase SQL editor.
+-- Strata — run this once in the Supabase SQL editor.
 --
 -- Records are stored whole, as jsonb, rather than as a table per type. The app
 -- owns these shapes and changes them often; a relational mirror would need a

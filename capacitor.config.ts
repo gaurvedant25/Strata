@@ -6,7 +6,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * WebView pointed at bundled assets rather than at anything hosted.
  */
 const config: CapacitorConfig = {
-  appId: "com.vedant.gymlog",
+  appId: "com.vedant.strata",
   appName: "Strata",
   webDir: "dist",
   android: {

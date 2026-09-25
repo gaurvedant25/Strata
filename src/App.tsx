@@ -125,7 +125,7 @@ export default function App() {
     if (!s.ready || onboarding !== null) return;
     const fresh =
       !s.bodyweight.length && !s.splits.length && !s.sessions.length;
-    setOnboarding(fresh && localStorage.getItem("gymlog.onboarded") !== "1");
+    setOnboarding(fresh && localStorage.getItem("strata.onboarded") !== "1");
   }, [
     s.ready,
     s.bodyweight.length,
@@ -236,7 +236,7 @@ export default function App() {
     setSignInOpen(false);
     if (!onboarding) return;
     if (s.bodyweight.length || s.splits.length || s.sessions.length) {
-      localStorage.setItem("gymlog.onboarded", "1");
+      localStorage.setItem("strata.onboarded", "1");
       setOnboarding(false);
     }
   }, [
@@ -282,7 +282,7 @@ export default function App() {
   }
 
   function dismissOnboarding() {
-    localStorage.setItem("gymlog.onboarded", "1");
+    localStorage.setItem("strata.onboarded", "1");
     setOnboarding(false);
   }
 

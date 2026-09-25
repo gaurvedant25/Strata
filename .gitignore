@@ -35,9 +35,6 @@ ds-bundle/
 # built APK and release bundle, refreshed on every `npm run apk` / `npm run aab`
 /strata.apk
 /strata.aab
-# the same two, under the name they had before the app was called Strata
-/gym-log.apk
-/gym-log.aab
 
 # Supabase CLI scratch: the linked-project pointer and a version check.
 supabase/.temp/

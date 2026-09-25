@@ -8,7 +8,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * nobody's data. Without them the app runs exactly as it always has: local
  * IndexedDB, no account, no network. That is deliberate rather than a
  * degraded mode, because a fork of this repo with no Supabase project of its
- * own should still be a working gym log.
+ * own should still be a working workout log.
  */
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -34,7 +34,7 @@ export const supabase: SupabaseClient | null = cloudConfigured
  * Resolved with `URL` rather than concatenated, because this app is built with
  * `base: "./"` so that it also works from a sub-path — which makes
  * `BASE_URL` the *relative* string `"./"`, not `"/"`. Pasting that onto an
- * origin produced `https://gym-log.vercel.app./`: a hostname with a trailing
+ * origin produced `https://<app>.vercel.app./`: a hostname with a trailing
  * dot, which is a different origin as far as the browser is concerned and
  * matches nothing in Supabase's redirect allowlist. Sign-in got all the way
  * through Google and then came back signed out, every time, with no error
