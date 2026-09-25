@@ -16,7 +16,7 @@
  *   node scripts/icons.mjs
  */
 import { deflateSync } from "node:zlib";
-import { writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,16 +49,19 @@ function chunk(type, data) {
   return Buffer.concat([len, body, crc]);
 }
 
-/** channels: 4 for RGBA, 3 for RGB (the App Store refuses an icon with alpha) */
-function png(size, pixels, channels) {
+/**
+ * channels: 4 for RGBA, 3 for RGB (the App Store refuses an icon with alpha).
+ * Square unless a height is given — the launch screens are not.
+ */
+function png(size, pixels, channels, height = size) {
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
   ihdr[9] = channels === 4 ? 6 : 2; // RGBA or RGB
   const stride = size * channels;
-  const raw = Buffer.alloc((stride + 1) * size);
-  for (let y = 0; y < size; y++) {
+  const raw = Buffer.alloc((stride + 1) * height);
+  for (let y = 0; y < height; y++) {
     const rowStart = y * (stride + 1);
     raw[rowStart] = 0; // filter: none
     pixels.copy(raw, rowStart + 1, y * stride, (y + 1) * stride);
@@ -258,3 +261,35 @@ write("assets/play-store-icon.png", render(512, { ground: "square" }));
 // Sources for `npx @capacitor/assets generate`, should the native icons be regenerated that way.
 write("assets/icon.png", render(1024, { ground: "square" }));
 write("assets/icon-foreground.png", render(1024, { ground: "none" }));
+
+/*
+ * The launch screens: plain black, the app's own ground, with nothing on them.
+ * The mark is the app icon and only that — it is not shown inside the app, and
+ * a launch screen is the first screen of it. These replace what was there
+ * before: the old dumbbell on Android and Capacitor's default logo on iOS.
+ * Every file keeps the size the platform's template gave it, read from its own
+ * header, so only what is in it changes.
+ */
+function flat(width, height, [r, g, b]) {
+  const px = Buffer.alloc(width * height * 3);
+  for (let i = 0; i < px.length; i += 3) {
+    px[i] = r;
+    px[i + 1] = g;
+    px[i + 2] = b;
+  }
+  return png(width, px, 3, height);
+}
+
+const RES = "android/app/src/main/res";
+const SPLASH = [
+  ...readdirSync(join(ROOT, RES))
+    .filter((d) => d.startsWith("drawable"))
+    .map((d) => `${RES}/${d}/splash.png`),
+  ...readdirSync(join(ROOT, "ios/App/App/Assets.xcassets/Splash.imageset"))
+    .filter((f) => f.endsWith(".png"))
+    .map((f) => `ios/App/App/Assets.xcassets/Splash.imageset/${f}`),
+].filter((p) => existsSync(join(ROOT, p)));
+for (const p of SPLASH) {
+  const head = readFileSync(join(ROOT, p));
+  write(p, flat(head.readUInt32BE(16), head.readUInt32BE(20), INK));
+}
