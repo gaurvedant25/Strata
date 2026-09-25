@@ -275,7 +275,7 @@ export async function exportBackup(): Promise<Backup> {
 export async function importBackup(raw: unknown) {
   const b = raw as Partial<Backup>;
   if (!b || b.format !== "gymlog")
-    throw new Error("Not a Gym Log backup file.");
+    throw new Error("Not a Strata backup file.");
   const d = await db();
   const tx = d.transaction(
     ["exercises", "routines", "splits", "sessions", "bodyweight", "meta"],

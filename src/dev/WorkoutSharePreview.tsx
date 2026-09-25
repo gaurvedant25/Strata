@@ -51,7 +51,7 @@ export default function WorkoutDesignPreview() {
     </label>
     <button className="min-h-11 w-full rounded-full bg-fg py-4 text-black" onClick={() => setOpen(true)}>Preview workout cards</button>
     <a className="block text-sm text-muted underline" href="/?share-preview">Progress cards</a>
-    <a className="block text-sm text-muted underline" href="/">Back to Gym Log</a>
+    <a className="block text-sm text-muted underline" href="/">Back to Strata</a>
     {open && <Editor data={data} onClose={() => setOpen(false)} />}
   </main>;
 }

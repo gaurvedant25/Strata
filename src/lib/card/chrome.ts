@@ -42,11 +42,11 @@ export const CENTRE = 0.529;
 export function header(L: Layout, dateLabel: string) {
   const size = 3.3;
   const opts: TextOpts = { size, weight: 600, track: 0.22, caps: true };
-  const w = measure(L, "Gym Log", opts).width;
+  const w = measure(L, "Strata", opts).width;
   const padX = 4.1;
   const h = 8;
   pill(L, MARGIN, MARGIN, w + padX * 2, h, FG);
-  text(L, "Gym Log", MARGIN + padX, MARGIN + 2.5, { ...opts, color: INK });
+  text(L, "Strata", MARGIN + padX, MARGIN + 2.5, { ...opts, color: INK });
   text(L, dateLabel, 100 - MARGIN, MARGIN + 2.5, {
     size,
     weight: 600,

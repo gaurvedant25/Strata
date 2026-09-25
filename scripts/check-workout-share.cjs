@@ -96,7 +96,7 @@ for (const aspect of ['story', 'square']) for (const gender of ['male', 'female'
       template.draw(L, { ...sample, gender });
       if (mode === 'background') assert.equal(labels.length, 0);
       else {
-        assert.ok(labels.some(s => s.includes('Gym Log')));
+        assert.ok(labels.some(s => s.includes('Strata')));
         assert.ok(labels.some(s => /streak/i.test(s)));
         assert.ok(labels.some(s => s.includes(sample.duration)));
         if (template.id === 'workout/scan') {

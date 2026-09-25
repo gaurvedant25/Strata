@@ -126,6 +126,6 @@ if (!existsSync(built)) {
 // Copied out to one fixed name you can keep handing to a phone or to Play.
 // Handing someone a copy from deep inside the build tree invites installing a
 // stale one later, because a rebuild replaces the original and not the copy.
-const out = join(ROOT, release ? "gym-log.aab" : "gym-log.apk");
+const out = join(ROOT, release ? "strata.aab" : "strata.apk");
 copyFileSync(built, out);
 console.log(`\n${release ? "AAB" : "APK"}: ${out}  (versionCode ${code})`);

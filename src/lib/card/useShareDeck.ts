@@ -144,7 +144,7 @@ export function useShareDeck(
     if (!card?.file || !subject || sending || !resultCurrent) return;
     setSending(true); setOutcome(null);
     try {
-      void shareFile(card.file, "Gym Log").then(value => {
+      void shareFile(card.file, "Strata").then(value => {
         setOutcome(value);
         if (value === "shared" || value === "saved") rememberCard(subject, card.id);
       }).catch(() => setOutcome("failed")).finally(() => setSending(false));

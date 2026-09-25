@@ -39,7 +39,7 @@ export function ShareCardEditor({ data, subject, onClose, onUnlock }: (
       .filter(([key]) => key.startsWith(prefix))
       .map(([key, value]) => [key.slice(prefix.length), value]));
   }, [aspect, overlaySettings]);
-  const deck = useShareDeck(stage === "edit" ? subject : null, frozen, `gym-log-${subject}-${aspect}.png`, aspect, photo, aspectOverlays, overlayColor);
+  const deck = useShareDeck(stage === "edit" ? subject : null, frozen, `strata-${subject}-${aspect}.png`, aspect, photo, aspectOverlays, overlayColor);
   const setOverlay = (next: OverlayTransform) => setOverlaySettings(current => ({ ...current, [overlayKey]: next }));
   async function choose(file?: File) {
     if (!file) return;

@@ -21,7 +21,7 @@ function start(L: Layout, height = 62, wild = false) {
 }
 
 function footer(L: Layout, d: WorkoutData, y: number) {
-  type(L, `Gym Log · ${d.dateLabel}`, 8, y, 2.6);
+  type(L, `Strata · ${d.dateLabel}`, 8, y, 2.6);
 }
 
 function summary(L: Layout, d: WorkoutData, y: number, lead: "streak" | "volume" | "records") {
@@ -144,7 +144,7 @@ export const workoutReceipt: CardTemplate<"workout"> = {
       L.ctx.fillStyle = ink(L);
       L.ctx.fillRect((10 + i * 2.5) * L.u, (y + 67) * L.u, 0.75 * L.u, 3 * L.u);
     }
-    type(L, `Gym Log · ${d.dateLabel}`, 10, y + 73, 2.6, 80);
+    type(L, `Strata · ${d.dateLabel}`, 10, y + 73, 2.6, 80);
     endOverlay(L);
   },
 };

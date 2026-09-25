@@ -45,11 +45,11 @@ const capH = (L: Layout, o: TextOpts) => measure(L, "H", o).height;
 /** The mark in its pill, and the date: shared by both designs. */
 function header(L: Layout, date: string) {
   const o: TextOpts = { family: "sans", size: 3.25, weight: 600, track: 0.22, caps: true };
-  const w = measure(L, "Gym Log", o).width;
+  const w = measure(L, "Strata", o).width;
   const h = 8;
   pill(L, M, M, w + 8, h, ink(L));
   const top = M + (h - capH(L, o)) / 2;
-  text(L, "Gym Log", M + 4, top, { ...o, color: INK });
+  text(L, "Strata", M + 4, top, { ...o, color: INK });
   text(L, date, 100 - M, top, {
     family: "sans", size: 3.25, weight: 600, track: 0.2, caps: true,
     color: MUTED, align: "right", maxW: 50,
@@ -344,7 +344,7 @@ function start(L: Layout, story: number, square: number, height: number) {
 }
 
 function footer(L: Layout, d: BodyData, y: number) {
-  type(L, `Gym Log · ${d.dateLabel}`, 8, y, 2.6);
+  type(L, `Strata · ${d.dateLabel}`, 8, y, 2.6);
 }
 
 export const BODY_TEMPLATES = [bodyPoster, bodyAnnotated, bodyRoster, bodyTier];

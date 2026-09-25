@@ -35,8 +35,8 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
       },
       manifest: {
-        name: "Gym Log",
-        short_name: "Gym Log",
+        name: "Strata",
+        short_name: "Strata",
         description: "Offline workout tracker. Your data never leaves the device.",
         theme_color: "#000000",
         background_color: "#000000",

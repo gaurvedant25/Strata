@@ -69,7 +69,7 @@ export function photoGround(L: Layout) {
 }
 
 function compactSignature(L: Layout, d: LiftData, y: number) {
-  label(L, `Gym Log · ${d.currentStreak} day streak`, M, y, 72);
+  label(L, `Strata · ${d.currentStreak} day streak`, M, y, 72);
 }
 
 export const liftMoment: CardTemplate<"lift"> = {

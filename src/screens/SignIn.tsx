@@ -145,7 +145,7 @@ export function SignIn({
     <div className="flex flex-1 flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+26px)] pt-[calc(env(safe-area-inset-top)+14px)]">
       <div className="flex-1">
         <div className="pt-[10vh]">
-          <Eyebrow>Gym Log</Eyebrow>
+          <Eyebrow>Strata</Eyebrow>
           <h1 className="mt-4 text-[1.8125rem] font-bold leading-[1.1] tracking-[-0.028em] text-pretty">
             {mode === "up"
               ? "Create an account and your training is never only on this phone."

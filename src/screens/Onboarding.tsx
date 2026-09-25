@@ -258,7 +258,7 @@ export function Onboarding({
           answered === REGION_ORDER.length
             ? "Every region now has a number behind it. Beat any of these in a session and the app records the PR against it."
             : `${answered} of ${REGION_ORDER.length} regions have a number behind them. The rest fill in as you log sets for them.`,
-        cta: "Enter Gym Log",
+        cta: "Enter Strata",
       };
     if (muscle)
       return {

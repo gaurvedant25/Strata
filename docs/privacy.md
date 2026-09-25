@@ -1,21 +1,21 @@
 # Privacy Policy
 
-**Gym Log**
+**Strata**
 Effective 9 September 2026 · Last updated 9 September 2026
 
 ## The short version
 
-Gym Log is a workout log that runs on your device. If you never sign in, nothing you enter leaves your phone: there is no account, no sync, and no copy of your training anywhere but the device in your hand.
+Strata is a workout log that runs on your device. If you never sign in, nothing you enter leaves your phone: there is no account, no sync, and no copy of your training anywhere but the device in your hand.
 
 If you do sign in, your training log is copied to your own account so that it survives a lost phone and reaches your other devices. Nothing else happens to it. There are no analytics, no advertising, no trackers, and no third party that receives your training data to use for its own purposes.
 
 ## Who is responsible
 
-Gym Log is made and operated by an individual developer. For anything in this policy, including any request about your data, write to **gaurvedant479@gmail.com**.
+Strata is made and operated by an individual developer. For anything in this policy, including any request about your data, write to **gaurvedant479@gmail.com**.
 
-## Two ways to use Gym Log
+## Two ways to use Strata
 
-**Without an account.** Everything you enter is stored in a database inside the app on your device (IndexedDB). The app is built to work with no signal at all, so it never waits on the network to show you anything. In this mode Gym Log makes no request that carries your training data anywhere.
+**Without an account.** Everything you enter is stored in a database inside the app on your device (IndexedDB). The app is built to work with no signal at all, so it never waits on the network to show you anything. In this mode Strata makes no request that carries your training data anywhere.
 
 **With an account.** Signing in turns on sync. Your log is copied to a set of rows that belongs to your account, and that copy is reconciled with your device when you sign in, when the network returns, and when you bring the app to the foreground. Your device remains the source of truth for reading; the server is a backup and a bridge between your own devices.
 
@@ -57,7 +57,7 @@ The sex setting never leaves your device. Bodyweight is synced with the rest of 
 
 Where the law requires a legal basis for handling information of this kind (for example the GDPR in the EEA, or the UK GDPR), that basis is **your explicit consent**, given by entering the information and, where sync is involved, by choosing to create an account. You can withdraw it at any time by deleting the entries, signing out, or deleting your account.
 
-## What Gym Log never does
+## What Strata never does
 
 - **No analytics or telemetry of any kind.** The app contains no analytics SDK and makes no request to any analytics or crash-reporting service.
 - **No advertising**, no advertising identifiers, no ad networks.
@@ -107,7 +107,7 @@ There is no charge for any of this, and you will not be treated differently for 
 
 ## Children
 
-Gym Log is not directed at children. Do not create an account if you are under 13, or under 16 where you live if your country sets that age for consent to data handling. If you believe a child has created an account, write to the address above and it will be removed.
+Strata is not directed at children. Do not create an account if you are under 13, or under 16 where you live if your country sets that age for consent to data handling. If you believe a child has created an account, write to the address above and it will be removed.
 
 ## Security
 

@@ -1,4 +1,4 @@
-# Gym Log
+# Strata
 
 An offline-first workout tracker that installs to your phone's home screen as a PWA — no App Store,
 no developer fee, no account, no server. Every workout is stored in IndexedDB **on the device**.

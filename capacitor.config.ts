@@ -7,7 +7,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
  */
 const config: CapacitorConfig = {
   appId: "com.vedant.gymlog",
-  appName: "Gym Log",
+  appName: "Strata",
   webDir: "dist",
   android: {
     // The screen is black end to end; a white flash on launch would be the only

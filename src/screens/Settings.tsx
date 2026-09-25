@@ -47,14 +47,14 @@ export function Settings({
   async function doExport() {
     const data = await exportBackup();
     const json = JSON.stringify(data, null, 2);
-    const file = new File([json], `gym-log-${todayKey()}.json`, {
+    const file = new File([json], `strata-${todayKey()}.json`, {
       type: "application/json",
     });
 
     // iOS installed PWAs handle share sheets far better than <a download>
     if (navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: "Gym Log backup" });
+        await navigator.share({ files: [file], title: "Strata backup" });
         return;
       } catch {
         /* user cancelled — fall through to download */
@@ -213,7 +213,7 @@ export function Settings({
           ) : (
             <div className="border-b border-rule px-5 py-4">
               <p className="text-[0.8125rem] leading-relaxed text-muted text-pretty">
-                You are using Gym Log without an account, so these logs live
+                You are using Strata without an account, so these logs live
                 only on this device.
               </p>
               <div className="pt-3.5">

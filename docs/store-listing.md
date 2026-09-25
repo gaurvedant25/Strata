@@ -12,8 +12,13 @@ Character limits are Play's, and the counts below are exact.
 ## App name (30 max)
 
 ```
-Gym Log
+Strata: Strength Ranks
 ```
+
+The exact name "Strata" is already taken on the App Store by unrelated apps
+(a health-data exporter, a notes app, an AI tool), and store names there must
+be unique, so the listing carries a descriptor. The name under the icon on the
+phone is plain "Strata" (`appName` in `capacitor.config.ts`).
 
 ## Short description (80 max) — 73 characters
 
@@ -40,7 +45,7 @@ A workout log that works offline and keeps your training yours.
 ## Full description (4000 max) — 1,827 characters
 
 ```
-Gym Log is a workout tracker for people who lift to get stronger.
+Strata is a workout tracker for people who lift to get stronger.
 
 Log a set in two taps. Weight, reps, done — the next set opens on the numbers you just used, because the plates rarely move between sets. No scrolling through menus mid-workout, no wizard, no ads.
 
@@ -75,7 +80,7 @@ Free to use. An optional Pro upgrade adds longer progress windows, month and yea
 - **Privacy policy:** https://gym-log-ebon.vercel.app/legal.html#privacy
 - **Data deletion:** https://gym-log-ebon.vercel.app/legal.html#delete
 - **Feature graphic:** `assets/play-feature-graphic.png` (1024×500, already made)
-- **App icon:** `assets/icon.png` (512×512, already made)
+- **App icon:** `assets/play-store-icon.png` (512×512, made by `npm run icons`)
 
 ### Screenshots — still to do
 
