@@ -133,10 +133,12 @@ function Figure({
             onClick={group ? () => onSelect(group) : undefined}
             style={{
               cursor: group ? "pointer" : "default",
-              // two stacked shadows: a tight rim plus a wide halo, which is what
-              // makes a lit muscle glow rather than just sit on a coloured shape
+              // Almost no glow: one faint, tight rim in the tier's colour at a
+              // quarter strength, so a lit muscle keeps a soft edge against the
+              // black without the halo spilling across the figure. (It used to
+              // be a tight rim plus a wide halo, both at full strength.)
               filter: sc
-                ? `drop-shadow(0 0 ${3 + sc.score * 7}px ${sc.color}) drop-shadow(0 0 ${9 + sc.score * 20}px ${sc.color})`
+                ? `drop-shadow(0 0 4px ${sc.color}40)`
                 : undefined,
               transition: "filter 165ms var(--ease-settle)",
             }}

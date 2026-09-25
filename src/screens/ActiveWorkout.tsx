@@ -84,7 +84,7 @@ type Toast = { text: string; undo: () => void };
 /** How long an Undo stays on offer. */
 const TOAST_MS = 4000;
 /** Set once the swipe has been used, which is when its explanation can go. */
-const HINT_KEY = "gym:swipe-hint-seen";
+const HINT_KEY = "strata.swipeHintSeen";
 function hintSeen() {
   try {
     return localStorage.getItem(HINT_KEY) === "1";
@@ -1052,7 +1052,7 @@ const SCRUB_SLOP = 6;
  * A number in the set table that can be tapped or dragged.
  *
  * A tap points the dock at it, as before. Held and pulled sideways it counts —
- * right for more, left for less, one step per ten pixels — so the small
+ * left for more, right for less, one step per ten pixels — so the small
  * corrections mid-set are a flick of the thumb rather than a trip to the dock.
  * Vertical movement is left to the page: whichever way the finger first goes
  * decides, and a scroll that starts on a cell is still a scroll.
@@ -1137,7 +1137,8 @@ function ScrubCell({
             /* the pointer is already gone */
           }
         }
-        const steps = Math.trunc(dx / SCRUB_PX);
+        // Leftward adds, rightward takes away.
+        const steps = Math.trunc(-dx / SCRUB_PX);
         const next = Math.max(0, Math.round((d.from + steps * step) * 100) / 100);
         if (next !== d.last) {
           d.last = next;
