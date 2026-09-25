@@ -22,7 +22,7 @@ import { Eyebrow, Sheet, inputCls } from "./ui";
  * picture will be, not a dark one that flashes white.
  *
  * `loading="lazy"` matters more here than it usually does: the library is
- * ninety-seven rows, and fetching every thumbnail to fill a sheet that opens
+ * nearly four hundred rows, and fetching every thumbnail to fill a sheet that opens
  * showing eight of them would be most of the work for none of the benefit.
  *
  * A row whose picture is missing or fails to load falls back to a mark rather
@@ -135,7 +135,7 @@ export function ExercisePicker({
    * heading to sit under — the group it belongs to.
    *
    * No rule between rows. The list used to be a hairline under every name,
-   * which at ninety-seven entries is ninety-seven lines: the separation now
+   * which at nearly four hundred entries is nearly four hundred lines: the separation now
    * comes from the space around each row and from the column of images, and
    * the only rules left in the sheet are the ones that divide the groups.
    */

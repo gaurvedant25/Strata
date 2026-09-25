@@ -25,7 +25,7 @@ Four sources, tried in this order
    the worked muscle in red. The picture is the GIF's halfway frame, saved as
    a PNG exactly as it is delivered — same size, same white ground, same
    colours — because that picture is the one that was asked for. This is
-   where 96 of the 97 thumbnails come from, and the credit is on the Image
+   where all but one of the 406 thumbnails come from, and the credit is on the Image
    credits page, which ships inside the app and is linked from Settings.
    ExerciseDB's own terms put that free set under non-commercial use with
    attribution; commercial use is its paid licence, which goes in through
@@ -227,6 +227,326 @@ EXERCISEDB = {
     "Snatch": "xHKN2s8",  # barbell one arm snatch
     "Thruster": "f7Y9eDZ",  # barbell thruster
     "Turkish Get-up": "Ha7SZ3y",  # kettlebell turkish get up (squat style)
+
+    # ─── The wider library: three hundred more, the same way ───
+    # Chest
+    "Decline Barbell Bench Press": "GrO65fd",  # barbell decline bench press
+    "Wide-Grip Bench Press": "JsKq9so",  # barbell wide bench press
+    "Reverse-Grip Incline Bench Press": "DU7I633",  # barbell reverse grip incline bench press
+    "Smith Machine Bench Press": "trqKQv2",  # smith bench press
+    "Smith Machine Incline Press": "5v7KYld",  # smith incline bench press
+    "Smith Machine Decline Press": "ETZfAbZ",  # smith decline bench press
+    "Smith Machine Wide-Grip Bench Press": "zoOvPcx",  # smith wide grip bench press
+    "Decline Dumbbell Press": "DwhEmmE",  # dumbbell decline bench press
+    "Neutral-Grip Dumbbell Press": "pP8wP2P",  # dumbbell neutral grip bench press
+    "Incline Neutral-Grip Dumbbell Press": "OVLmUuL",  # dumbbell incline palm-in press
+    "Reverse-Grip Dumbbell Press": "UIbGx6H",  # dumbbell reverse bench press
+    "Single-Arm Dumbbell Bench Press": "zGSIWQi",  # dumbbell lying one arm press
+    "Single-Arm Incline Dumbbell Press": "PDaMuyV",  # dumbbell one arm incline chest press
+    "Alternating Incline Dumbbell Press": "TVdivgY",  # dumbbell incline alternate press
+    "Incline Dumbbell Fly": "ESOd5Pl",  # dumbbell incline fly
+    "Decline Dumbbell Fly": "xXm4nYq",  # dumbbell decline fly
+    "Single-Arm Dumbbell Fly": "o5Jsk92",  # dumbbell one arm bench fly
+    "Dumbbell Pullover": "9XjtHvS",  # dumbbell pullover
+    "Barbell Pullover": "i6LWjok",  # barbell pullover
+    "Cable Crossover": "UKWTJWR",  # cable standing up straight crossovers
+    "Incline Cable Fly": "tBWXbIT",  # cable incline fly
+    "Decline Cable Fly": "7saC5zz",  # cable decline fly
+    "Low Cable Fly": "FVmZVhk",  # cable low fly
+    "Lying Cable Fly": "lJJ7Yq8",  # cable lying fly
+    "Seated Cable Chest Press": "nIR4Rwl",  # cable seated chest press
+    "Cable Bench Press": "7xI5MXA",  # cable bench press
+    "Incline Cable Press": "Vh0GsK4",  # cable incline bench press
+    "Decline Cable Press": "2Pya1cP",  # cable decline press
+    "Incline Machine Chest Press": "jHAnWmT",  # lever incline chest press
+    "Decline Machine Chest Press": "vsVoPHt",  # lever decline chest press
+    "Kettlebell Floor Press": "rg59QCH",  # kettlebell one arm floor press
+    "Medicine Ball Chest Pass": "aDoFKrE",  # medicine ball chest pass
+    "Decline Push-up": "i5cEhka",  # decline push-up
+    "Incline Push-up": "B1EVP9F",  # incline push-up
+    "Wide Push-up": "JmMVpR3",  # wide hand push up
+    "Clap Push-up": "wigSg76",  # clap push up
+    "Plyometric Push-up": "Snj1wSv",  # plyo push up
+    "Archer Push-up": "A9qxk2F",  # archer push up
+    "Wall Push-up": "LEH9jxP",  # push-up (wall)
+    "Shoulder Tap Push-up": "qEse6fe",  # shoulder tap push-up
+    "Scapular Push-up": "jV65tKx",  # scapula push-up
+    "One-Arm Push-up": "MUic5zN",  # single arm push-up
+    "Planche Push-up": "gw9PqGk",  # full planche push-up
+    "Suspension Push-up": "IaGQCrC",  # suspended push-up
+    "Medicine Ball Push-up": "W8KAlkI",  # push-up medicine ball
+    "Straight Bar Dip": "LQFOrMn",  # chest dip on straight bar
+    "Ring Dip": "ezTvXcr",  # ring dips
+    "Korean Dip": "rWoBmi5",  # korean dips
+    "Assisted Dip": "PAgTVaK",  # assisted chest dip (kneeling)
+    # Back
+    "Pendlay Row": "r0z6xzQ",  # barbell pendlay row
+    "Reverse-Grip Barbell Row": "SzX3uzM",  # barbell reverse grip bent over row
+    "Incline Barbell Row": "dmgMp3n",  # barbell incline row
+    "Chest-Supported Dumbbell Row": "7vG5o25",  # dumbbell incline row
+    "Renegade Row": "b9kqlBy",  # kettlebell alternating renegade row
+    "Kettlebell Row": "g9AsZ8P",  # kettlebell one arm row
+    "Smith Machine Row": "ZX9UZmj",  # smith bent over row
+    "Smith Machine One-Arm Row": "Q4DSJPC",  # smith one arm row
+    "Machine Seated Row": "7I6LNUG",  # lever seated row
+    "Machine High Row": "nZZZy9m",  # lever high row
+    "Machine Bent-Over Row": "X3cqyXz",  # lever bent over row
+    "Machine Single-Arm Row": "oROuvrX",  # lever unilateral row
+    "Machine Pullover": "4U7iLb5",  # lever pullover
+    "Machine Lat Pulldown": "7F1DVzn",  # lever front pulldown
+    "Reverse-Grip Lat Pulldown": "xBYcQHj",  # cable underhand pulldown
+    "Behind-the-Neck Pulldown": "SpsOSXk",  # cable rear pulldown
+    "Single-Arm Lat Pulldown": "U5INZY6",  # cable one arm pulldown
+    "Wide-Grip Seated Cable Row": "qcY50ZD",  # cable seated wide-grip row
+    "Rope Seated Row": "SJqRxOt",  # cable rope seated row
+    "Single-Arm Cable Row": "vpp9Ku2",  # cable seated one arm alternate row
+    "Single-Arm Cable Bent-Over Row": "EIsE3u8",  # cable one arm bent over row
+    "Standing Cable Row": "4f8RXP8",  # cable standing row (v-bar)
+    "Kneeling Cable High Row": "ZSJNetl",  # cable high row (kneeling)
+    "Cable Shrug": "Eg98Ft9",  # cable shrug
+    "Machine Shrug": "ZZKbeMw",  # lever shrug
+    "Smith Machine Shrug": "OUQ0ZyW",  # smith shrug
+    "Incline Dumbbell Shrug": "JymLInS",  # dumbbell incline shrug
+    "Trap Bar Deadlift": "jQGwmxN",  # trap bar deadlift
+    "Rack Pull": "za9Ni4z",  # barbell rack pull
+    "Dumbbell Deadlift": "nUwVh7b",  # dumbbell deadlift
+    "Wide-Grip Pull-up": "Qqi7bko",  # wide grip pull-up
+    "Neutral-Grip Pull-up": "0V2YQjW",  # pull up (neutral grip)
+    "Close-Grip Chin-up": "VnfUNW7",  # close grip chin-up
+    "Mixed-Grip Chin-up": "T8UpLkb",  # mixed grip chin-up
+    "Behind-the-Neck Pull-up": "CbFSYC1",  # rear pull-up
+    "Archer Pull-up": "72BC5Za",  # archer pull up
+    "L-Sit Pull-up": "d1GgzTU",  # l-pull-up
+    "One-Arm Chin-up": "HjdqmZa",  # one arm chin-up
+    "Scapular Pull-up": "uTBt1HV",  # scapular pull-up
+    "Muscle-up": "yJUHKTn",  # muscle up
+    "Rope Climb": "yaAxcQr",  # rope climb
+    "Suspension Row": "4OaumBr",  # suspended row
+    "Front Lever Raise": "hbY9wqG",  # front lever reps
+    "Front Lever": "PkCN2lv",  # front lever
+    "Back Lever": "GaSzzuh",  # back lever
+    "Assisted Pull-up": "kiJ4Z2K",  # assisted pull-up
+    "Assisted Chin-up": "MaMuGH6",  # lever assisted chin-up
+    # Shoulders
+    "Military Press": "wdRZISl",  # barbell standing close grip military press
+    "Behind-the-Neck Press": "ngPpyRS",  # barbell seated behind head military press
+    "Bradford Press": "dCPESfR",  # barbell standing bradford press
+    "Smith Machine Military Press": "jjUPrze",  # smith standing military press
+    "Smith Machine Shoulder Press": "xUwnBMT",  # smith seated shoulder press
+    "Standing Dumbbell Press": "A6wtbuL",  # dumbbell standing overhead press
+    "Alternating Dumbbell Press": "bBi35y3",  # dumbbell standing alternate overhead press
+    "Single-Arm Dumbbell Press": "84RyJf8",  # dumbbell one arm shoulder press
+    "Neutral-Grip Shoulder Press": "f1jf47L",  # dumbbell seated shoulder press (parallel grip)
+    "Cuban Press": "QfAKy1G",  # dumbbell cuban press
+    "Cable Shoulder Press": "PzQanLE",  # cable shoulder press
+    "Kettlebell Overhead Press": "blBXysN",  # kettlebell two arm military press
+    "Kettlebell Arnold Press": "UM8mgyG",  # kettlebell arnold press
+    "Kettlebell Push Press": "osdXT3K",  # kettlebell one arm push press
+    "Seated Lateral Raise": "hxyTtWj",  # dumbbell seated lateral raise
+    "Single-Arm Lateral Raise": "n5cWCsI",  # dumbbell one arm lateral raise
+    "Machine Lateral Raise": "dRTfGZT",  # lever lateral raise
+    "Lateral-to-Front Raise": "xMjBKwn",  # dumbbell lateral to front raise
+    "Barbell Front Raise": "b2Uoz54",  # barbell front raise
+    "Cable Front Raise": "u2X71Np",  # cable front raise
+    "Seated Dumbbell Front Raise": "Ys97II0",  # dumbbell seated front raise
+    "Incline Y-Raise": "PbzNu7c",  # dumbbell incline y-raise
+    "Cable Reverse Fly": "aqvSOQE",  # cable cross-over revers fly
+    "High Cable Reverse Fly": "P5p0j8B",  # cable standing cross-over high reverse fly
+    "Seated Cable Rear Delt Raise": "x825CZm",  # cable seated rear lateral raise
+    "Lying Rear Delt Raise": "53Ttlck",  # dumbbell lying rear lateral raise
+    "Incline Rear Delt Raise": "vYk8lqw",  # dumbbell incline rear lateral raise
+    "Band Reverse Fly": "sTfvVsG",  # band reverse fly
+    "Barbell Rear Delt Row": "S9zHIvU",  # barbell rear delt row
+    "Dumbbell Upright Row": "ainizkb",  # dumbbell upright row
+    "Cable Upright Row": "cALKspW",  # cable upright row
+    "Wide-Grip Upright Row": "RgJDRR1",  # barbell wide-grip upright row
+    "Smith Machine Upright Row": "1DN3iz4",  # smith upright row
+    "Cable External Rotation": "FWdVhcW",  # cable standing shoulder external rotation
+    "Cable Internal Rotation": "YPoVrBi",  # cable seated shoulder internal rotation
+    "Dumbbell External Rotation": "bmBf7LN",  # dumbbell lying external shoulder rotation
+    "Handstand Push-up": "rQxwMxO",  # handstand push-up
+    "Handstand Hold": "XooAdhl",  # handstand
+    # Arms
+    "Drag Curl": "IENzBdA",  # barbell drag curl
+    "Reverse Barbell Curl": "xNrS20v",  # barbell reverse curl
+    "Wide-Grip Barbell Curl": "faHKVkK",  # barbell standing wide grip biceps curl
+    "Close-Grip Barbell Curl": "4dUn2iv",  # barbell standing close grip curl
+    "Barbell Hammer Curl": "o1ntciW",  # olympic barbell hammer curl
+    "Reverse Preacher Curl": "4LIG9xr",  # barbell reverse preacher curl
+    "EZ-Bar Preacher Curl": "hacCyUv",  # ez barbell close grip preacher curl
+    "Close-Grip EZ-Bar Curl": "V4ryaZa",  # ez barbell close-grip curl
+    "Reverse EZ-Bar Curl": "Y5X65IB",  # ez barbell reverse grip curl
+    "Spider Curl": "2kattbR",  # ez barbell spider curl
+    "Incline Dumbbell Curl": "F3xgbjF",  # dumbbell incline biceps curl
+    "Incline Hammer Curl": "ByX0WxV",  # dumbbell incline hammer curl
+    "Cross-Body Hammer Curl": "Qyk5J3p",  # dumbbell cross body hammer curl
+    "Alternating Hammer Curl": "6em2Dxj",  # dumbbell alternate seated hammer curl
+    "Seated Hammer Curl": "IGtBdNT",  # dumbbell seated hammer curl
+    "Alternating Dumbbell Curl": "BU15nH4",  # dumbbell alternate biceps curl
+    "Seated Dumbbell Curl": "TiaZTxx",  # dumbbell seated curl
+    "Zottman Curl": "kXaIn5A",  # dumbbell zottman curl
+    "Dumbbell Preacher Curl": "jivWf8n",  # dumbbell preacher curl
+    "Reverse Dumbbell Curl": "0IgNjSM",  # dumbbell standing reverse curl
+    "Waiter Curl": "KOpzGBL",  # dumbbell waiter biceps curl
+    "Rope Hammer Curl": "HPlPoQA",  # cable hammer curl (with rope)
+    "Overhead Cable Curl": "wDUqY2u",  # cable overhead curl
+    "Cable Preacher Curl": "P2lNrGL",  # cable preacher curl
+    "Cable Reverse Curl": "eOG0r6v",  # cable reverse curl
+    "Single-Arm Cable Curl": "YTur5nR",  # cable one arm curl
+    "Cable Concentration Curl": "NvfE43H",  # cable concentration curl
+    "Seated Cable Curl": "8oYqOt9",  # cable seated curl
+    "Cable Drag Curl": "dXz8zjF",  # cable drag curl
+    "Machine Bicep Curl": "q6y3OhV",  # lever bicep curl
+    "Machine Preacher Curl": "b6hQYMb",  # lever preacher curl
+    "JM Press": "ZsiqXYa",  # barbell jm bench press
+    "Reverse-Grip Skull Crusher": "yRLPCLu",  # barbell reverse grip skullcrusher
+    "Seated Barbell Overhead Extension": "5uFK1xr",  # barbell seated overhead triceps extension
+    "Seated EZ-Bar Extension": "iaapw0g",  # ez barbell seated triceps extension
+    "Dumbbell Skull Crusher": "mpKZGWz",  # dumbbell lying triceps extension
+    "Seated Dumbbell Overhead Extension": "kont8Ut",  # dumbbell seated triceps extension
+    "Single-Arm Overhead Extension": "BCUR88E",  # dumbbell standing one arm extension
+    "Incline Dumbbell Triceps Extension": "OVIKwsd",  # dumbbell incline triceps extension
+    "Tate Press": "s5PdDyY",  # dumbbell tate press
+    "Close-Grip Dumbbell Press": "7jGOBF3",  # dumbbell close grip press
+    "Single-Arm Dumbbell Kickback": "bQy2Eni",  # dumbbell one arm kickback
+    "Cable Overhead Triceps Extension": "2IxROQ1",  # cable overhead triceps extension (rope attachment)
+    "Reverse-Grip Pushdown": "VjYliFZ",  # cable reverse-grip pushdown
+    "V-Bar Pushdown": "gAwDzB3",  # cable triceps pushdown (v-bar)
+    "Single-Arm Pushdown": "qRZ5S1N",  # cable one arm tricep pushdown
+    "Cable Triceps Kickback": "vvNjDJS",  # cable two arm tricep kickback
+    "Machine Triceps Extension": "Ser9eQp",  # lever triceps extension
+    "Seated Dip Machine": "BRImeP8",  # lever seated dip
+    "Close-Grip Push-up": "x6KpKpq",  # close-grip push-up
+    "Diamond Push-up": "soIB2rj",  # diamond push-up
+    "Triceps Dip": "X6C6i5Y",  # triceps dip
+    "Reverse Wrist Curl": "LsZkfU6",  # barbell reverse wrist curl
+    "Dumbbell Wrist Curl": "q8aHNoF",  # dumbbell one arm wrist curl
+    "Dumbbell Reverse Wrist Curl": "BLCvwr2",  # dumbbell reverse wrist curl
+    "Behind-the-Back Wrist Curl": "2qTvJAZ",  # barbell standing back wrist curl
+    "Cable Wrist Curl": "LrV4s90",  # cable wrist curl
+    "Finger Curl": "awG04cF",  # finger curls
+    "Hand Gripper": "mKwcrHn",  # lever gripper hands
+    # Legs
+    "High-Bar Squat": "Gnfo4FM",  # barbell high bar squat
+    "Low-Bar Squat": "bTpEUcm",  # barbell low bar squat
+    "Barbell Sumo Squat": "s7HX1BY",  # barbell wide squat
+    "Box Squat": "W9pFVv1",  # barbell bench squat
+    "Overhead Squat": "gfk9kD4",  # barbell overhead squat
+    "Zercher Squat": "LSTChY9",  # barbell zercher squat
+    "Barbell Hack Squat": "5VCj6iH",  # barbell hack squat
+    "Barbell Jump Squat": "1gFNTZV",  # barbell jump squat
+    "Smith Machine Squat": "jFtipLl",  # smith squat
+    "Smith Machine Front Squat": "lFhb2Rw",  # smith front squat (clean grip)
+    "Smith Machine Hack Squat": "ZuPXtCK",  # smith hack squat
+    "Smith Machine Leg Press": "7zdxRTl",  # smith leg press
+    "Smith Machine Split Squat": "wWFspEi",  # smith single leg split squat
+    "Dumbbell Squat": "HsvHqgf",  # dumbbell squat
+    "Bulgarian Split Squat": "qx4fgX7",  # dumbbell single leg split squat
+    "Barbell Bulgarian Split Squat": "gGNQmVt",  # barbell single leg split squat
+    "Barbell Lunge": "t8iSghb",  # barbell lunge
+    "Dumbbell Lunge": "RRWFUcw",  # dumbbell lunge
+    "Dumbbell Reverse Lunge": "SSsBDwB",  # dumbbell rear lunge
+    "Lateral Lunge": "py1HSzx",  # barbell lateral lunge
+    "Barbell Step-up": "Kxquu2E",  # barbell step-up
+    "Stiff-Leg Deadlift": "hrVQWvE",  # barbell straight leg deadlift
+    "Dumbbell Stiff-Leg Deadlift": "5eLRITT",  # dumbbell stiff leg deadlift
+    "Dumbbell Romanian Deadlift": "rR0LJzx",  # dumbbell romanian deadlift
+    "Single-Leg Romanian Deadlift": "gKozT8X",  # dumbbell single leg deadlift
+    "Seated Leg Curl": "Zg3XY7P",  # lever seated leg curl
+    "Kneeling Leg Curl": "nnmCTLN",  # lever kneeling leg curl
+    "Single-Leg Leg Press": "WWD6FzI",  # sled 45 degrees one leg press
+    "Hip Adduction Machine": "oHsrypV",  # lever seated hip adduction
+    "Cable Hip Adduction": "hBGWILP",  # cable hip adduction
+    "Barbell Calf Raise": "8ozhUIZ",  # barbell standing calf raise
+    "Barbell Seated Calf Raise": "ipvgBnC",  # barbell seated calf raise
+    "Dumbbell Calf Raise": "dPmaUaU",  # dumbbell standing calf raise
+    "Dumbbell Seated Calf Raise": "r29jP7S",  # dumbbell seated calf raise
+    "Single-Leg Calf Raise": "1kB3Wmk",  # dumbbell single leg calf raise
+    "Leg Press Calf Raise": "ykHcWme",  # sled calf press on leg press
+    "Smith Machine Calf Raise": "6MaEjVA",  # smith standing leg calf raise
+    "Donkey Calf Raise": "u5ESqzH",  # donkey calf raise
+    "Bodyweight Calf Raise": "bJYHBIN",  # bodyweight standing calf raise
+    "Jump Squat": "LIlE5Tn",  # jump squat
+    "Pistol Squat": "nqs5HGV",  # single leg squat (pistol) male
+    "Sissy Squat": "xdYPUtE",  # sissy squat
+    "Curtsy Squat": "gUjqdei",  # curtsey squat
+    "Jump Lunge": "PM1PZjg",  # lunge with jump
+    "Glute-Ham Raise": "Vvwjz6N",  # glute-ham raise
+    "Nordic Hamstring Curl": "ms7tjSG",  # inverse leg curl (bench support)
+    # Glutes
+    "Reverse Hyperextension": "Krmb3cB",  # lever reverse hyperextension
+    "Hip Abduction Machine": "CHpahtl",  # lever seated hip abduction
+    "Cable Hip Extension": "Kpajagk",  # cable standing hip extension
+    "Band Pull-Through": "VtTbiP3",  # band pull through
+    "Dumbbell Sumo Pull-Through": "BmrwWzo",  # dumbbell sumo pull through
+    "Glute Bridge March": "GibBPPg",  # glute bridge march
+    "Single-Leg Glute Bridge": "rmEukuS",  # single leg bridge with outstretched leg
+    "Bodyweight Hip Thrust": "aWedzZX",  # glute bridge two legs on bench (male)
+    "Side-Lying Leg Raise": "7WaDzyL",  # side hip abduction
+    "Monster Walk": "O95afRA",  # monster walk
+    # Core
+    "Lying Leg Raise": "WhuFnR7",  # lying leg raise flat bench
+    "Seated Leg Raise": "Hgs6Nl1",  # seated leg raise
+    "Incline Leg Raise": "eVxAzgz",  # incline leg hip raise (leg straight)
+    "Captain's Chair Leg Raise": "weoDEpH",  # captains chair straight leg raise
+    "Hanging Oblique Knee Raise": "BaE7O6U",  # hanging oblique knee raise
+    "Hanging Pike": "nuBF9MO",  # hanging pike
+    "Bench Leg Pull-in": "OyoZ3Pu",  # leg pull in flat bench
+    "Reverse Crunch": "nCU1Ekp",  # reverse crunch
+    "Decline Crunch": "9Ap7miY",  # decline crunch
+    "Decline Sit-up": "QLL2gdc",  # decline sit-up
+    "Oblique Crunch": "QUDd8WS",  # oblique crunches floor
+    "Cross-Body Crunch": "rbu5UUb",  # cross body crunch
+    "Tuck Crunch": "BMMolZ3",  # tuck crunch
+    "Elbow-to-Knee Crunch": "jvp6DiD",  # elbow-to-knee
+    "Jackknife Sit-up": "mbkgB44",  # jackknife sit-up
+    "Flutter Kicks": "UVo2Qs2",  # flutter kicks
+    "Plank Shoulder Tap": "yRpV5TC",  # shoulder tap
+    "Inchworm": "ZgsNQ6d",  # inchworm
+    "Side Plank": "RKjH6Lt",  # side bridge v. 2
+    "Reverse Plank": "tFToB7l",  # reverse plank with leg lift
+    "V-Sit": "ZuXu4Eq",  # v-sit on floor
+    "L-Sit": "UpWmA5E",  # l-sit on floor
+    "Human Flag": "pQ0Mx1Z",  # flag
+    "Planche": "YZ4961r",  # full planche
+    "Planche Lean": "LYJodFS",  # lean planche
+    "Standing Cable Crunch": "jpgqxiS",  # cable standing crunch
+    "Cable Reverse Crunch": "RqOtqD7",  # cable reverse crunch
+    "Cable Side Bend": "wPypxFY",  # cable side bend
+    "Seated Cable Twist": "UEjSrKI",  # cable seated twist
+    "Dumbbell Side Bend": "IpONWYv",  # dumbbell side bend
+    "Pallof Press": "9pa4H5m",  # band horizontal pallof press
+    "Landmine Rotation": "QYysSLV",  # landmine 180
+    "Machine Crunch": "Wgaz7pm",  # lever seated crunch
+    "Kettlebell Windmill": "9Tkqa9O",  # kettlebell windmill
+    # Cardio
+    "Burpee": "dK9394r",  # burpee
+    "Star Jump": "HtfCpfi",  # star jump (male)
+    "Skater Hops": "zfNHMN9",  # skater hops
+    "Bear Crawl": "0Yz8WdV",  # bear crawl
+    "Running": "oLrKqDH",  # run
+    "Battle Ropes": "RJa4tCo",  # battling ropes
+    "Ski Erg": "vpQaQkH",  # ski ergometer
+    "Arm Bike": "pAIWRGu",  # hands bike
+    "Jumping Jack": "f9lVSSI",  # astride jumps (male)
+    "Scissor Jumps": "Eh2v5Iu",  # scissor jumps (male)
+    "Broad Jump": "uZKq7lo",  # forward jump
+    "Dumbbell Burpee": "0JtKWum",  # dumbbell burpee
+    "Jog in Place": "CcWEoWV",  # short stride run
+    "High Knees": "PrQbjvB",  # push to run
+    "Shadow Boxing": "hoXt6wv",  # left hook. boxing
+    "Spin Bike Sprint": "H1PESYI",  # stationary bike run
+    "Air Bike": "XSCHmiI",  # cycle cross trainer
+    # Other
+    "Kettlebell Snatch": "aXcUyKb",  # kettlebell one arm snatch
+    "Kettlebell Clean": "LHWF7us",  # kettlebell hang clean
+    "Kettlebell Clean and Jerk": "vzAxBtt",  # kettlebell one arm clean and jerk
+    "Kettlebell Thruster": "yWxMvB5",  # kettlebell thruster
+    "Kettlebell High Pull": "8ARQ9Hw",  # kettlebell sumo high pull
+    "Dumbbell Clean": "7Hg55JG",  # dumbbell clean
+    "Dumbbell Snatch": "6pTkI99",  # dumbbell one arm snatch
+    "Overhead Carry": "mWBtgmb",  # dumbbell single arm overhead carry
+    "Medicine Ball Slam": "oHg8eop",  # medicine ball overhead slam
 }
 
 # This library's name -> (the drawing in everkinetic/data, which half of the
@@ -384,7 +704,7 @@ def slug(name: str) -> str:
 
 
 def fetch(url: str) -> bytes:
-    request = urllib.request.Request(url, headers={"User-Agent": "gym-log/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "strata/1.0"})
     with urllib.request.urlopen(request, timeout=60) as response:
         return response.read()
 

@@ -150,12 +150,18 @@ for (const counted of ["Crunch", "Barbell Curl", "Back Squat"]) {
 
 // In no pool, and no other Arms lift shares two words with it. Offering the
 // bicep curls here would be worse than offering nothing.
-assert.equal(familyOf("Wrist Curl"), undefined);
+assert.equal(familyOf("Hand Gripper"), undefined);
 assert.deepEqual(
-  suggest("Wrist Curl"),
+  suggest("Hand Gripper"),
   [],
   "A lift with no real substitute suggests nothing",
 );
+
+// The wrist curl used to be that example. The wider library gave it real
+// variations, and those — only those — are what it offers now, never the
+// bicep curls that share one word with it.
+for (const name of suggest("Wrist Curl"))
+  assert.ok(/wrist curl/i.test(name), `${name} is not a wrist curl`);
 
 /* ---- 7. An exercise the athlete created still gets answers ------------- */
 
