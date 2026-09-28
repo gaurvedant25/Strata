@@ -1,5 +1,11 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
-import { CalendarIcon, ChartIcon } from "./components/icons";
+import { useEffect, useRef, useState } from "react";
+import {
+  HistoryTab,
+  ProgressTab,
+  RoutinesTab,
+  StrengthTab,
+} from "./components/icons";
+import { TabBar, type TabItem } from "./components/TabBar";
 import { Paywall } from "./components/Paywall";
 import { ProExpired } from "./components/ProExpired";
 import { ProInvite } from "./components/ProInvite";
@@ -27,8 +33,6 @@ import { useStore } from "./store";
 
 export type Tab = "home" | "routines" | "history" | "progress";
 
-type IconT = ComponentType<{ className?: string; size?: number }>;
-
 /**
  * Four tabs, icons only, in a bar that floats over the content.
  *
@@ -36,72 +40,17 @@ type IconT = ComponentType<{ className?: string; size?: number }>;
  * is a place you visit rarely, and giving it a fifth of the bar cost the four
  * you use constantly the room to be a comfortable size.
  *
- * The labels are gone, which is only survivable because something else now says
- * where you are: a highlight that travels to the tab you picked. An unlabelled
- * icon in a static bar leaves you reading four small drawings to work out which
- * one is lit; an unlabelled icon the highlight just slid onto tells you both
- * where you are and which way you came. The names live on as `aria-label`,
- * so
+ * The labels are gone, which is only survivable because two other things now
+ * say where you are: a highlight that travels to the tab you picked, and the
+ * tab's mark filling in when it lands. The names live on as `aria-label`, so
  * the bar reads the same to a screen reader as it did when it was labelled.
  */
-const TABS: { id: Tab; label: string; Icon: IconT }[] = [
-  { id: "home", label: "Strength", Icon: BodyIcon },
-  { id: "routines", label: "Routines", Icon: ListIcon },
-  { id: "history", label: "History", Icon: CalendarIcon },
-  { id: "progress", label: "Progress", Icon: ChartIcon },
+const TABS: TabItem<Tab>[] = [
+  { id: "home", label: "Strength", Icon: StrengthTab },
+  { id: "routines", label: "Routines", Icon: RoutinesTab },
+  { id: "history", label: "History", Icon: HistoryTab },
+  { id: "progress", label: "Progress", Icon: ProgressTab },
 ];
-
-function BodyIcon({
-  className,
-  size = 20,
-}: {
-  className?: string;
-  size?: number;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <circle cx="12" cy="4.3" r="2.3" />
-      <path d="M12 8.2v6.3M7.5 10.2 12 8.2l4.5 2M8.3 21l1.9-6.5h3.6L15.7 21M9 14.5l-2.2 2.2M15 14.5l2.2 2.2" />
-    </svg>
-  );
-}
-
-function ListIcon({
-  className,
-  size = 20,
-}: {
-  className?: string;
-  size?: number;
-}) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M9 6h11M9 12h11M9 18h11" />
-      <circle cx="4.5" cy="6" r="1.3" fill="currentColor" stroke="none" />
-      <circle cx="4.5" cy="12" r="1.3" fill="currentColor" stroke="none" />
-      <circle cx="4.5" cy="18" r="1.3" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
 
 export default function App() {
   const s = useStore();
@@ -308,8 +257,6 @@ export default function App() {
 
   const showLogger = inWorkout && viewLogger;
 
-  const activeIdx = TABS.findIndex((t) => t.id === tab);
-
   function goTab(id: Tab) {
     setTab(id);
     setViewLogger(false);
@@ -431,66 +378,12 @@ export default function App() {
           </button>
         )}
 
-        {/*
-          A fixed height in pixels, where the rest of the app scales with the
-          reader's text size. There is no type in here any more, and what the
-          height is actually sized to is a thumb: 66 less the 7 of padding at
-          each end leaves 52px targets, comfortably over the 44 the platform
-          asks for. A thumb does not get bigger when you turn the text up.
-        */}
-        <nav
-          aria-label="Sections"
-          className="glass pointer-events-auto relative flex h-[66px] rounded-full p-[7px]"
-        >
-          {/*
-            The one switch animation in the app, and the only reason the labels
-            could go. It travels rather than cutting, so the movement itself
-            says which way you went — two tabs to the right feels different from
-            one to the left, which is part of what a label was carrying.
-
-            A strong ease-in-out rather than the app's usual settle: this is a
-            solid object crossing open screen, and it should leave slowly, cover
-            the distance, and arrive slowly. 240ms is deliberate without
-            crossing the 300ms ceiling for something you tap this often.
-
-            Sized as a quarter of the inner width and moved by whole multiples
-            of itself, so it lands exactly on a tab at any screen width.
-          */}
-          <span
-            aria-hidden="true"
-            className="absolute inset-y-[7px] left-[7px] w-[calc((100%-14px)/4)] rounded-full border border-white/[0.12] bg-white/[0.11] shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-[transform,opacity] duration-[240ms] ease-[cubic-bezier(0.77,0,0.175,1)]"
-            style={{
-              transform: `translateX(${activeIdx * 100}%)`,
-              // Settings is not a tab, so while it is open no tab is current.
-              // The highlight fades where it stands rather than sliding off to
-              // nowhere, and comes back from there when you pick a tab again.
-              opacity: settingsOpen ? 0 : 1,
-            }}
-          />
-          {TABS.map(({ id, label, Icon }) => {
-            const active = !settingsOpen && tab === id;
-            return (
-              <button
-                key={id}
-                onClick={() => goTab(id)}
-                // With the label gone, the name has to be said somewhere: a
-                // screen reader reads this instead of the icon, and hears from
-                // `aria-current` which one it is on — neither of which the
-                // travelling highlight can tell it.
-                aria-label={label}
-                aria-current={active ? "page" : undefined}
-                // A deeper dip than the app's default. `press` was tuned for
-                // wide controls, and 3% on a 52px circle is a movement you
-                // cannot see; the icon is small enough to need the full 10%.
-                className={`press relative z-[1] grid min-w-0 flex-1 place-items-center rounded-full [--press:0.9] ${
-                  active ? "text-fg" : "text-dim"
-                }`}
-              >
-                <Icon size={23} />
-              </button>
-            );
-          })}
-        </nav>
+        {/* Settings is not a tab, so while it is open no tab is current. */}
+        <TabBar
+          tabs={TABS}
+          current={settingsOpen ? null : tab}
+          onSelect={goTab}
+        />
       </div>
 
       {/*

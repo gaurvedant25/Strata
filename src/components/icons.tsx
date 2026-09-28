@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 type P = { className?: string; size?: number };
 
 const base = (size = 22) => ({
@@ -135,16 +137,156 @@ export const GridIcon = ({ className, size = 23 }: P) => (
   </svg>
 );
 
-export const CalendarIcon = ({ className, size = 23 }: P) => (
+/*
+ * The tab bar's four marks, each drawn twice.
+ *
+ * Outlined at rest and filled when current, the way the platform's own tab
+ * bars swap a symbol for its `.fill` variant. With no labels under them, the
+ * change of weight is half of what says which tab you are on — the travelling
+ * highlight is the other half — so every one of them is an object with an
+ * inside that can be filled, rather than a scribble of lines that cannot.
+ *
+ * Four different silhouettes on purpose: a diagonal, a clipboard, a page with
+ * rings, and an open chart, so they can be told apart by shape before they are
+ * read.
+ *
+ * Where a filled mark has detail inside it — the clipboard's lines, the
+ * calendar's days — the detail is cut out of the fill with a mask rather than
+ * painted on it in black, so it shows whatever is behind the icon, the
+ * highlight or the glass, the way a hole would. Every shape inside a mask sets
+ * its own stroke: left to inherit the icon's white one, a hole comes out
+ * ringed by a halo of the very fill it was meant to cut away.
+ */
+type TabP = P & { filled?: boolean };
+
+/** A mask id that is unique per icon on the page and legal inside `url()`. */
+const useMaskId = (prefix: string) =>
+  `${prefix}-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+/**
+ * Strength: a dumbbell, laid on the diagonal like the platform's own.
+ *
+ * Level, it read as a cotton reel — two tall plates and a stub of bar. On the
+ * diagonal the bar gets the length it needs to be a bar.
+ */
+export const StrengthTab = ({ className, size = 24, filled }: TabP) => (
   <svg {...base(size)} className={className}>
-    <rect x="3.5" y="5" width="17" height="16" rx="3" />
-    <path d="M3.5 10h17M8 3v4M16 3v4" />
+    <g transform="rotate(-45 12 12)">
+      <path d="M1.5 12h3M8.5 12h7M19.5 12h3" />
+      <rect
+        x="4.5"
+        y="6.5"
+        width="4"
+        height="11"
+        rx="1.6"
+        fill={filled ? "currentColor" : "none"}
+      />
+      <rect
+        x="15.5"
+        y="6.5"
+        width="4"
+        height="11"
+        rx="1.6"
+        fill={filled ? "currentColor" : "none"}
+      />
+    </g>
   </svg>
 );
 
-export const ChartIcon = ({ className, size = 23 }: P) => (
+/** Routines: a clipboard with the plan written on it. */
+export const RoutinesTab = ({ className, size = 24, filled }: TabP) => {
+  const id = useMaskId("clip");
+  const lines = "M8.5 11.5h7M8.5 15h7M8.5 18.5h4";
+  return (
+    <svg {...base(size)} className={className}>
+      {filled ? (
+        <>
+          <mask id={id}>
+            <rect width="24" height="24" fill="#fff" stroke="none" />
+            <path d={lines} stroke="#000" />
+            <rect
+              x="8"
+              y="2"
+              width="8"
+              height="5"
+              rx="1.6"
+              fill="#000"
+              stroke="#000"
+            />
+          </mask>
+          <rect
+            x="4.5"
+            y="4.5"
+            width="15"
+            height="17"
+            rx="3"
+            fill="currentColor"
+            mask={`url(#${id})`}
+          />
+        </>
+      ) : (
+        <>
+          <path d="M9 4.5H7.5a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3v-11a3 3 0 0 0-3-3H15" />
+          <path d={lines} />
+        </>
+      )}
+      <rect x="9" y="2.75" width="6" height="3.5" rx="1.2" />
+    </svg>
+  );
+};
+
+/**
+ * History: a calendar page.
+ *
+ * When current the page, its edge and its rings are solid white, and the
+ * header rule and the days are drawn over it in grey. The rule stops short of
+ * the edge so it does not notch the white border.
+ */
+export const HistoryTab = ({ className, size = 24, filled }: TabP) => {
+  const ink = filled ? "var(--color-faint)" : "currentColor";
+  return (
+    <svg {...base(size)} className={className}>
+      <rect
+        x="3.5"
+        y="5"
+        width="17"
+        height="15.5"
+        rx="3.5"
+        fill={filled ? "currentColor" : "none"}
+      />
+      <path d="M8 3v3.5M16 3v3.5" />
+      <path d={filled ? "M4.4 10h15.2" : "M3.5 10h17"} stroke={ink} />
+      {[
+        [8, 14],
+        [12, 14],
+        [16, 14],
+        [8, 17.5],
+        [12, 17.5],
+      ].map(([cx, cy]) => (
+        <circle
+          key={`${cx}${cy}`}
+          cx={cx}
+          cy={cy}
+          r="1.05"
+          fill={ink}
+          stroke="none"
+        />
+      ))}
+    </svg>
+  );
+};
+
+/**
+ * Progress: a line that climbs.
+ *
+ * The one mark with no filled form: when current it is the same line, lit
+ * white rather than grey. Filling the ground under it, solid or tinted, read
+ * as a shadow or a solid block rather than as the chart.
+ */
+export const ProgressTab = ({ className, size = 24 }: TabP) => (
   <svg {...base(size)} className={className}>
-    <path d="M5 20V11M12 20V4M19 20v-6" />
+    <path d="M3.5 20.5h17" />
+    <path d="M4.5 16 9 11l4 3.5 6.5-8" />
   </svg>
 );
 

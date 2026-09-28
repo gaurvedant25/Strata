@@ -716,6 +716,33 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 /*
+ * A tab's mark landing.
+ *
+ * The platform's symbol bounce: it gives under the tap, springs past its size
+ * and settles, so the icon acknowledges being picked the way the highlight
+ * acknowledges arriving. Plays on the filled mark as it mounts, which is once
+ * per tab lit — scrubbing along the bar bounces each one as it is crossed.
+ */
+@keyframes tab-pop {
+  0% {
+    transform: scale(1);
+  }
+  28% {
+    transform: scale(0.82);
+  }
+  62% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.tab-pop {
+  animation: tab-pop 0.44s cubic-bezier(0.33, 0, 0.25, 1);
+}
+
+/*
  * Room under a screen's last row for the floating stack to hover in.
  *
  * The stack no longer takes any layout space, so every scrolling screen has to
