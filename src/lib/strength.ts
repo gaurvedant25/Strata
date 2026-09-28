@@ -262,6 +262,10 @@ export const RANKING_LIFTS: Record<MuscleGroup, RankingLift[]> = {
     { name: "Power Clean", factor: 0.9 },
     { name: "Upright Row", factor: 0.5 },
     { name: "Dumbbell Shrug", factor: 0.45 },
+    // The bent-over row carries the traps through every rep. A row runs about
+    // sixty per cent of a deadlift, so against the deadlift's 1.45 a 90 kg row
+    // stands level with a 100 kg shrug.
+    { name: "Barbell Row", factor: 0.9 },
   ],
   lats: [
     { name: "Lat Pulldown", factor: 1 },
