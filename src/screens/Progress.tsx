@@ -15,9 +15,10 @@ import {
   numInputCls,
 } from "../components/ui";
 import { exerciseHistory, personalRecords, streakSummary } from "../lib/stats";
+import { useNow } from "../lib/useNow";
 import { useEntitlement, useWriteGate } from "../lib/useEntitlement";
 import type { GateSubject } from "../lib/entitlement";
-import { num, parseKey } from "../lib/util";
+import { localDate, num, parseKey } from "../lib/util";
 import { liftCard } from "../lib/card/select";
 import { ProgressSharePreview } from "../components/ProgressSharePreview";
 import { useStore } from "../store";
@@ -30,13 +31,13 @@ const METRICS: { id: Metric; label: string }[] = [
 ];
 
 const shortDate = (key: string) =>
-  parseKey(key).toLocaleDateString(undefined, {
+  localDate(parseKey(key), {
     day: "numeric",
     month: "short",
   });
 
 const longDate = (key: string) =>
-  parseKey(key).toLocaleDateString(undefined, {
+  localDate(parseKey(key), {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -99,6 +100,8 @@ export function Progress({
   const { can } = useEntitlement();
   const { guard } = useWriteGate(() => onUnlock("start-workout"));
   const s = useStore();
+  // Only the streak on a shared card reads the time, and it moves by the day.
+  const now = useNow(60_000);
   const unitLabel = s.settings.unit === "lb" ? "lbs" : "kg";
   const [metric, setMetric] = useState<Metric>("e1rm");
 
@@ -296,7 +299,7 @@ export function Progress({
    */
   const liftData = current && values.length > 0 && values.every(Number.isFinite)
     ? liftCard({
-        currentStreak: streakSummary(s.sessions, s.now).current,
+        currentStreak: streakSummary(s.sessions, now).current,
         metricId: metric,
         history: exerciseHistory(done, current.id).map((p) => p[metric]),
         name: current.name,
@@ -308,7 +311,7 @@ export function Progress({
           : RANGES.find((r) => r.id === range)!.label,
         // The ends of the range, and how finely this metric is written — the
         // two things the cards cannot work out from the series alone.
-        dates: points.map((p) => parseKey(p.date).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })),
+        dates: points.map((p) => localDate(parseKey(p.date), { day: "numeric", month: "short", year: "numeric" })),
         decimals: metric === "volume" ? 0 : 1,
         stats: pr
           ? [

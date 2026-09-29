@@ -12,7 +12,7 @@ import {
   streakSummary,
   working,
 } from "../stats";
-import { fmtClock, fmtDuration, num, parseKey, todayKey } from "../util";
+import { fmtClock, fmtDuration, localDate, num, parseKey, todayKey } from "../util";
 import type { Gender, Session } from "../../types";
 import type { BodyData, LiftData, StreakData } from "./types";
 
@@ -32,7 +32,7 @@ import type { BodyData, LiftData, StreakData } from "./types";
  */
 
 const dayLabel = (dateKey: string) =>
-  parseKey(dateKey).toLocaleDateString(undefined, {
+  localDate(parseKey(dateKey), {
     weekday: "short",
     day: "numeric",
     month: "short",

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNow } from "../lib/useNow";
 import { useConfirm } from "../components/confirm";
 import { StreakDetails } from "../components/StreakDetails";
 import { StreakIcon } from "../components/icons";
@@ -11,7 +12,7 @@ import {
   streakSummary,
   working,
 } from "../lib/stats";
-import { fmtClock, fmtDuration, num, parseKey, todayKey } from "../lib/util";
+import { fmtClock, fmtDuration, localDate, num, parseKey, todayKey } from "../lib/util";
 import { workoutCard } from "../lib/card/select";
 import type { WorkoutData } from "../lib/card/types";
 import { WorkoutSharePreview } from "../components/WorkoutSharePreview";
@@ -81,6 +82,8 @@ function FourWeeks({ sessions, now }: { sessions: Session[]; now: number }) {
 
 export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
   const s = useStore();
+  // Streaks and the four-week strip change by the day; a minute is plenty.
+  const now = useNow(60_000);
   const [open, setOpen] = useState<Session | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [streakOpen, setStreakOpen] = useState(false);
@@ -88,8 +91,8 @@ export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
 
   const done = useMemo(() => s.sessions.filter((x) => x.endedAt), [s.sessions]);
   const streak = useMemo(
-    () => streakSummary(s.sessions, s.now),
-    [s.sessions, s.now],
+    () => streakSummary(s.sessions, now),
+    [s.sessions, now],
   );
   const latestStreakWorkout = streak.latestSessionId
     ? (s.sessions.find((x) => x.id === streak.latestSessionId)?.name ?? null)
@@ -101,7 +104,7 @@ export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
     const m = new Map<string, Session[]>();
     for (const x of done) {
       if (x.startedAt < since) continue;
-      const key = parseKey(x.date).toLocaleDateString(undefined, {
+      const key = localDate(parseKey(x.date), {
         month: "long",
         year: "numeric",
       });
@@ -138,7 +141,7 @@ export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
             </button>
           </div>
         </div>
-        <FourWeeks sessions={s.sessions} now={s.now} />
+        <FourWeeks sessions={s.sessions} now={now} />
         <TextTabs
           className="pb-3"
           options={FILTERS.map((f) => ({ id: f.id, label: f.label }))}
@@ -180,9 +183,9 @@ export function History({ onUnlock }: { onUnlock: (f: GateSubject) => void }) {
                     className="press press-row grid w-full grid-cols-[46px_1fr_auto] items-center gap-x-3.5 rounded-[18px] border border-rule bg-[#101010] px-[18px] py-4 text-left"
                   >
                     <span className="font-mono text-[0.6875rem] font-medium uppercase leading-[1.35] tracking-[0.06em] text-muted">
-                      {d.toLocaleDateString(undefined, { day: "2-digit" })}
+                      {localDate(d, { day: "2-digit" })}
                       <br />
-                      {d.toLocaleDateString(undefined, { month: "short" })}
+                      {localDate(d, { month: "short" })}
                     </span>
                     <span className="min-w-0">
                       {/*
@@ -283,7 +286,7 @@ function Detail({
           {session.name}
         </h1>
         <p className="mt-2.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.14em] text-muted">
-          {d.toLocaleDateString(undefined, {
+          {localDate(d, {
             weekday: "long",
             day: "numeric",
             month: "long",
@@ -395,7 +398,7 @@ function Detail({
           variant="quiet"
           onClick={guard(() =>
             setShareData(
-              workoutCard(session, s.exerciseById, s.now, unitLabel,
+              workoutCard(session, s.exerciseById, Date.now(), unitLabel,
                 s.sessions, s.settings.gender),
             ),
           )}

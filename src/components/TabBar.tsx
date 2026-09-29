@@ -77,6 +77,14 @@ const still = () =>
  * every frame; the only state here is which icon is lit, and that changes once
  * per tab crossed.
  *
+ * And what is written is only ever a transform or an opacity. The bar is
+ * frosted glass, and on an iPhone anything that has to be repainted inside a
+ * backdrop blur is expensive — the highlight used to change its width, its
+ * fill and its shadow on every frame, which is three repaints of the glass per
+ * frame. Now the stretch is a scale, the lens's brighter surface and shadow are
+ * a second layer that fades in, and the magnified icon is a scale of its own:
+ * all of it the compositor can move without painting anything.
+ *
  * `current` is null while a screen that is not a tab is open (Settings): the
  * highlight fades where it stands, and the next press brings it back under the
  * finger rather than sliding in from wherever it was left.
@@ -92,6 +100,10 @@ export function TabBar<T extends string>({
 }) {
   const navRef = useRef<HTMLElement>(null);
   const blobRef = useRef<HTMLSpanElement>(null);
+  const lensRef = useRef<HTMLSpanElement>(null);
+  const iconRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  /** Width of one slot, kept by the resize observer so a frame never measures. */
+  const slotW = useRef(0);
   const [x] = useState(() => motionValue(0));
   const [lift] = useState(() => motionValue(0));
   /** The tab under a finger that is down, which is lit ahead of the tab itself. */
@@ -106,29 +118,53 @@ export function TabBar<T extends string>({
   const slotOf = useRef<number | null>(null);
   /** Off for the first render, so the tab you launch on does not bounce. */
   const [settled, setSettled] = useState(false);
+  /**
+   * The tab just let go of, held lit until the screen behind it arrives.
+   *
+   * The switch is a transition, so `current` can trail the release by a few
+   * frames while the new screen is built. Without this the icon would go
+   * back to the old tab for those frames and then jump forward again.
+   */
+  const [chosen, setChosen] = useState<number | null>(null);
 
   const n = tabs.length;
   const currentIdx = current == null ? -1 : tabs.findIndex((t) => t.id === current);
 
-  const slot = () => ((navRef.current?.clientWidth ?? 0) - PAD * 2) / n;
+  // Any change of the real tab — the chosen one arriving, Settings opening,
+  // a sheet sending you elsewhere — ends the hold.
+  const [seenIdx, setSeenIdx] = useState(currentIdx);
+  if (seenIdx !== currentIdx) {
+    setSeenIdx(currentIdx);
+    setChosen(null);
+  }
+
+  const litIdx = pointing ?? chosen ?? currentIdx;
+  const litRef = useRef(litIdx);
+  litRef.current = litIdx;
+
+  const slot = () => {
+    if (!slotW.current && navRef.current)
+      slotW.current = (navRef.current.clientWidth - PAD * 2) / n;
+    return slotW.current;
+  };
 
   function paint() {
     const el = blobRef.current;
-    const nav = navRef.current;
-    if (!el || !nav) return;
-    const w = slot();
+    const lens = lensRef.current;
+    if (!el || !lens) return;
     const l = lift.get();
     const s = Math.min(Math.abs(x.getVelocity()) / FULL_STRETCH_AT, 1);
-    const width = w * (1 + s * STRETCH_X);
     const scale = 1 + l * LENS;
-    el.style.width = `${width}px`;
-    // Stretched about its middle, so it grows both ways from where it is
+    // Scaled about its middle, so the stretch grows both ways from where it is
     // rather than only forward from its left edge.
-    el.style.transform = `translateX(${x.get() - (width - w) / 2}px) scale(${scale}, ${scale * (1 - s * SQUASH_Y)})`;
-    el.style.backgroundColor = `rgb(255 255 255 / ${0.11 + l * 0.06})`;
-    el.style.boxShadow = `inset 0 1px 0 rgb(255 255 255 / ${0.12 + l * 0.08}), 0 ${l * 6}px ${l * 18}px rgb(0 0 0 / ${l * 0.35})`;
+    el.style.transform = `translateX(${x.get()}px) scale(${scale * (1 + s * STRETCH_X)}, ${scale * (1 - s * SQUASH_Y)})`;
+    lens.style.opacity = String(Math.max(0, Math.min(1, l)));
     // The lit icon rides the lens, so it is magnified with it.
-    nav.style.setProperty("--lift", String(l));
+    const zoom = l ? `scale(${1 + l * LENS})` : "";
+    iconRefs.current.forEach((node, i) => {
+      const want = i === litRef.current ? zoom : "";
+      if (node && node.style.transform !== want) node.style.transform = want;
+    });
   }
 
   function show(visible: boolean) {
@@ -162,6 +198,10 @@ export function TabBar<T extends string>({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A different icon lit mid-press takes over the magnification.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(paint, [litIdx]);
 
   // Following the current tab when it changes from outside the bar — a sheet
   // sending you to Routines, Settings closing — and on first paint.
@@ -197,7 +237,9 @@ export function TabBar<T extends string>({
   useEffect(() => {
     const nav = navRef.current;
     if (!nav || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
+    const ro = new ResizeObserver(([entry]) => {
+      // The content box is the bar less its padding: exactly the slots.
+      slotW.current = entry.contentRect.width / n;
       if (press.current || slotOf.current === null) return paint();
       if (x.isAnimating()) glideTo(slotOf.current);
       else x.jump(slotOf.current * slot());
@@ -266,6 +308,7 @@ export function TabBar<T extends string>({
     liftTo(0);
     glideTo(p.index);
     setPointing(null);
+    if (p.index !== currentIdx) setChosen(p.index);
     onSelect(tabs[p.index].id);
   }
 
@@ -303,10 +346,17 @@ export function TabBar<T extends string>({
       <span
         ref={blobRef}
         aria-hidden="true"
-        className="absolute inset-y-[7px] left-[7px] rounded-full border border-white/[0.12] opacity-0 transition-opacity duration-200 will-change-transform"
-      />
+        className="absolute inset-y-[7px] left-[7px] rounded-full border border-white/[0.12] bg-white/[0.11] opacity-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.12)] transition-opacity duration-200 will-change-transform"
+        style={{ width: `calc((100% - ${PAD * 2}px) / ${n})` }}
+      >
+        {/* The lens: brighter, lifted off the bar, faded in by a press. */}
+        <span
+          ref={lensRef}
+          className="absolute -inset-px rounded-full bg-white/[0.06] opacity-0 shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_6px_18px_rgb(0_0_0/0.35)] will-change-[opacity]"
+        />
+      </span>
       {tabs.map(({ id, label, Icon }, i) => {
-        const lit = pointing !== null ? pointing === i : currentIdx === i;
+        const lit = litIdx === i;
         return (
           <button
             key={id}
@@ -324,10 +374,10 @@ export function TabBar<T extends string>({
             }`}
           >
             <span
+              ref={(node) => {
+                iconRefs.current[i] = node;
+              }}
               className="grid place-items-center"
-              style={
-                lit ? { transform: "scale(calc(1 + var(--lift, 0) * 0.14))" } : undefined
-              }
             >
               {/* Keyed on being lit, so lighting up mounts the filled mark
                   fresh and its bounce plays — once per tab you land on. */}

@@ -12,13 +12,32 @@ export function parseKey(key: string) {
   return new Date(y, m - 1, d);
 }
 
+/**
+ * A date, written out for the reader's locale.
+ *
+ * `toLocaleDateString` with options builds a fresh `Intl.DateTimeFormat` on
+ * every call, and building one is the expensive part — measured here, 150
+ * calls took 13.5ms against 0.2ms for the same 150 through one kept formatter,
+ * and a phone is several times slower than that. History alone formats two or
+ * three dates a row. So each set of options gets one formatter, made the first
+ * time it is asked for and reused after.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+export function localDate(d: Date | number, options: Intl.DateTimeFormatOptions) {
+  const key = JSON.stringify(options);
+  let f = formatters.get(key);
+  if (!f) formatters.set(key, (f = new Intl.DateTimeFormat(undefined, options)));
+  return f.format(d);
+}
+
 export function fmtDate(key: string) {
   const d = parseKey(key);
   const today = todayKey();
   if (key === today) return "Today";
   const yest = todayKey(new Date(Date.now() - 864e5));
   if (key === yest) return "Yesterday";
-  return d.toLocaleDateString(undefined, {
+  return localDate(d, {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -101,7 +120,7 @@ export function fmtRelative(ts: number, now = Date.now()) {
   if (hr < 24) return `${hr} hr${hr === 1 ? "" : "s"} ago`;
   const day = Math.round(hr / 24);
   if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
-  return parseKey(todayKey(new Date(ts))).toLocaleDateString(undefined, {
+  return localDate(parseKey(todayKey(new Date(ts))), {
     day: "numeric",
     month: "short",
   });

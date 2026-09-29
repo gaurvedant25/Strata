@@ -1,5 +1,6 @@
 import { previewSummary } from "../lib/entitlement";
 import { useEntitlement } from "../lib/useEntitlement";
+import { useNow } from "../lib/useNow";
 import { fmtDuration } from "../lib/util";
 import { useStore } from "../store";
 import { Button, Sheet } from "./ui";
@@ -32,12 +33,13 @@ export function ProExpired({
 }) {
   const { ent } = useEntitlement();
   const s = useStore();
+  const now = useNow(60_000);
 
   const sum = previewSummary(
     s.sessions,
     ent.previewStartedAt,
     ent.previewEndsAt,
-    s.now,
+    now,
   );
 
   const tiles = [

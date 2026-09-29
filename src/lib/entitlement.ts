@@ -1,5 +1,6 @@
 import { personalRecords, qualifiesForStreak, streakSummary } from "./stats";
 import type { Session } from "../types";
+import { localDate } from "./util";
 
 /**
  * Who is allowed what, worked out in one place.
@@ -354,7 +355,7 @@ export function planLabel(ent: Entitlement, now = Date.now()): string {
 export function shortDate(ms: number, now = Date.now()): string {
   const d = new Date(ms);
   const sameYear = d.getFullYear() === new Date(now).getFullYear();
-  return d.toLocaleDateString(undefined, {
+  return localDate(d, {
     day: "numeric",
     month: "short",
     ...(sameYear ? {} : { year: "numeric" }),

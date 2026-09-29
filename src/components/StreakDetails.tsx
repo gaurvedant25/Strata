@@ -2,6 +2,7 @@ import { X } from "./icons";
 import { Scrim } from "./ui";
 import { useDialog, usePresence } from "../lib/useDialog";
 import type { StreakSummary } from "../lib/stats";
+import { localDate } from "../lib/util";
 
 const R = 70;
 const CIRC = 2 * Math.PI * R;
@@ -16,7 +17,7 @@ function remainingLabel(ms: number) {
 }
 
 function exactTime(at: number) {
-  return new Date(at).toLocaleString(undefined, {
+  return localDate(at, {
     weekday: "short",
     day: "numeric",
     month: "short",

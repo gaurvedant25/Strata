@@ -379,7 +379,6 @@ function boot() {
 
 function useProvideStore() {
   const [s, setS] = useState<State>(empty);
-  const [now, setNow] = useState(Date.now());
   const [nextUpBySplit, setNextUpBySplit] = useState(readNextUp);
   const [pinnedLiftId, setPinnedLiftId] = useState(readPinnedLift);
 
@@ -387,11 +386,9 @@ function useProvideStore() {
     void boot().then((data) => setS({ ...data, ready: true }));
   }, []);
 
-  // drives live session duration and relative timestamps across the app
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
+  // The time is not kept here. It used to tick every second from this spot,
+  // re-rendering everything that reads the store; what needs it now asks
+  // `useNow` for it directly (see lib/useNow).
 
   const reload = useCallback(async () => {
     const data = await adoptLooseRoutines(await store.loadAll());
@@ -496,7 +493,6 @@ function useProvideStore() {
 
   const api = {
     ...s,
-    now,
     active,
     activeSplit,
     splitRoutines,

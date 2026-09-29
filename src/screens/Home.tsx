@@ -35,7 +35,7 @@ import {
   type TrendPeriod,
 } from "../lib/strength";
 import { personalRecords } from "../lib/stats";
-import { fmtClock, num, parseKey, todayKey } from "../lib/util";
+import { fmtClock, localDate, num, parseKey, todayKey } from "../lib/util";
 import { useStore } from "../store";
 import { useEntitlement, useWriteGate } from "../lib/useEntitlement";
 import type { GateSubject } from "../lib/entitlement";
@@ -509,7 +509,7 @@ export function Home({
           scramble: true,
         },
         {
-          text: parseKey(pr.date).toLocaleDateString(undefined, {
+          text: localDate(parseKey(pr.date), {
             day: "numeric",
             month: "short",
           }),

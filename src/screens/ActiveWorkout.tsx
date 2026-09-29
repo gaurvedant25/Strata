@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { useAuth } from "../auth";
 import { useConfirm } from "../components/confirm";
 import { AddExerciseSheet } from "../components/AddExerciseSheet";
+import { Elapsed } from "../components/Elapsed";
 import { Check, Plus, Share, Swap, Trash } from "../components/icons";
 import { SwipeRow } from "../components/SwipeRow";
 import { Button, Empty, Scrim, Sheet } from "../components/ui";
@@ -20,6 +21,7 @@ import {
   qualifiesForStreak,
 } from "../lib/stats";
 import { fmtClock, fmtDuration, num, uid } from "../lib/util";
+import { useNow } from "../lib/useNow";
 import { useStore } from "../store";
 import type { GateSubject } from "../lib/entitlement";
 import type { Exercise, Session, SetLog } from "../types";
@@ -195,7 +197,11 @@ export function ActiveWorkout({
 
   const unitKey = s.settings.unit === "lb" ? "lb" : "kg";
   const unit = unitKey === "lb" ? "lbs" : "kg";
-  const elapsed = sessionElapsed(session, s.now);
+  // The header's clock ticks on its own (see Elapsed). The rest of this screen
+  // needs the time only for the finish sheet's summary, kept live while the
+  // sheet is open, and for the streak, which moves by the day.
+  const now = useNow(confirmFinish ? 1000 : 60_000);
+  const elapsed = sessionElapsed(session, now);
   const volume = sessionVolume(session);
   const setsDone = sessionSetCount(session);
   // Every set accounted for, logged or skipped, is the end of the workout.
@@ -262,7 +268,7 @@ export function ActiveWorkout({
   // about where it left your streak.
   const streak =
     pendingCompletion && !celebrationOff
-      ? streakFor(s.sessions, session, s.now)
+      ? streakFor(s.sessions, session, now)
       : null;
 
   // The best estimated 1RM each lift had before today, for counting PRs.
@@ -464,7 +470,7 @@ export function ActiveWorkout({
       onBack={onBack}
       name={session.name}
       onRename={(v) => s.renameSession(v)}
-      elapsed={fmtDuration(elapsed)}
+      session={session}
       onFinish={() => setConfirmFinish(true)}
     />
   );
@@ -902,7 +908,7 @@ export function ActiveWorkout({
           streak={streak}
           busy={completionSaving}
           error={completionError}
-          onShare={() => setWorkoutShare(workoutCard(session, s.exerciseById, s.now,
+          onShare={() => setWorkoutShare(workoutCard(session, s.exerciseById, Date.now(),
             unit, s.sessions, s.settings.gender))}
           canShare={!!session.endedAt}
           stats={[
@@ -1192,13 +1198,13 @@ function Header({
   onBack,
   name,
   onRename,
-  elapsed,
+  session,
   onFinish,
 }: {
   onBack: () => void;
   name: string;
   onRename: (v: string) => void;
-  elapsed: string;
+  session: Session;
   onFinish: () => void;
 }) {
   return (
@@ -1228,7 +1234,7 @@ function Header({
           className="min-w-0 flex-1 truncate bg-transparent text-[1.1875rem] font-medium tracking-[-0.01em] outline-none"
         />
         <span className="shrink-0 font-mono text-[0.6875rem] text-muted">
-          {elapsed}
+          <Elapsed session={session} />
         </span>
         <button
           onClick={onFinish}

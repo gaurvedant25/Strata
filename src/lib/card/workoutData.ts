@@ -1,7 +1,7 @@
 import type { Exercise, Gender, Session, SetLog } from "../../types";
 import { e1rm, streakSummary } from "../stats";
 import { MUSCLE_LABEL, type MuscleGroup } from "../strength";
-import { fmtDuration, num } from "../util";
+import { fmtDuration, localDate, num } from "../util";
 import type { WorkoutData } from "./types";
 
 const GROUPS: Record<string, MuscleGroup[]> = {
@@ -67,7 +67,7 @@ export function workoutCard(session: Session, exerciseById: Map<string, Exercise
   const all = [...sessions.filter(s => s.id !== session.id && !s.deleted), session];
   return {
     name: session.name,
-    dateLabel: new Date(endedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+    dateLabel: localDate(endedAt, { day: "numeric", month: "short", year: "numeric" }),
     unit, volume: num(volume, 0),
     volumeRecord: previousVolume > 0 && volume > previousVolume + 1e-6,
     duration: fmtDuration(Math.max(0, endedAt - session.startedAt)),

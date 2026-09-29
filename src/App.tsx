@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import {
   HistoryTab,
   ProgressTab,
   RoutinesTab,
   StrengthTab,
 } from "./components/icons";
+import { Elapsed } from "./components/Elapsed";
 import { TabBar, type TabItem } from "./components/TabBar";
 import { Paywall } from "./components/Paywall";
 import { ProExpired } from "./components/ProExpired";
@@ -17,8 +18,6 @@ import {
   type GateSubject,
 } from "./lib/entitlement";
 import { useEntitlement } from "./lib/useEntitlement";
-import { sessionElapsed } from "./lib/stats";
-import { fmtDuration } from "./lib/util";
 import { ActiveWorkout } from "./screens/ActiveWorkout";
 import { History } from "./screens/History";
 import { Home } from "./screens/Home";
@@ -373,16 +372,25 @@ export default function App() {
               Workout in progress
             </span>
             <span className="font-mono text-[0.8125rem] text-muted">
-              {fmtDuration(sessionElapsed(s.active!, s.now))} →
+              <Elapsed session={s.active!} /> →
             </span>
           </button>
         )}
 
-        {/* Settings is not a tab, so while it is open no tab is current. */}
+        {/*
+          Settings is not a tab, so while it is open no tab is current.
+
+          The switch is a transition. The screen you pick is built on the same
+          thread that moves the highlight, and History or Strength can take
+          tens of milliseconds to build on a phone — done urgently, that stalls
+          the highlight mid-glide. As a transition React builds it in slices
+          and hands the frames in between back to the animation, and the bar
+          keeps the tab lit until the screen arrives.
+        */}
         <TabBar
           tabs={TABS}
           current={settingsOpen ? null : tab}
-          onSelect={goTab}
+          onSelect={(id) => startTransition(() => goTab(id))}
         />
       </div>
 
